@@ -1,0 +1,113 @@
+"""Card reward and draft system."""
+from __future__ import annotations
+from typing import TYPE_CHECKING, List
+
+from .enums import CardRarity
+
+if TYPE_CHECKING:
+    from .state import GameState
+    from .cards import Card
+
+
+# Rarity weights per act (base, without relic modifiers)
+_RARITY_WEIGHTS = {
+    CardRarity.COMMON:   (60, 50, 40),   # act 1/2/3
+    CardRarity.UNCOMMON: (37, 40, 40),
+    CardRarity.RARE:     (3,  10, 20),
+}
+
+# All Ironclad card names by rarity (used for random selection)
+_IRONCLAD_POOL = {
+    CardRarity.COMMON: [
+        "Anger", "Armaments", "Body Slam", "Clash", "Cleave", "Clothesline",
+        "Flex", "Havoc", "Headbutt", "Heavy Blade", "Iron Wave",
+        "Perfected Strike", "Pommel Strike", "Shrug It Off", "Sword Boomerang",
+        "Thunderclap", "True Grit", "Twin Strike", "Warcry", "Wild Strike",
+    ],
+    CardRarity.UNCOMMON: [
+        "Battle Trance", "Blood for Blood", "Bloodletting", "Burning Pact",
+        "Carnage", "Combust", "Dark Embrace", "Disarm", "Dropkick", "Dual Wield",
+        "Entrench", "Evolve", "Feel No Pain", "Fire Breathing", "Flame Barrier",
+        "Ghostly Armor", "Hemokinesis", "Infernal Blade", "Inflame", "Intimidate",
+        "Metallicize", "Power Through", "Pummel", "Rage", "Rampage",
+        "Reckless Charge", "Rupture", "Searing Blow", "Second Wind", "Seeing Red",
+        "Sentinel", "Sever Soul", "Shockwave", "Spot Weakness", "Uppercut",
+        "Whirlwind",
+    ],
+    CardRarity.RARE: [
+        "Barricade", "Berserk", "Bludgeon", "Brutality", "Corruption",
+        "Demon Form", "Double Tap", "Exhume", "Feed", "Fiend Fire",
+        "Immolate", "Impervious", "Juggernaut", "Limit Break", "Offering",
+        "Reaper",
+    ],
+}
+
+
+def _roll_rarity(state: GameState) -> CardRarity:
+    act = min(state.act, 3) - 1
+    common_w = _RARITY_WEIGHTS[CardRarity.COMMON][act]
+    uncommon_w = _RARITY_WEIGHTS[CardRarity.UNCOMMON][act]
+    rare_w = _RARITY_WEIGHTS[CardRarity.RARE][act]
+
+    # Question Card relic: +1 rare chance
+    # Busted Crown relic: -2 choices shown (handled elsewhere)
+    roll = state.rng.card_rng.next_int(common_w + uncommon_w + rare_w)
+    if roll < rare_w:
+        return CardRarity.RARE
+    elif roll < rare_w + uncommon_w:
+        return CardRarity.UNCOMMON
+    return CardRarity.COMMON
+
+
+def generate_card_reward(state: GameState, count: int = 3) -> List[Card]:
+    """Generate a card reward offer (3 cards, no duplicates)."""
+    from .cards import make_card
+    offers: List[Card] = []
+    seen_names = set()
+
+    attempts = 0
+    while len(offers) < count and attempts < 50:
+        attempts += 1
+        rarity = _roll_rarity(state)
+        pool = _IRONCLAD_POOL[rarity]
+        idx = state.rng.card_rng.next_int(len(pool))
+        name = pool[idx]
+        if name in seen_names:
+            continue
+        seen_names.add(name)
+
+        # Rare cards: 25% chance to be upgraded (Prayer Wheel doubles this)
+        upgraded = False
+        if rarity == CardRarity.RARE and state.rng.card_rng.next_int(100) < 25:
+            upgraded = True
+
+        offers.append(make_card(name, upgraded))
+
+    return offers
+
+
+BOSS_RELIC_POOL: List[str] = []  # populated by relics_full._update_relic_registry()
+
+
+def generate_boss_relic_choices(state: GameState, count: int = 3) -> List[str]:
+    """Return 3 boss relic IDs to choose from."""
+    pool = list(BOSS_RELIC_POOL)
+    state.rng.loot_rng.shuffle(pool)
+    return pool[:count]
+
+
+def gold_reward(state: GameState, enemy_type: str = "normal") -> int:
+    """Roll gold drop for an enemy encounter."""
+    base = {"normal": (10, 20), "elite": (25, 35), "boss": (95, 105)}
+    lo, hi = base.get(enemy_type, (10, 20))
+    gold = lo + state.rng.loot_rng.next_int(hi - lo + 1)
+    # Golden Idol: +25%
+    return gold
+
+
+def potion_drop(state: GameState, enemy_type: str = "normal") -> bool:
+    """Should a potion drop? Returns True/False."""
+    # Base 40% for normal, 50% for elite
+    chance = 40 if enemy_type == "normal" else 50
+    # Sozu relic: no potions
+    return state.rng.potion_rng.next_int(100) < chance
