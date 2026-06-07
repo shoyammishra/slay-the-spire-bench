@@ -16,8 +16,11 @@ GitHub: https://github.com/shoyammishra/slay-the-spire-bench (private)
 - **Current task:** Run qwen3-32b on OpenRouter (structured + raw); re-run synergy for all models after the 2nd synergy rework.
 - **Key files:** `slay_bench/benchmark.py`, `slay_bench/run_loop.py`, `run_benchmark.py`
 - **Completed (2026-06-07):** (1) qwen3-32b wired via OpenRouter with `<think>` stripping + retry. (2) Synergy eval reworked again — payoff-weighted classifier + archetype-targeted drafting (fixes Aggro-bias). 40 tests pass.
-- **Next:** Re-run `--only synergy` for ALL model+format combos (numbers in this file predate the rework). Then scale to n≥20.
+- **Next:** Re-run `--only synergy` for ALL 6 model+format combos (numbers in this file predate the rework). Then scale to n≥20.
 - **Provider note:** qwen3-32b MUST use `--provider openrouter` (Groq free-tier 6000 TPM truncates its reasoning). llama models stay on Groq.
+- **⚠️ GOTCHA — running process uses startup code:** a launched Python run loads `benchmark.py` once at startup; editing it does NOT affect an in-flight run. The qwen3 STRUCTURED run was started BEFORE the synergy rework, so its synergy data (already computed before run-level) is OLD/FLAWED. All 6 combos — incl. qwen3 struct+raw — need `--only synergy` with the reworked code. Re-launch or use `--only` to pick up code changes.
+- **Remaining run plan:** (1) qwen3 raw full run; (2) `--only synergy` ×6 (qwen3 struct+raw on openrouter, llama-3.1-8b struct+raw, llama-4-scout struct+raw); (3) fold real synergy numbers into findings.md + CLAUDE.md; (4) merge `synergy-rework` → main.
+- **Speed:** qwen3 is throughput-bound on OpenRouter (~30–80 tok/s); run-level is slow (1.5–3h for n=5). Paid Groq (~400–1000 tok/s, no TPM cap) is the real speedup lever for n≥20 — see docs/notes.md.
 
 ## Docs
 Detail lives in `docs/` — not here.
