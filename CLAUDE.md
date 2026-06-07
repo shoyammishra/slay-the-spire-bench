@@ -25,6 +25,7 @@ GitHub: https://github.com/shoyammishra/slay-the-spire-bench (private)
 - **⚠️ GOTCHA — running process uses startup code:** a launched Python run loads `benchmark.py` once at startup; editing it does NOT affect an in-flight run. Re-launch or use `--only` to pick up code changes.
 - **Remaining run plan:** (1) `--only synergy --n-synergy 8` ×4 (llama-3.1-8b struct+raw, llama-4-scout struct+raw); (2) `--only run --n-run 5` ×4 (scout needs n=5 re-run); (3) fold real numbers into findings.md + report.md + CLAUDE.md; (4) merge `synergy-rework` → main.
 - **Speed:** Paid Groq (~400–1000 tok/s, no TPM cap) is the real speedup lever for n≥20 — see docs/notes.md.
+- **➡️ Next steps = the paper-grade run matrix in `docs/roadmap.md`** (models, per-dim n≥20, ≥5 seeds, both formats, mean±std, run order). When a paid Groq Dev tier is available: run-level first (no valid data), then scale turn/combat, then expand synergy, then add a 3rd-family model.
 
 ## Docs
 Detail lives in `docs/` — not here.
