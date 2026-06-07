@@ -81,16 +81,35 @@ class GroqLLM(LLMInterface):
                 from groq import Groq
                 import os
                 key = self._api_key or os.environ.get("GROQ_API_KEY")
-                self._client = Groq(api_key=key)
+                # max_retries=0: disable the SDK's own retry loop so OUR backoff
+                # below is the single, predictable retry path (and converts a
+                # persistent 429 into RateLimitExhausted for graceful partial save).
+                self._client = Groq(api_key=key, max_retries=0)
             except ImportError:
                 raise RuntimeError("pip install groq")
         return self._client
+
+    @staticmethod
+    def _is_rate_limit(e) -> bool:
+        """Robustly detect a 429 from the groq SDK (typed first, strings as fallback)."""
+        try:
+            import groq
+            if isinstance(e, groq.RateLimitError):
+                return True
+        except ImportError:
+            pass
+        # APIStatusError carries .status_code; httpx errors carry .response.status_code
+        status = getattr(e, "status_code", None) or getattr(
+            getattr(e, "response", None), "status_code", None)
+        return status == 429 or "rate" in type(e).__name__.lower() \
+            or "429" in str(e) or "rate limit" in str(e).lower()
 
     def complete(self, system: str, user: str, **kwargs) -> str:
         import time
         client = self._get_client()
         last_err = None
-        for attempt in range(5):
+        attempts = 6
+        for attempt in range(attempts):
             try:
                 resp = client.chat.completions.create(
                     model=self.model,
@@ -104,13 +123,12 @@ class GroqLLM(LLMInterface):
                 return resp.choices[0].message.content
             except Exception as e:  # noqa: BLE001 — retry only on rate limits
                 last_err = e
-                status = getattr(e, "status_code", None)
-                is_rate_limit = status == 429 or "rate" in type(e).__name__.lower() \
-                    or "429" in str(e) or "rate limit" in str(e).lower()
-                if not is_rate_limit:
+                if not self._is_rate_limit(e):
                     raise
-                wait = 2 ** attempt  # 1, 2, 4, 8, 16s
-                print(f"    [rate limit] retry {attempt+1}/5 in {wait}s...", flush=True)
+                # Cap at 30s so later attempts cover a full per-minute reset
+                # (1, 2, 4, 8, 16, 30 ≈ 61s total before giving up).
+                wait = min(2 ** attempt, 30)
+                print(f"    [rate limit] retry {attempt+1}/{attempts} in {wait}s...", flush=True)
                 time.sleep(wait)
         # Out of retries — signal exhaustion so the harness can stop gracefully.
         raise RateLimitExhausted(str(last_err))
