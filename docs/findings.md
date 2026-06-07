@@ -1,5 +1,16 @@
 # Findings
 
+## ⛔ Existing run-level numbers are INVALID — do not report (2026-06-07)
+
+The run-level results currently sitting in the `results/*.json` files (llama-3.1-8b
+20%/40% survival, 13.4 floors; scout-17b floors=5) are from **old, pre-fix code** and must
+be **ignored entirely** — treat run-level as having NO valid data yet. They predate the
+map dead-end fix, the EventBus listener-stacking fix, and the `_safe_int`/null-index fix, any
+of which can change run outcomes. A clean run-level pass on the current code is **pending**
+and is **blocked on free-tier TPM** (next section). Until that pass lands on a paid tier, the
+paper has no run-level numbers. The 13.4-floors / 20–40% figures still appearing in
+report.md tables are stale and should not be quoted.
+
 ## ⚠️ Run-level scaling blocked on free-tier Groq TPM (2026-06-07)
 
 Attempting `--only run --n-run 3` on llama-3.1-8b (both formats) hit the free-tier Groq

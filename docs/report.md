@@ -68,7 +68,7 @@ Every model is tested in two formats, on **identical seeds**, for a controlled a
 
 All results use `seed=42`, n=5 turn, n=3 combat, n=3 synergy, n=5 run unless noted. Scout run-level used n=1 in early pilots.
 
-> **Validity note:** llama-3.1-8b results are fully valid. Scout-17b run-level results (floors=5) are **invalid** — recorded before the map dead-end bug was fixed; a proper n=5 re-run is pending. qwen3-32b was attempted but **dropped** — no valid data could be collected on free-tier providers (see below).
+> **Validity note:** ALL **run-level** rows below are **INVALID and must not be quoted** — they are from pre-fix code (predate the map dead-end, EventBus listener-stacking, and null-index fixes). Run-level currently has NO valid data; a clean pass is pending and blocked on free-tier Groq TPM (needs a paid tier). The non-run dimensions (turn, combat, synergy) for llama-3.1-8b are valid; scout-17b non-run dims are valid too. qwen3-32b was **dropped** — no valid data on free-tier providers (see below).
 
 ### llama-3.1-8b-instant (Groq, valid)
 
