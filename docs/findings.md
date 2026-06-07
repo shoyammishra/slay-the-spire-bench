@@ -1,5 +1,39 @@
 # Findings
 
+## ⚠️ Run-level scaling blocked on free-tier Groq TPM (2026-06-07)
+
+Attempting `--only run --n-run 3` on llama-3.1-8b (both formats) hit the free-tier Groq
+**6000 TPM** cap and could not complete. Run-level is the most token-heavy dimension: each
+combat turn ships the full game state (~3000+ tokens/call) and a run makes dozens-to-hundreds
+of stateful calls. The 429 error showed `Used 2725, Requested 3367` — a single prompt nearly
+exhausts the per-minute budget, so throttling hit nearly every call. Structured completed
+**0 runs** (partial-save kept the prior valid run-level results); raw hung in an infinite
+retry loop and was manually stopped.
+
+**Takeaway:** free Groq sustains only ~2 calls/min, so even n=1 run-level is impractical
+(~30+ min and constant throttling). Synergy/turn/combat survive because they are short
+single-shot calls. **Unblocking run-level — and paper-grade n≥20 anywhere — requires a paid
+Groq Dev tier** (uncapped/higher TPM; the 429 message itself recommends it). No code fix
+helps; the limit is structural.
+
+## 📊 Paper-grade vs pilot-grade (2026-06-07)
+
+All current results are **pilot-grade**. The harness, ground truth, and design are
+paper-ready (bugs fixed, fixtures deterministic), but the *runs* are not:
+
+- **Synergy is now n=8** (hand-crafted fixtures) — real signal at 12.5pp resolution, NOT the
+  old 33pp noise. But it's a **deterministic fixed set**: re-running gives the same 8
+  questions, so there's no sampling variance to compute std over. It's a clean mini-exam, not
+  a sampled distribution. For paper-grade error bars: either add fixtures (4–5/archetype →
+  n=16–20) or sample each fixture k times at temp>0.
+- **Turn (n=5), combat (n=3), run (n=3)** still move in coarse steps and need n≥20–30.
+- **Model lineup is thin**: two Llama models, same family. Paper wants a capability ladder
+  across families and ideally a frontier/reasoning model (the dropped qwen3 left none).
+- All numbers need **mean ± std / CI**, not point estimates.
+
+Bottom line: the remaining work is **scale + model breadth**, which is compute/credit-bound,
+not code-bound. Paid Groq (or another paid provider) is the unblock.
+
 ## ✅ Synergy redesigned to hand-crafted archetype decks (2026-06-07)
 
 **Decision:** the synergy dimension no longer evaluates RNG-drafted Act-1 decks. It now
