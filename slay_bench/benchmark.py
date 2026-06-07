@@ -1089,7 +1089,7 @@ class BenchmarkHarness:
                       f"completed run(s); keeping partial results. ({e})", flush=True)
                 break
             scores.append(score)
-            print(f"    survived={score.survived}  floors={score.floors_reached}  hp={score.final_hp}/{score.max_hp}", flush=True)
+            print(f"    survived={score.survived}  floors={score.floors_reached}  hp={score.final_hp}/{score.max_hp}  parse_errors={score.parse_errors}", flush=True)
         return scores
 
     def run_all(self, seed: int = 42, n_turn: int = 5, n_combat: int = 3,
