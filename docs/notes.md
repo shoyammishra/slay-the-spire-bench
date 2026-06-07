@@ -30,6 +30,13 @@
 ## Status snapshot (2026-06-07, checkpoint)
 - Branch `synergy-rework` pushed to origin (NOT merged to main yet — merge later with
   the synergy re-run results folded in).
-- In progress: qwen3-32b pilot on OpenRouter (structured done; raw run-level running).
-- Pending after runs: re-run `--only synergy` for ALL model+format combos (synergy
-  numbers everywhere predate the payoff-weighted rework), then merge to main.
+- In progress: qwen3-32b STRUCTURED pilot on OpenRouter, currently in run-level eval.
+  NOTE: this process was launched BEFORE the synergy rework edits. A running Python
+  process loads the module once at startup, so it is executing the OLD synergy code —
+  its synergy data (which already ran, before run-level) is FLAWED. Must `--only synergy`.
+- Still TODO: (1) qwen3 raw full run; (2) `--only synergy` refresh for ALL 6 combos
+  (qwen3 struct+raw on openrouter, llama-3.1-8b struct+raw, llama-4-scout struct+raw)
+  using the reworked code; (3) fold real synergy numbers into findings.md + CLAUDE.md;
+  (4) merge synergy-rework -> main.
+- KEY GOTCHA: edits to benchmark.py do NOT affect an already-running run. Re-launch to
+  pick up code changes, or refresh the affected dimension with `--only`.
