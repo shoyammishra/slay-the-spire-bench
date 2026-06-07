@@ -3,7 +3,7 @@
 ## What This Is
 A Python simulator + LLM benchmark harness for Slay the Spire (Ironclad only).
 Tests LLM planning ability across 4 dimensions: turn-level, combat-level, synergy, and run-level.
-GitHub: https://github.com/shoyammishra/slay-the-spire-bench (private)
+GitHub: https://github.com/shoyammishra/slay-the-spire-bench (public)
 
 ## Security — CRITICAL
 - `.env` contains real API keys for BOTH Groq and OpenRouter. It is gitignored. NEVER commit it.
