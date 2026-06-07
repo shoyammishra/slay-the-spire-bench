@@ -1,5 +1,45 @@
 # Experiment Log
 
+## 2026-06-07 — Synergy re-run on HAND-CRAFTED fixtures, n=8 (CURRENT valid synergy data)
+
+**Config:** `--only synergy --n-synergy 8`, both formats, both models, seed=42.
+**Status:** Valid + current. Supersedes ALL earlier synergy numbers (which used RNG-drafted
+decks). 8 fixtures = one pass over the fixed set (2 per archetype × 4 archetypes); all 8
+classify confident, 0 ambiguous.
+
+| Model | Format | Archetype | Card Pick | Removal | Parse OK |
+|---|---|---|---|---|---|
+| llama-3.1-8b-instant | structured | 50.0% | 100% | 25.0% | 100% |
+| llama-3.1-8b-instant | raw | 37.5% | 62.5% | 12.5% | 100% |
+| llama-4-scout-17b | structured | 75.0% | 75.0% | 25.0% | 100% |
+| llama-4-scout-17b | raw | 50.0% | 100% | 12.5% | 100% |
+
+**Per-archetype identification (8 attempts each = 2 decks × 2 models × 2 formats):**
+
+| True archetype | Correct | Models said instead |
+|---|---|---|
+| Block | 7/8 | one "Strength" |
+| Aggro | 8/8 | — |
+| Strength | 2/8 | almost always "Aggro" |
+| Exhaust | 0/8 | ALWAYS "Aggro" |
+
+**Key findings (NEW, from clean fixtures):**
+- **Exhaust archetype is never recognised** (0/8) — every model/format calls it "Aggro".
+  Strength also weak (2/8). Models name an archetype only when its signature is a simple
+  surface pattern (Block, generic Aggro); they miss mechanic-defined strategies (Exhaust
+  payoff) even with signature cards present. Systematic, not noise.
+- **Name-vs-play dissociation:** card-pick is high (62.5–100%) even on decks the model can't
+  label — local card-quality judgement is strong, abstract strategic label is weak.
+- **Removal still near-zero** (12.5–25%) — the 25% comes only from Block fixtures where the
+  removal target coincides; models cut situational cards, not basic Strike.
+- scout-17b (structured) is the best archetype identifier (75%). No single format wins
+  outright: raw helps llama card-pick, structured helps scout archetype ID.
+
+**Note:** the old `67%/100%` archetype figures (RNG-draft era) are RETIRED. They came from a
+3-deck RNG sample with an Aggro-biased heuristic and do not reflect the fixed-deck eval.
+
+---
+
 ## 2026-06-07 — qwen3-32b DROPPED (no valid data on free tiers)
 
 **Status:** Excluded from the study. Result files deleted.
@@ -18,10 +58,12 @@ uncapped TPM + ~400–1000 tok/s). Revisit = future work. See docs/notes.md, doc
 
 ---
 
-## 2026-06-07 — Synergy re-run (post synergy-fix): all models, seed=42
+## 2026-06-07 — Synergy re-run (post synergy-fix): all models, seed=42  [SUPERSEDED]
 
 **Config:** `--only synergy`, n_synergy=3, both formats, both models
-**Status:** Valid. First synergy results with real deck (greedy card_choice_fn fix applied).
+**Status:** ⛔ SUPERSEDED by the hand-crafted n=8 run above. These used RNG-drafted decks +
+an Aggro-biased heuristic (only ~3/10 decks confidently labelled); the 67%/100% figures are
+retired. Kept for history only.
 
 | Model | Format | Archetype | Card Pick | Removal | Parse OK |
 |---|---|---|---|---|---|

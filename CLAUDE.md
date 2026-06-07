@@ -13,17 +13,17 @@ GitHub: https://github.com/shoyammishra/slay-the-spire-bench (private)
 
 - **Status:** In progress — synergy REDESIGNED to hand-crafted decks + RE-RUN at n=8 (done). Run-level re-run BLOCKED by free-tier Groq TPM (see below). qwen3 DROPPED.
 - **Current task:** Run-level n=3 re-run is blocked on free Groq's 6000 TPM cap (run-level is too token-heavy — hundreds of stateful calls; one prompt alone requests ~3367 tok and trips 429 on nearly every call). Need PAID Groq Dev tier to scale run-level + everything else to n≥20. Synergy n=8 already re-run with hand-crafted fixtures.
-- **⛔ ALL existing run-level numbers INVALID (2026-06-07):** the run-level data in `results/*.json` (llama 20%/40%, 13.4 floors; scout floors=5) is from OLD pre-fix code (predates map dead-end + EventBus stacking + `_safe_int` fixes). IGNORE it — run-level has NO valid data yet. A clean pass is pending + blocked on free TPM. The 13.4/20–40% figures still in report.md tables are STALE — do not quote.
+- **⛔ ALL existing run-level numbers INVALID (2026-06-07):** the run-level data in `results/*.json` (llama 20%/40%, 13.4 floors; scout floors=5) is from OLD pre-fix code (predates map dead-end + EventBus stacking + `_safe_int` fixes). IGNORE it — run-level has NO valid data yet. A clean pass is pending + blocked on free TPM. (report.md/findings.md/report.html now all EXCLUDE run-level — do not re-introduce the old 13.4/20–40% figures.)
 - **⚠️ Run-level blocked on free tier (2026-06-07):** `--only run --n-run 3` on llama-3.1-8b hit the 6000 TPM wall — structured completed 0 runs (kept prior valid run results via partial-save), raw hung in an infinite retry loop and was Ctrl-C'd. Free Groq sustains ~2 calls/min; a single run needs dozens-to-hundreds → infeasible. Partial-save logic worked: existing run-level + fresh synergy results both intact. **Unblock = paid Groq Dev tier** (the 429 error itself recommends it). This is the same lever needed for paper-grade n≥20.
 - **Paper-grade gap (discussed 2026-06-07):** all current numbers are PILOT-grade. Synergy n=8 is real signal (12.5pp steps, not 33pp) but DETERMINISTIC (8 fixed fixtures = a fixed mini-exam, no sampling variance/std). Turn (n=5), combat (n=3), run (n=3) still move in coarse steps. Paper needs: (1) n≥20–30 per dim, (2) multiple seeds, (3) a 3rd model from another family (ideally a frontier/reasoning model — the dropped qwen3 left no reasoning model), (4) mean±std reporting. For synergy variance: add more fixtures (4–5/archetype → n=16–20) OR sample each fixture k times at temp>0 for error bars. Harness is paper-READY; blocker is compute/credits, not code.
 - **Key files:** `slay_bench/benchmark.py`, `slay_bench/run_loop.py`, `run_benchmark.py`
-- **Completed this session (2026-06-07):** (1) **Synergy REDESIGNED** — RNG drafts dropped; now 8 hand-crafted `_SYNERGY_FIXTURES` decks for clean ground truth (removed dead `_archetype_draft_fn`). (2) `_classify_archetype_confident()` (signature-only labels + ambiguity) + per-sample JSON audit. (3) **Combat null/string index crash fixed** — `_safe_int()` in both combat loops. (4) **Robust Groq 429 handling** — typed detection + `max_retries=0` + 6-attempt backoff. (5) qwen3 DROPPED + files deleted. 43 tests pass.
+- **Completed this session (2026-06-07):** (1) **Synergy REDESIGNED** — RNG drafts dropped; now 8 hand-crafted `_SYNERGY_FIXTURES` decks for clean ground truth (removed dead `_archetype_draft_fn`). (2) `_classify_archetype_confident()` (signature-only labels + ambiguity) + per-sample JSON audit. (3) **Combat null/string index crash fixed** — `_safe_int()` in both combat loops. (4) **Robust Groq 429 handling** — typed detection + `max_retries=0` + 6-attempt backoff. (5) qwen3 DROPPED + files deleted. 43 tests pass. (6) **Synergy n=8 RE-RUN done** — real numbers folded into all docs (Exhaust 0/8, name-vs-play dissociation). (7) **`docs/report.html`** — standalone shareable pilot report for the professor. (8) **All run-level numbers flagged INVALID** (pre-fix code).
 - **⚠️ qwen3-32b DROPPED (2026-06-07):** could not get valid data on free tiers. **OpenRouter free** is too slow (~30–80 tok/s; n=5 run-level = 1.5–3h) and returned **402 Payment Required** once exhausted. **Groq free** 6000 TPM truncates its reasoning mid-`<think>` → parse-failure cascade (0% everywhere). A reasoning model needs a PAID tier (paid OpenRouter for speed, or paid Groq for uncapped TPM). qwen3 result files deleted. Revisit = future work. See docs/report.md + docs/notes.md.
-- **⚠️ Synergy numbers invalid:** earlier `--only synergy` runs (RNG-drafted decks) gave noise — only ~3/10 decks were confidently labeled and models collapsed to "Aggro" (archetype_acc=0.333 identical across all 4 combos). RNG Act-1 decks have no crisp archetype. **Synergy now uses 8 hand-crafted decks** (`_SYNERGY_FIXTURES`, 2/archetype) for clean ground truth. Re-run `--only synergy --n-synergy 8`. See docs/findings.md.
-- **Next:** Re-run `--only synergy --n-synergy 8` ×4 + `--only run --n-run 5` ×4 for the llama combos. Then fold real numbers into findings.md + report.md + CLAUDE.md.
+- **✅ Synergy DONE (n=8 hand-crafted fixtures):** real numbers collected for all 4 combos and folded into all docs + `docs/report.html`. Key result: Exhaust 0/8 (always "Aggro"), Strength 2/8, Block 7/8, Aggro 8/8; name-vs-play dissociation; removal 12.5–25%. Earlier RNG-draft synergy numbers (67%/100%) are RETIRED.
+- **Next:** Run-level is the only remaining dimension with no valid data — clean pass blocked on free TPM (needs paid Groq). Then scale all dims to n≥20 + ≥5 seeds + a 3rd-family model. See `docs/roadmap.md` run matrix.
 - **Provider note:** llama models on Groq. Reasoning models (qwen3 etc.) require a paid tier — do not benchmark on free tiers.
 - **⚠️ GOTCHA — running process uses startup code:** a launched Python run loads `benchmark.py` once at startup; editing it does NOT affect an in-flight run. Re-launch or use `--only` to pick up code changes.
-- **Remaining run plan:** (1) `--only synergy --n-synergy 8` ×4 (llama-3.1-8b struct+raw, llama-4-scout struct+raw); (2) `--only run --n-run 5` ×4 (scout needs n=5 re-run); (3) fold real numbers into findings.md + report.md + CLAUDE.md; (4) merge `synergy-rework` → main.
+- **Remaining run plan:** (1) ~~synergy n=8 ×4~~ DONE; (2) `--only run --n-run ≥20` ×4 — clean run-level pass, blocked on free TPM (needs paid Groq); (3) scale turn/combat to n≥20 + ≥5 seeds; (4) add a 3rd-family model; (5) merge `synergy-rework` → main. Full checklist in `docs/roadmap.md`.
 - **Speed:** Paid Groq (~400–1000 tok/s, no TPM cap) is the real speedup lever for n≥20 — see docs/notes.md.
 - **➡️ Next steps = the paper-grade run matrix in `docs/roadmap.md`** (models, per-dim n≥20, ≥5 seeds, both formats, mean±std, run order). When a paid Groq Dev tier is available: run-level first (no valid data), then scale turn/combat, then expand synergy, then add a 3rd-family model.
 
@@ -139,8 +139,8 @@ Output files per run (overwrites if same model+format+seed):
 - **null/string LLM indices crashed combat (2026-06-07)**: a model returning `"target_index": null` crashed run-level with `TypeError: None < int`. Added `_safe_int()`; applied to both `RunEvaluator._llm_combat` and `CombatEvaluator` (same latent bug). Regression test added.
 - **qwen3-32b reasoning model (wired, then DROPPED)**: outputs `<think>...</think>` blocks. `complete_json` strips them; `max_tokens` raised to 3000 (Groq) / 8000 (OpenRouter). `OpenRouterLLM.complete` retries 429s + network drops with backoff and fails fast on 402. **Dropped from the study:** Groq free-tier TPM (6000) truncates it mid-think (parse-failure cascade, 0%), and OpenRouter free tier is too slow (~30–80 tok/s) and hit 402 Payment Required. A reasoning model needs a PAID tier to benchmark viably. Result files deleted.
 
-## Post-fix Results (seed=42, n_turn=5, n_combat=3, n_synergy=3, n_run=5)
-These are valid post-fix results. Synergy numbers below are **still pre-synergy-fix** and should be re-run.
+## Current Results (seed=42; turn n=5, combat n=3, synergy n=8). Run-level EXCLUDED (no valid data).
+Polished shareable report: `docs/report.html`. Full detail: `docs/findings.md`, `docs/experiment_log.md`.
 
 ### llama-3.1-8b-instant
 | Metric | Structured | Raw |
@@ -149,16 +149,24 @@ These are valid post-fix results. Synergy numbers below are **still pre-synergy-
 | Turn legal rate | 60% | 100% |
 | Combat win rate | 100% | 100% |
 | Combat HP ratio | 112.3% | 113.8% |
-| Synergy archetype | 67% | 100% |
-| Synergy best card | 33% | 33% |
-| Synergy removal | 0% | 0% |
-| Run survival | 20% | 40% |
-| Run avg floors | 13.4/15 | 13.4/15 |
-| Run HP fraction | 93.8% (survivors) | 60.6% (survivors) |
-| Run draft coherence | 36.4% | 40.9% |
-| **Overall** | **41.9%** | **60.7%** |
+| Synergy archetype (n=8) | 50.0% | 37.5% |
+| Synergy best card (n=8) | 100% | 62.5% |
+| Synergy removal (n=8) | 25.0% | 12.5% |
 
-Key findings: Raw format clearly outperforms structured (60.7% vs 41.9%). Run-level is now real — 13.4 avg floors, 20–40% survival. Removal acc = 0% is genuine model failure — both models reason about card quality instead of deck cycling (see docs/findings.md).
+### meta-llama/llama-4-scout-17b
+| Metric | Structured | Raw |
+|---|---|---|
+| Turn damage ratio | 49.8% | 37.5% |
+| Turn legal rate | 100% | 100% |
+| Combat win rate | 100% | 100% |
+| Combat HP ratio | 111.4% | 103.5% |
+| Synergy archetype (n=8) | 75.0% | 50.0% |
+| Synergy best card (n=8) | 75.0% | 100% |
+| Synergy removal (n=8) | 25.0% | 12.5% |
+
+**Per-archetype ID (8 attempts each = 2 decks × 2 models × 2 formats):** Block 7/8, Aggro 8/8, Strength 2/8, **Exhaust 0/8 (always "Aggro")**.
+
+Key findings (from hand-crafted n=8 fixtures): (1) **Exhaust archetype never recognised** — every model/format calls it "Aggro" despite signature cards. (2) **Name-vs-play dissociation** — card-pick high (62.5–100%) even on decks the model can't label. (3) **Removal near-zero** (12.5–25%) — models cut situational cards, not basic Strike. (4) **No single format wins** — raw helps llama card-pick, structured helps scout archetype ID. See docs/findings.md.
 
 ## Available Groq Models (as of 2026-06-07)
 - `llama-3.1-8b-instant` — small, fast (tested)

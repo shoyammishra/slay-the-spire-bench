@@ -2,7 +2,8 @@
 
 **Date:** 2026-06-07  
 **Status:** Pilot complete; paper-grade runs in progress  
-**Branch:** synergy-rework
+**Branch:** synergy-rework  
+**Shareable version:** a polished standalone HTML report is at [`docs/report.html`](report.html) (open in any browser).
 
 ---
 
@@ -78,14 +79,13 @@ All results use `seed=42`, n=5 turn, n=3 combat, n=3 synergy, n=5 run unless not
 | Turn legal rate | 60% | 100% |
 | Combat win rate | 100% | 100% |
 | Combat HP ratio vs bot | 112.3% | 113.8% |
-| Synergy archetype acc | 66.7% | 100% |
-| Synergy card pick acc | 33.3% | 33.3% |
-| Synergy removal acc | 0% | 0% |
-| Run survival rate | 20% | 40% |
-| Run avg floors reached | 13.4 / 15 | 13.4 / 15 |
-| Run HP fraction (survivors) | 93.8% | 60.6% |
-| Run draft coherence | 36.4% | 40.9% |
-| **Overall score** | **47.5%** | **63.5%** |
+| Synergy archetype acc (n=8) | 50.0% | 37.5% |
+| Synergy card pick acc (n=8) | 100% | 62.5% |
+| Synergy removal acc (n=8) | 25.0% | 12.5% |
+| Run-level | — INVALID, excluded — | — INVALID, excluded — |
+
+Synergy uses the hand-crafted n=8 fixtures (current). Run-level is excluded — its on-disk
+numbers are from pre-fix code.
 
 ### meta-llama/llama-4-scout-17b (Groq, run-level pending re-run)
 
@@ -95,14 +95,12 @@ All results use `seed=42`, n=5 turn, n=3 combat, n=3 synergy, n=5 run unless not
 | Turn legal rate | 100% | 100% |
 | Combat win rate | 100% | 100% |
 | Combat HP ratio vs bot | 111.4% | 103.5% |
-| Synergy archetype acc | 66.7% | 100% |
-| Synergy card pick acc | 66.7% | 33.3% |
-| Synergy removal acc | 0% | 0% |
-| Run survival rate | 0% ⚠ | 0% ⚠ |
-| Run avg floors reached | 5.0 ⚠ | 5.0 ⚠ |
-| **Overall score** | **48.6%** | **45.5%** |
+| Synergy archetype acc (n=8) | 75.0% | 50.0% |
+| Synergy card pick acc (n=8) | 75.0% | 100% |
+| Synergy removal acc (n=8) | 25.0% | 12.5% |
+| Run-level | — INVALID, excluded — | — INVALID, excluded — |
 
-⚠ Run-level recorded before map dead-end fix; floors=5 is a simulator bug, not model performance. Re-run pending.
+Synergy uses the hand-crafted n=8 fixtures (current). Run-level excluded (pre-fix data).
 
 ### qwen/qwen3-32b — DROPPED from the study
 
@@ -115,20 +113,23 @@ Because qwen3 is a reasoning model that spends 600–4000 tokens thinking per ca
 
 ### Key findings
 
-**Raw format outperforms structured for reasoning tasks.** The clearest example: llama-3.1-8b turn damage ratio jumps from 36.7% to 69.6%, and archetype accuracy from 67% to 100%, when switching from JSON to natural English. The model's reasoning about game state is stronger when it can read prose.
+**Models cannot recognise the Exhaust archetype.** On the hand-crafted n=8 fixtures, all eight Exhaust decks (across both models and both formats) were labelled "Aggro" — 0/8. Strength was also weak (2/8), while Block (7/8) and Aggro (8/8) were reliable. Models name an archetype only when its signature is a simple surface pattern; they miss strategies defined by a *mechanical interaction* (exhaust-for-payoff) even when the deck is full of signature cards. A clean, systematic knowledge gap.
 
-**Structured format can be better for index-based tasks.** Scout-17b card pick accuracy: 66.7% structured vs 33.3% raw. When the output is a precise index into a list, JSON structure helps.
+**Naming the strategy and playing it are dissociated.** Card-pick accuracy is high (62.5–100%) even on decks the model cannot label — llama-3.1-8b (structured) picks the right card 100% of the time while scoring only 50% on archetype ID. Local card-quality judgement is strong; the abstract strategic label is weak.
 
-**Removal accuracy is 0% for all models in all formats — a genuine finding.** Expert heuristic says to remove "Strike" first (basics dilute draw quality as the deck improves). All models instead suggest removing Disarm, Battle Trance, or Bash — reasoning about card quality for the current archetype, not deck cycling. This is a systematic failure, not random noise, and is a clean paper result.
+**Removal accuracy is near-zero (12.5–25%).** Expert heuristic removes basic "Strike" first (basics dilute draw quality as the deck improves). Models instead suggest removing Disarm, Battle Trance, or Bash — reasoning about a card's standalone quality, not deck cycling. The small non-zero values come only from Block fixtures where the targets coincide. Systematic, not random.
 
-**Combat is easy; run-level is hard.** All tested models win 100% of isolated combats and beat the greedy bot on HP. Survival rate across a full 15-floor run drops to 20–40%, showing the difficulty lives in multi-decision consistency under accumulating state.
+**Prompt format matters, and which format wins depends on the task.** Raw helps reasoning: llama-3.1-8b turn damage ratio jumps 36.7%→69.6% and legal rate 60%→100%. Structured helps index-based output: scout-17b archetype ID is 75% structured vs 50% raw. Not a wash either way.
 
-**Dimension difficulty ranking** (structured format, llama-3.1-8b):
+**Combat is saturated; difficulty lives upstream.** All tested models win 100% of isolated combats and beat the greedy bot on HP (103–114%). The hard part of planning is the longer-horizon work (archetype reasoning, deck-building), where scores drop sharply.
+
+**Dimension difficulty ranking** (pilot, fixed-fixture synergy):
 1. Combat — 100% win rate, beats bot on HP
-2. Synergy archetype — 67% structured, 100% raw
-3. Turn-level damage ratio — 37% structured, 70% raw
-4. Synergy removal — 0% all models all formats
-5. Run-level survival — 20–40%
+2. Synergy card-pick — 62.5–100%
+3. Synergy archetype ID — 37.5–75%, collapses on Exhaust/Strength
+4. Turn-level damage ratio — 37–70%, format-sensitive
+5. Synergy removal — 12.5–25%
+   (Run-level: hardest in principle, but NO valid data yet — excluded.)
 
 ---
 
@@ -160,15 +161,16 @@ Because qwen3 is a reasoning model that spends 600–4000 tokens thinking per ca
 - 40 unit tests, all passing
 
 ### What's pending
-- **`--only synergy` ×4** — all 4 llama model+format combos need synergy re-run with the reworked classifier (payoff-weighted + archetype-targeted drafting)
-- **Scout-17b run-level** — needs n=5 re-run after map+EventBus bug fixes
-- **Scale to n≥20** — current pilot uses n=5; paper requires n≥20 with mean ± std
+- **Run-level (all combos)** — no valid data yet; on-disk numbers are pre-fix. First priority for a clean pass; blocked on free-tier Groq TPM (needs paid tier).
+- **Scale to n≥20** — current pilot uses small n; paper requires n≥20 with mean ± std and ≥5 seeds.
+- **3rd model from another family** — current lineup is two Llama models; cross-family signal needed.
+- See [`docs/roadmap.md`](roadmap.md) → "Paper-grade run matrix" for the full checklist.
 
 ### What doesn't work / known limitations
 - **qwen3-32b dropped** — free-tier OpenRouter too slow (~30–80 tok/s; 402 once exhausted) and free-tier Groq's 6000 TPM cap truncated its reasoning mid-`<think>`. No valid data; needs a paid tier to revisit.
-- n=5 is too small for statistical claims; all numbers are directional only
-- Scout-17b run-level results are invalid (pre-fix); pending re-run
-- **Synergy archetype numbers invalid** — the heuristic was mislabeling decks (signature-card scoring fix landed late 2026-06-07); all archetype accuracy must be re-collected with `--n-synergy 20`
+- Small n (3–8) is too small for statistical claims; all numbers are directional only
+- **Run-level has no valid data** — pre-fix numbers excluded; clean pass pending (blocked on free-tier TPM)
+- Synergy n=8 is a fixed deterministic set — real signal but no sampling variance; needs more fixtures or k-sampling for error bars
 
 ---
 
