@@ -1,5 +1,42 @@
 # Findings
 
+## ⚠️ Synergy archetype scoring — 3rd fix (2026-06-07): confident/ambiguous labels
+
+The `--only synergy` re-runs (post 2nd-rework) produced **archetype_acc = 0.0 on ALL
+4 llama combos** — including raw, which historically scored 100%. Investigation showed
+this was the **expert heuristic mislabeling decks**, not model failure (parse_ok was 1.0,
+i.e. the models WERE answering):
+
+- **seed 244** was labeled `Exhaust` despite having **zero Exhaust cards** — the score
+  came entirely from `Armaments` + `Headbutt`, which are miscategorized in the broad
+  `_ARCHETYPES["Exhaust"]` list (added there for draft-coherence, but they're not Exhaust
+  payoffs). The deck is plainly Aggro/Strength; a model answering "Aggro" was marked wrong.
+- **seed 242** was a near-tie (Strength 4 / Block 5 / Exhaust 4 / Aggro 3) decided by one
+  generic common. `Corruption` (a real Exhaust payoff, weighted 3×) lost to Juggernaut +
+  filler. The deck has no dominant archetype; "Block" was arbitrary.
+- **seed 243** was labeled `Block` off a single `Body Slam` in an otherwise aggressive deck.
+
+**Root causes:** (1) miscategorized cards in the broad key-lists polluted the label;
+(2) no confidence margin — when the targeted draft fails to land a payoff (common at small
+card pools), the label is decided by generic-common noise.
+
+**Fix:** added `_classify_archetype_confident(deck, relics) -> (label, confident)`. The
+LABEL is now decided by **signature cards only** (`_ARCHETYPE_PAYOFFS`, relics count as a
+signature). A deck is confidently labeled only when exactly one archetype uniquely owns the
+most signatures; otherwise (no payoff, or a tie) it is **ambiguous** and `archetype_correct`
+is set to `None` → excluded from `archetype_acc` (same pattern as survivors-only HP). The
+plain `_classify_archetype` is unchanged (still used for draft coherence / best-pick, which
+need a concrete answer). Synergy JSON now persists per-sample `expert_archetype`,
+`model_archetype`, `confident`, plus `archetype_n_scored` / `archetype_n_ambiguous` so labels
+are auditable. Verified on seeds 242/243/244: 242 & 244 → ambiguous (excluded), 243 → Block
+(scored). 42 tests pass.
+
+**Consequence:** the archetype_acc=0 numbers from the post-2nd-rework `--only synergy` runs
+are INVALID (measured a broken heuristic). Re-run `--only synergy` with this fix. NOTE: at
+n=3 the targeted draft lands a clean signature on roughly 1/3 of seeds, so few samples are
+scored — **bump n_synergy** (≥10–20) so enough confident decks accumulate. A further
+improvement would be making `_archetype_draft_fn` land payoffs more reliably (RNG-limited).
+
 ## ⚠️ Synergy eval reworked again (2026-06-07) — prior synergy numbers INVALID
 
 The synergy dimension had two compounding problems, now fixed:

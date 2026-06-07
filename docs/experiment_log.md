@@ -1,5 +1,23 @@
 # Experiment Log
 
+## 2026-06-07 — qwen3-32b DROPPED (no valid data on free tiers)
+
+**Status:** Excluded from the study. Result files deleted.
+
+qwen3-32b (reasoning model) was wired and attempted on both providers; neither free
+tier could produce valid data:
+- **OpenRouter free:** ~30–80 tok/s → n=5 run-level = 1.5–3h; free credits exhausted
+  mid-run → HTTP 402 Payment Required.
+- **Groq free:** 6000 TPM cap truncated its reasoning mid-`<think>` → parse-failure
+  cascade, 0% across every dimension (turn/combat/synergy/run all 0; combat parse
+  errors 7.67/sample).
+
+Root cause is infrastructural, not a model-capability result — so the 0% scores are NOT
+reported as qwen3 performance. A reasoning model needs a PAID tier (paid Groq preferred:
+uncapped TPM + ~400–1000 tok/s). Revisit = future work. See docs/notes.md, docs/report.md.
+
+---
+
 ## 2026-06-07 — Synergy re-run (post synergy-fix): all models, seed=42
 
 **Config:** `--only synergy`, n_synergy=3, both formats, both models

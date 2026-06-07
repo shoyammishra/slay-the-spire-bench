@@ -66,9 +66,9 @@ Every model is tested in two formats, on **identical seeds**, for a controlled a
 
 ## 3. Experiments & Results
 
-All results use `seed=42`, n=5 turn, n=3 combat, n=3 synergy, n=5 run unless noted. Scout and qwen3 run-level used n=1 in early pilots.
+All results use `seed=42`, n=5 turn, n=3 combat, n=3 synergy, n=5 run unless noted. Scout run-level used n=1 in early pilots.
 
-> **Validity note:** llama-3.1-8b results are fully valid. Scout-17b run-level results (floors=5) are **invalid** — recorded before the map dead-end bug was fixed; a proper n=5 re-run is pending. qwen3-32b structured results reflect a total parse failure (see below).
+> **Validity note:** llama-3.1-8b results are fully valid. Scout-17b run-level results (floors=5) are **invalid** — recorded before the map dead-end bug was fixed; a proper n=5 re-run is pending. qwen3-32b was attempted but **dropped** — no valid data could be collected on free-tier providers (see below).
 
 ### llama-3.1-8b-instant (Groq, valid)
 
@@ -104,21 +104,14 @@ All results use `seed=42`, n=5 turn, n=3 combat, n=3 synergy, n=5 run unless not
 
 ⚠ Run-level recorded before map dead-end fix; floors=5 is a simulator bug, not model performance. Re-run pending.
 
-### qwen/qwen3-32b (OpenRouter, structured — total parse failure)
+### qwen/qwen3-32b — DROPPED from the study
 
-| Metric | Structured | Raw |
-|---|---|---|
-| Turn damage ratio | 0% | 0% |
-| Turn parse success | 0% | 0% |
-| Combat win rate | 0% | 0% |
-| Combat avg parse errors | 7.67 | 7.67 |
-| Synergy archetype acc | 0% | N/A |
-| Synergy parse success | 33.3% | 0% |
-| Run survival rate | 0% | 0% |
-| Run avg floors | 1.8 | 1.8 |
-| **Overall score** | **0%** | **0%** |
+qwen3-32b was attempted but **excluded** because neither provider could run it viably:
 
-qwen3's results are 0% across the board due to a **JSON parse failure cascade**: the model outputs extended `<think>` reasoning blocks, then wraps its answer in markdown fences and non-standard structure. `complete_json` strips `<think>` blocks but the remaining output still fails JSON parsing. Every failed parse ends the player's turn early, so the model effectively skips all its turns. The `--only synergy` re-run with the reworked synergy code is still pending for qwen3; these results predate it.
+- **OpenRouter (free tier):** too slow — ~30–80 tok/s, making a single n=5 run-level eval take 1.5–3 hours. The free tier was also exhausted partway, returning `402 Payment Required` (paid credits needed to continue).
+- **Groq (free tier):** the 6000 tokens-per-minute (TPM) rate limit truncated qwen3's reasoning mid-`<think>`, so the model never emitted a complete, parseable answer. This produced a parse-failure cascade (0% across all dimensions).
+
+Because qwen3 is a reasoning model that spends 600–4000 tokens thinking per call, it needs either paid OpenRouter (for speed) or paid Groq (for an uncapped TPM that won't truncate it). With only free-tier access available, no valid qwen3 data could be collected, so it has been removed from the results. Its result files have been deleted. Revisiting qwen3 (or another reasoning model) on a paid tier is left as future work.
 
 ### Key findings
 
@@ -160,24 +153,22 @@ qwen3's results are 0% across the board due to a **JSON parse failure cascade**:
 - Full simulator: combat, map traversal, card drafting, enemies, relics, events, potions
 - All 4 benchmark dimensions with ground truth scoring
 - Two prompt formats (structured JSON, raw English) on identical seeds
-- Groq provider (llama models) and OpenRouter provider (qwen3)
+- Groq provider (llama models) and OpenRouter provider (reasoning models)
 - `<think>` block stripping for reasoning models
 - Rate-limit retry with partial-result saving
 - `--only` flag for efficient single-dimension re-runs
 - 40 unit tests, all passing
 
 ### What's pending
-- **qwen3-32b JSON parse failure** — the model's output format doesn't parse reliably. Likely needs either a different response schema or post-processing improvements. All qwen3 results are currently 0% due to this.
-- **qwen3 raw full run** — in progress at time of writing (slow: ~30–80 tok/s on OpenRouter)
-- **`--only synergy` ×6** — all 6 model+format combos need synergy re-run with the reworked classifier (payoff-weighted + archetype-targeted drafting)
+- **`--only synergy` ×4** — all 4 llama model+format combos need synergy re-run with the reworked classifier (payoff-weighted + archetype-targeted drafting)
 - **Scout-17b run-level** — needs n=5 re-run after map+EventBus bug fixes
 - **Scale to n≥20** — current pilot uses n=5; paper requires n≥20 with mean ± std
 
 ### What doesn't work / known limitations
-- qwen3 structured/raw both score 0% — JSON parse failures cascade through all dimensions
+- **qwen3-32b dropped** — free-tier OpenRouter too slow (~30–80 tok/s; 402 once exhausted) and free-tier Groq's 6000 TPM cap truncated its reasoning mid-`<think>`. No valid data; needs a paid tier to revisit.
 - n=5 is too small for statistical claims; all numbers are directional only
 - Scout-17b run-level results are invalid (pre-fix); pending re-run
-- Synergy numbers for all models except llama-3.1-8b predate the 2nd synergy rework and must be re-run
+- **Synergy archetype numbers invalid** — the heuristic was mislabeling decks (signature-card scoring fix landed late 2026-06-07); all archetype accuracy must be re-collected with `--n-synergy 20`
 
 ---
 
@@ -201,9 +192,8 @@ python run_benchmark.py --provider groq --model meta-llama/llama-4-scout-17b-16e
 # llama-4-scout-17b — raw (Groq)
 python run_benchmark.py --provider groq --model meta-llama/llama-4-scout-17b-16e-instruct --n-turn 5 --n-combat 3 --n-synergy 3 --n-run 5 --format raw
 
-# qwen3-32b — MUST use OpenRouter (Groq truncates its reasoning)
-python run_benchmark.py --provider openrouter --model qwen/qwen3-32b --n-turn 5 --n-combat 3 --n-synergy 3 --n-run 5 --format structured
-python run_benchmark.py --provider openrouter --model qwen/qwen3-32b --n-turn 5 --n-combat 3 --n-synergy 3 --n-run 5 --format raw
+# NOTE: qwen3-32b (reasoning model) was dropped — free-tier OpenRouter is too slow
+# and free-tier Groq's TPM cap truncates its reasoning. Revisiting needs a paid tier.
 
 # Re-run only synergy (merges other dims from existing JSON on disk)
 python run_benchmark.py --provider groq --model llama-3.1-8b-instant --format structured --only synergy
@@ -217,5 +207,5 @@ python run_benchmark.py --provider groq --model llama-3.1-8b-instant --format st
 
 **Speed notes:**
 - llama models on Groq: fast (~400–1000 tok/s on paid tier)
-- qwen3 on OpenRouter: slow (~30–80 tok/s); run-level takes 1.5–3 hours for n=5
+- Reasoning models (e.g. qwen3) on free-tier OpenRouter: slow (~30–80 tok/s); run-level takes 1.5–3 hours for n=5 — and free-tier Groq truncates them. A paid tier is required to benchmark them viably.
 - Always run mock first to catch bugs before spending credits

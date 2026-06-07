@@ -15,7 +15,8 @@
 
 ### M3 — Paper-grade evaluation (IN PROGRESS)
 - n≥20 samples per dimension per model
-- ≥3 models (8B, 17B, 32B+)
+- Models: llama-3.1-8b, llama-4-scout-17b (qwen3-32b dropped — free tiers can't run a
+  reasoning model; a 32B+ reasoning model needs a paid tier — future work)
 - Both formats (structured, raw) for each model
 - Statistical summary: mean ± std per metric
 

@@ -155,6 +155,11 @@ class OpenRouterLLM(LLMInterface):
                     wait = 2 ** attempt
                     print(f"    [rate limit] retry {attempt+1}/5 in {wait}s...", flush=True)
                     time.sleep(wait)
+                elif e.code == 402:
+                    raise RuntimeError(
+                        "OpenRouter returned 402 Payment Required — "
+                        "add credits at openrouter.ai/credits to use this model."
+                    ) from e
                 else:
                     raise
             except Exception as e:
@@ -222,10 +227,13 @@ class CombatScore:
 @dataclass
 class SynergyScore:
     """Score for a synergy-recognition query."""
-    archetype_correct: Optional[bool]          # None if not asked
+    archetype_correct: Optional[bool]          # None if not asked OR deck is ambiguous
     card_pick_correct: Optional[bool]          # picked the expert-labeled best card
     removal_correct: Optional[bool]            # removed the expert-labeled worst card
     parse_ok: bool
+    expert_archetype: str = ""                 # the heuristic label (for audit)
+    archetype_confident: bool = True           # False = ambiguous deck, excluded from acc
+    model_archetype: str = ""                  # what the model answered (for audit)
     raw_response: dict = field(default_factory=dict)
 
 
@@ -365,6 +373,15 @@ class TurnEvaluator:
 
 # ── Combat-level evaluator ─────────────────────────────────────────────────────
 
+def _safe_int(v, default: int = 0) -> int:
+    """Coerce an LLM-supplied index to an int. Models sometimes return null, a
+    string, a float, or omit the field — all become `default` (0 = first option)."""
+    try:
+        return int(v)
+    except (TypeError, ValueError):
+        return default
+
+
 class CombatEvaluator:
     """LLM plays a full combat from start to finish, turn by turn."""
 
@@ -420,8 +437,8 @@ class CombatEvaluator:
                     turn_done = True
 
                 elif action == "play":
-                    idx = resp.get("card_index", 0)
-                    target_idx = resp.get("target_index", 0)
+                    idx = _safe_int(resp.get("card_index", 0))
+                    target_idx = _safe_int(resp.get("target_index", 0))
                     hand = state.combat.hand
                     if not (0 <= idx < len(hand)):
                         parse_errors += 1
@@ -525,6 +542,38 @@ def _classify_archetype(deck: List, relics: List) -> str:
         scores["Strength"] += 2.0
     best = max(scores, key=lambda k: scores[k])
     return best if scores[best] > 0 else "Aggro"
+
+
+def _classify_archetype_confident(deck: List, relics: List) -> Tuple[str, bool]:
+    """Label the deck's archetype using *signature* cards only, and report whether
+    that label is trustworthy.
+
+    The plain `_classify_archetype` always returns *something* (needed for draft
+    coherence / best-pick), but for scoring "did the model identify the archetype?"
+    we must not penalize the model when the deck has no real archetype. A deck is
+    only confidently labeled when exactly one archetype owns the most signature
+    (payoff) cards — relics count as a signature. Otherwise (no payoff at all, or a
+    tie between archetypes) the deck is genuinely ambiguous and is excluded from
+    archetype accuracy.
+
+    Returns (label, confident). When not confident, `label` is the best-effort
+    `_classify_archetype` value, kept only for display/audit."""
+    relic_names = {r.name for r in relics}
+    deck_set = {c.name for c in deck}
+    sig: Dict[str, int] = {arch: 0 for arch in _ARCHETYPES}
+    for arch in _ARCHETYPES:
+        sig[arch] = sum(1 for c in _ARCHETYPE_PAYOFFS.get(arch, set()) if c in deck_set)
+    if "Barricade" in relic_names or "Calipers" in relic_names:
+        sig["Block"] += 1
+    if "Brimstone" in relic_names:
+        sig["Strength"] += 1
+
+    ranked = sorted(sig.items(), key=lambda kv: kv[1], reverse=True)
+    top_arch, top_n = ranked[0]
+    runner_n = ranked[1][1]
+    confident = top_n > 0 and top_n > runner_n
+    label = top_arch if confident else _classify_archetype(deck, relics)
+    return label, confident
 
 
 def _draft_coherence(deck: List, archetype: str) -> float:
@@ -646,7 +695,8 @@ class SynergyEvaluator:
     def evaluate(self, state, card_offers: List, expert_pick_idx: Optional[int] = None,
                  expert_remove_name: Optional[str] = None) -> SynergyScore:
 
-        expert_archetype = _classify_archetype(state.player.deck, state.player.relics)
+        expert_archetype, archetype_confident = _classify_archetype_confident(
+            state.player.deck, state.player.relics)
         # Derive real expert labels when callers don't supply hand-labeled data
         if expert_pick_idx is None and card_offers:
             expert_pick_idx = _expert_best_card_index(
@@ -677,10 +727,16 @@ class SynergyEvaluator:
         archetype_correct = None
         card_pick_correct = None
         removal_correct = None
+        model_archetype = ""
 
         if parse_ok:
-            arch = resp.get("archetype", "")
-            archetype_correct = arch.strip().lower() == expert_archetype.lower()
+            model_archetype = resp.get("archetype", "").strip()
+            # Only score archetype ID when the deck has a real, unambiguous archetype.
+            # Ambiguous decks (no signature card, or a tie) stay None → excluded from acc.
+            if archetype_confident:
+                # Substring match: accept "Block", "Block deck", "Defensive / Block", etc.
+                # Archetype names are mutually non-overlapping, so `in` is unambiguous.
+                archetype_correct = expert_archetype.lower() in model_archetype.lower()
 
             if expert_pick_idx is not None:
                 pick = resp.get("best_card_index")
@@ -695,6 +751,9 @@ class SynergyEvaluator:
             card_pick_correct=card_pick_correct,
             removal_correct=removal_correct,
             parse_ok=parse_ok,
+            expert_archetype=expert_archetype,
+            archetype_confident=archetype_confident,
+            model_archetype=model_archetype,
             raw_response=resp,
         )
 
@@ -769,8 +828,8 @@ class RunEvaluator:
                     end_player_turn(state)
                     turn_done = True
                 elif resp.get("action") == "play":
-                    idx = resp.get("card_index", 0)
-                    tidx = resp.get("target_index", 0)
+                    idx = _safe_int(resp.get("card_index", 0))
+                    tidx = _safe_int(resp.get("target_index", 0))
                     hand = state.combat.hand
                     if 0 <= idx < len(hand) and hand[idx].can_play(state):
                         enemies_alive = [e for e in state.combat.enemies if e.hp > 0]
@@ -960,6 +1019,10 @@ class BenchmarkResult:
             "archetype_acc": avg([float(s.archetype_correct)
                                   for s in self.synergy_scores
                                   if s.archetype_correct is not None]),
+            "archetype_n_scored": sum(1 for s in self.synergy_scores
+                                      if s.archetype_correct is not None),
+            "archetype_n_ambiguous": sum(1 for s in self.synergy_scores
+                                         if s.parse_ok and not s.archetype_confident),
             "card_pick_acc": avg([float(s.card_pick_correct)
                                   for s in self.synergy_scores
                                   if s.card_pick_correct is not None]),
@@ -967,6 +1030,17 @@ class BenchmarkResult:
                                 for s in self.synergy_scores
                                 if s.removal_correct is not None]),
             "parse_ok_rate": avg([float(s.parse_ok) for s in self.synergy_scores]),
+            "samples": [
+                {
+                    "expert_archetype": s.expert_archetype,
+                    "model_archetype": s.model_archetype,
+                    "confident": s.archetype_confident,
+                    "archetype_correct": s.archetype_correct,
+                    "card_pick_correct": s.card_pick_correct,
+                    "removal_correct": s.removal_correct,
+                }
+                for s in self.synergy_scores
+            ],
         } if self.synergy_scores else None
 
         ACT1_FLOORS = 15
@@ -1068,8 +1142,8 @@ class BenchmarkHarness:
             offers = generate_card_reward(state, 3)
             score = evaluator.evaluate(state, offers)
             scores.append(score)
-            label = _classify_archetype(state.player.deck, state.player.relics)
-            print(f"    expert_label={label}  archetype_ok={score.archetype_correct}  "
+            tag = score.expert_archetype if score.archetype_confident else f"{score.expert_archetype}?(ambiguous)"
+            print(f"    expert_label={tag}  model_said='{score.model_archetype}'  archetype_ok={score.archetype_correct}  "
                   f"card_pick_ok={score.card_pick_correct}  removal_ok={score.removal_correct}", flush=True)
         return scores
 

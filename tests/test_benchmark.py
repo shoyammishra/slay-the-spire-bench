@@ -9,7 +9,7 @@ from slay_bench.benchmark import (
     MockLLM, TurnEvaluator, CombatEvaluator, SynergyEvaluator,
     RunEvaluator, BenchmarkHarness,
     _exhaustive_best_sequence, _simulate_play_sequence,
-    _classify_archetype, _draft_coherence,
+    _classify_archetype, _classify_archetype_confident, _draft_coherence,
     TurnScore, CombatScore, SynergyScore, RunScore, BenchmarkResult,
 )
 from slay_bench.prompt_builder import (
@@ -192,6 +192,45 @@ def test_combat_evaluator_play_attacks():
     assert isinstance(score, CombatScore)
     print(f"[PASS] CombatEvaluator attacks: won={score.won}, cards_played={score.cards_played}, "
           f"parse_errors={score.parse_errors}")
+
+
+def test_combat_evaluator_null_indices():
+    """Model returning null/string card_index or target_index must not crash."""
+    responses = ['{"action": "play", "card_index": null, "target_index": null, "reasoning": "bad"}',
+                 '{"action": "play", "card_index": "0", "target_index": "0", "reasoning": "str"}',
+                 '{"action": "end_turn", "reasoning": "done"}'] * 20
+    mock = MockLLM(responses)
+    evaluator = CombatEvaluator(mock, max_turns=20)
+    state = new_ironclad_game(31)
+    enemy = Cultist(state.rng.hp_rng)
+    score = evaluator.evaluate(state, [enemy])  # must not raise TypeError
+    assert isinstance(score, CombatScore)
+    print(f"[PASS] CombatEvaluator null/str indices handled: won={score.won}, "
+          f"turns={score.turns}")
+
+
+def test_classify_archetype_confident():
+    """Confident only when one archetype uniquely owns the most signature cards."""
+    from types import SimpleNamespace
+    card = lambda n: SimpleNamespace(name=n)
+
+    # One signature (Body Slam = Block payoff), rest generic → confident Block
+    deck = [card(n) for n in ("Strike", "Defend", "Bash", "Body Slam", "Hemokinesis")]
+    label, conf = _classify_archetype_confident(deck, [])
+    assert conf and label == "Block", (label, conf)
+
+    # No signature card at all → ambiguous (this is the seed-244 bug: Armaments /
+    # Headbutt are NOT Exhaust payoffs, so they must not fabricate an Exhaust label)
+    deck = [card(n) for n in ("Strike", "Bash", "Armaments", "Headbutt", "Uppercut")]
+    label, conf = _classify_archetype_confident(deck, [])
+    assert not conf, (label, conf)
+
+    # Tie: one payoff for each of two archetypes → ambiguous
+    deck = [card(n) for n in ("Corruption", "Juggernaut")]  # Exhaust + Block
+    label, conf = _classify_archetype_confident(deck, [])
+    assert not conf, (label, conf)
+
+    print("[PASS] _classify_archetype_confident: signature/ambiguity logic correct")
 
 
 # ── SynergyEvaluator tests ────────────────────────────────────────────────────
