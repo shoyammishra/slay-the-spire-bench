@@ -262,6 +262,22 @@ def test_synergy_evaluator_raw():
     print(f"[PASS] SynergyEvaluator raw: archetype={score.raw_response.get('archetype')}")
 
 
+def test_synergy_eval_fixtures():
+    """run_synergy_eval uses hand-crafted decks: confident labels, correct ground
+    truth, and a model that answers right scores right."""
+    # Fixture 0 is the Strength deck; best pick idx 1, removal = Strike.
+    mock = MockLLM(['{"archetype": "Strength", "best_card_index": 1, "worst_card_name": "Strike"}'])
+    harness = BenchmarkHarness(mock, model_name="mock", prompt_format="structured")
+    scores = harness.run_synergy_eval([42])  # one sample -> fixture 0
+    s = scores[0]
+    assert s.expert_archetype == "Strength", s.expert_archetype
+    assert s.archetype_confident is True          # crafted decks are never ambiguous
+    assert s.archetype_correct is True            # model said Strength
+    assert s.card_pick_correct is True            # picked index 1
+    assert s.removal_correct is True              # said Strike
+    print(f"[PASS] synergy fixtures: label={s.expert_archetype}, all-correct path works")
+
+
 # ── Archetype classification tests ───────────────────────────────────────────
 
 def test_classify_archetype():

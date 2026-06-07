@@ -1,5 +1,35 @@
 # Findings
 
+## ✅ Synergy redesigned to hand-crafted archetype decks (2026-06-07)
+
+**Decision:** the synergy dimension no longer evaluates RNG-drafted Act-1 decks. It now
+uses 8 fixed, hand-crafted decks (`_SYNERGY_FIXTURES` in benchmark.py) — 2 per archetype,
+each with 4–5 signature payoff cards so the archetype is unmistakable, a basic Strike as the
+removal target, and a 3-card offer whose on-archetype card is the expert best pick.
+
+**Why:** the `--n-synergy 10` RNG run exposed that RNG Act-1 decks are a dead end for
+archetype ID. Evidence (per-sample audit, all 4 combos): only **3/10 decks** came out
+confidently labeled, archetype_acc was an identical **0.333** everywhere, and the models
+**collapsed to "Aggro"** on ~8/10 samples regardless of deck. Worse, the few "confident"
+labels were debatable — seed 243 was labeled Block off a *single* Body Slam in an otherwise
+aggressive deck, so the model answering "Aggro" was arguably *more* correct than the
+heuristic. Root cause: Act-1 decks (6–13 cards, RNG-limited payoffs) simply don't have a
+crisp archetype yet — those crystallize in Acts 2–3. Grounding "what's this deck's
+archetype?" on them measures noise.
+
+**Result:** ground truth is now deterministic and unambiguous (verified: all 8 fixtures
+classify confident + match intended archetype; best-pick offer is on-archetype; removal =
+Strike). The synergy test becomes a clean "given an obviously-X deck, does the model
+identify X, pick the X card, and remove the dead basic?" — a measurement that can go in the
+paper. The old `_archetype_draft_fn` (RNG-toward-target drafting) was removed as dead code.
+**All prior synergy numbers are superseded — re-run `--only synergy --n-synergy 8` (8 = one
+pass over all fixtures; multiples of 8 for repeats).**
+
+The genuine findings from the RNG run still hold and are worth reporting: models show a
+strong **Aggro-bias** (default to "Aggro" regardless of deck — the same bias the old
+*heuristic* had), `removal_acc ≈ 0`, and low `card_pick_acc`. The fixed-deck eval will show
+whether the Aggro-bias persists when the deck is unmistakably non-Aggro.
+
 ## ⚠️ Synergy archetype scoring — 3rd fix (2026-06-07): confident/ambiguous labels
 
 The `--only synergy` re-runs (post 2nd-rework) produced **archetype_acc = 0.0 on ALL

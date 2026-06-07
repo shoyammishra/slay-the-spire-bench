@@ -626,38 +626,6 @@ def _expert_best_card_index(offers: List, deck: List, relics: List) -> int:
     return best_i
 
 
-def _archetype_draft_fn(target_archetype: str):
-    """Return a card_choice_fn that drafts *toward* a target archetype.
-
-    Prefers the archetype's payoff cards, then its support cards, then falls back
-    to the highest-rarity non-curse offer. This produces a deck with a coherent,
-    identifiable strategy — so 'archetype accuracy' tests real recognition instead
-    of agreement on a random pile of greedy first-picks."""
-    from .enums import CardRarity, CardType
-    keys = set(_ARCHETYPES.get(target_archetype, []))
-    payoffs = _ARCHETYPE_PAYOFFS.get(target_archetype, set())
-    rarity_w = {
-        CardRarity.RARE: 2.0, CardRarity.UNCOMMON: 1.0, CardRarity.COMMON: 0.0,
-        CardRarity.BASIC: -1.0, CardRarity.SPECIAL: -5.0, CardRarity.CURSE: -10.0,
-    }
-
-    def pick(offers):
-        best, best_score = None, float("-inf")
-        for c in offers:
-            if c.type == CardType.CURSE:
-                continue
-            score = rarity_w.get(c.rarity, 0.0)
-            if c.name in payoffs:
-                score += 20.0
-            elif c.name in keys:
-                score += 10.0
-            if score > best_score:
-                best_score, best = score, c
-        return best
-
-    return pick
-
-
 def _expert_worst_card_name(deck: List) -> Optional[str]:
     """Heuristic 'expert' removal target: curses first, then basic Strike, then Defend."""
     from .enums import CardType
@@ -669,6 +637,50 @@ def _expert_worst_card_name(deck: List) -> Optional[str]:
             if c.name == target:
                 return c.name
     return None
+
+
+# Hand-crafted, unambiguous archetype decks for the synergy dimension.
+# RNG-drafted Act-1 decks rarely have a clear archetype (most come out ambiguous,
+# and even "confident" labels off a single signature card are debatable). Fixed
+# decks give the synergy test clean, deterministic ground truth: each deck has 4-5
+# signature payoff cards so its archetype is unmistakable, a basic Strike as the
+# expert removal target, and a 3-card offer whose on-archetype card is the expert
+# best pick. (archetype, deck_card_names, offer_card_names, expert_pick_idx).
+# Card keys: "Strike_R"/"Defend_R" are the registry keys; their .name is Strike/Defend.
+_SYNERGY_FIXTURES = [
+    ("Strength",
+     ["Demon Form", "Limit Break", "Inflame", "Heavy Blade", "Flex", "Twin Strike",
+      "Strike_R", "Strike_R", "Strike_R", "Defend_R"],
+     ["Defend_R", "Bludgeon", "Strike_R"], 1),          # Bludgeon = Strength payoff
+    ("Block",
+     ["Barricade", "Body Slam", "Juggernaut", "Entrench", "Impervious", "Iron Wave",
+      "Defend_R", "Defend_R", "Defend_R", "Strike_R"],
+     ["Shrug It Off", "Anger", "Strike_R"], 0),          # Shrug It Off = Block
+    ("Exhaust",
+     ["Corruption", "Feel No Pain", "Dark Embrace", "Fiend Fire", "Evolve", "Dual Wield",
+      "Strike_R", "Strike_R", "Defend_R"],
+     ["Strike_R", "Defend_R", "Sever Soul"], 2),         # Sever Soul = Exhaust
+    ("Aggro",
+     ["Perfected Strike", "Rampage", "Blood for Blood", "Reckless Charge", "Pommel Strike",
+      "Anger", "Strike_R", "Strike_R", "Defend_R", "Bash"],
+     ["Twin Strike", "Defend_R", "Iron Wave"], 0),       # Twin Strike = Aggro strike-payoff
+    ("Strength",
+     ["Demon Form", "Inflame", "Heavy Blade", "Whirlwind", "Flex",
+      "Strike_R", "Strike_R", "Strike_R", "Defend_R", "Defend_R"],
+     ["Carnage", "Defend_R", "Shrug It Off"], 0),        # Carnage = Strength payoff
+    ("Block",
+     ["Barricade", "Juggernaut", "Entrench", "Impervious", "Ghostly Armor", "Shrug It Off",
+      "Defend_R", "Defend_R", "Strike_R", "Strike_R"],
+     ["Anger", "Second Wind", "Strike_R"], 1),           # Second Wind = Block
+    ("Exhaust",
+     ["Corruption", "Feel No Pain", "Dark Embrace", "Sever Soul", "Evolve",
+      "Strike_R", "Strike_R", "Strike_R", "Defend_R"],
+     ["Defend_R", "Strike_R", "Fiend Fire"], 2),         # Fiend Fire = Exhaust
+    ("Aggro",
+     ["Perfected Strike", "Rampage", "Blood for Blood", "Pommel Strike", "Clothesline",
+      "Anger", "Strike_R", "Strike_R", "Defend_R", "Bash"],
+     ["Reckless Charge", "Defend_R", "Iron Wave"], 0),   # Reckless Charge = Aggro payoff
+]
 
 
 def _greedy_combat_hp(state_after_start, max_turns: int = 50) -> int:
@@ -1139,30 +1151,32 @@ class BenchmarkHarness:
         return scores
 
     def run_synergy_eval(self, seeds: List[int]) -> List[SynergyScore]:
-        """Evaluate synergy recognition at a mid-run snapshot."""
-        from slay_bench import new_ironclad_game
-        from slay_bench.rewards import generate_card_reward
-        from slay_bench.run_loop import run_act
-        from .enums import CardType
-        import copy
+        """Evaluate synergy recognition on hand-crafted, unambiguous archetype decks.
 
-        # Cycle target archetypes so every sample drafts toward a coherent,
-        # identifiable strategy (and all four archetypes get tested over a run).
-        targets = list(_ARCHETYPES)  # ["Strength", "Block", "Exhaust", "Aggro"]
+        RNG-drafted Act-1 decks rarely have a clear archetype, so we use fixed
+        fixtures (`_SYNERGY_FIXTURES`) for clean, deterministic ground truth. `seeds`
+        is used only to pick which fixture each sample runs (so n_synergy controls
+        the count); the deck/offers/labels come from the fixture, not from RNG."""
+        from slay_bench import new_ironclad_game
+        from slay_bench.cards import make_card
 
         evaluator = SynergyEvaluator(self.llm, self.prompt_format)
         scores = []
         for i, seed in enumerate(seeds):
-            target = targets[i % len(targets)]
-            print(f"  [synergy {i+1}/{len(seeds)}] seed={seed}  drafting->{target}", flush=True)
+            archetype, deck_names, offer_names, pick_idx = _SYNERGY_FIXTURES[i % len(_SYNERGY_FIXTURES)]
+            print(f"  [synergy {i+1}/{len(seeds)}] deck={archetype}", flush=True)
             state = new_ironclad_game(seed)
-            run_act(state, act=1, card_choice_fn=_archetype_draft_fn(target))
-            offers = generate_card_reward(state, 3)
-            score = evaluator.evaluate(state, offers)
+            state.player.deck = [make_card(n) for n in deck_names]
+            offers = [make_card(n) for n in offer_names]
+            # Ground truth is supplied explicitly: best pick = the on-archetype offer,
+            # removal = a basic Strike (meta-correct: basics dilute draw quality).
+            score = evaluator.evaluate(state, offers,
+                                       expert_pick_idx=pick_idx,
+                                       expert_remove_name="Strike")
             scores.append(score)
-            tag = score.expert_archetype if score.archetype_confident else f"{score.expert_archetype}?(ambiguous)"
-            print(f"    expert_label={tag}  model_said='{score.model_archetype}'  archetype_ok={score.archetype_correct}  "
-                  f"card_pick_ok={score.card_pick_correct}  removal_ok={score.removal_correct}", flush=True)
+            print(f"    expert_label={score.expert_archetype}  model_said='{score.model_archetype}'  "
+                  f"archetype_ok={score.archetype_correct}  card_pick_ok={score.card_pick_correct}  "
+                  f"removal_ok={score.removal_correct}", flush=True)
         return scores
 
     def run_run_eval(self, seeds: List[int]) -> List[RunScore]:
