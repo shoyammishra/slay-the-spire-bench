@@ -29,6 +29,11 @@ from .prompt_builder import (
 
 # ── LLM interface ─────────────────────────────────────────────────────────────
 
+class RateLimitExhausted(RuntimeError):
+    """Raised when the API rate limit persists after all retries. The harness
+    catches this and returns partial results instead of losing completed work."""
+
+
 class LLMInterface(ABC):
     """Abstract LLM client. Implement `complete()` for any provider."""
 
@@ -39,20 +44,27 @@ class LLMInterface(ABC):
     def complete_json(self, system: str, user: str, **kwargs) -> dict:
         """Call complete() and parse JSON from the response."""
         raw = self.complete(system, user, **kwargs)
+        # Strip <think>...</think> blocks (reasoning models like qwen3)
+        import re as _re
+        text = _re.sub(r'<think>.*?</think>', '', raw, flags=_re.DOTALL).strip()
         # Strip markdown fences if present
-        text = raw.strip()
         if text.startswith("```"):
             lines = text.splitlines()
             text = "\n".join(lines[1:-1] if lines[-1].startswith("```") else lines[1:])
         try:
             return json.loads(text)
         except json.JSONDecodeError:
-            # Try to extract a JSON object from the text
-            import re
-            m = re.search(r'\{.*\}', text, re.DOTALL)
-            if m:
-                return json.loads(m.group())
-            return {"error": "parse_failure", "raw": raw}
+            pass
+        # Try to extract the first valid JSON object from the text
+        import re
+        for m in re.finditer(r'\{', text):
+            for end in range(len(text), m.start(), -1):
+                candidate = text[m.start():end]
+                try:
+                    return json.loads(candidate)
+                except json.JSONDecodeError:
+                    continue
+        return {"error": "parse_failure", "raw": raw}
 
 
 class GroqLLM(LLMInterface):
@@ -75,17 +87,33 @@ class GroqLLM(LLMInterface):
         return self._client
 
     def complete(self, system: str, user: str, **kwargs) -> str:
+        import time
         client = self._get_client()
-        resp = client.chat.completions.create(
-            model=self.model,
-            messages=[
-                {"role": "system", "content": system},
-                {"role": "user", "content": user},
-            ],
-            temperature=kwargs.get("temperature", 0.0),
-            max_tokens=kwargs.get("max_tokens", 512),
-        )
-        return resp.choices[0].message.content
+        last_err = None
+        for attempt in range(5):
+            try:
+                resp = client.chat.completions.create(
+                    model=self.model,
+                    messages=[
+                        {"role": "system", "content": system},
+                        {"role": "user", "content": user},
+                    ],
+                    temperature=kwargs.get("temperature", 0.0),
+                    max_tokens=kwargs.get("max_tokens", 3000),
+                )
+                return resp.choices[0].message.content
+            except Exception as e:  # noqa: BLE001 — retry only on rate limits
+                last_err = e
+                status = getattr(e, "status_code", None)
+                is_rate_limit = status == 429 or "rate" in type(e).__name__.lower() \
+                    or "429" in str(e) or "rate limit" in str(e).lower()
+                if not is_rate_limit:
+                    raise
+                wait = 2 ** attempt  # 1, 2, 4, 8, 16s
+                print(f"    [rate limit] retry {attempt+1}/5 in {wait}s...", flush=True)
+                time.sleep(wait)
+        # Out of retries — signal exhaustion so the harness can stop gracefully.
+        raise RateLimitExhausted(str(last_err))
 
 
 class OpenRouterLLM(LLMInterface):
@@ -96,7 +124,7 @@ class OpenRouterLLM(LLMInterface):
         self._api_key = api_key
 
     def complete(self, system: str, user: str, **kwargs) -> str:
-        import os, urllib.request
+        import os, time, urllib.request, urllib.error
         key = self._api_key or os.environ.get("OPENROUTER_API_KEY")
         payload = json.dumps({
             "model": self.model,
@@ -105,19 +133,36 @@ class OpenRouterLLM(LLMInterface):
                 {"role": "user", "content": user},
             ],
             "temperature": kwargs.get("temperature", 0.0),
-            "max_tokens": kwargs.get("max_tokens", 512),
+            "max_tokens": kwargs.get("max_tokens", 8000),
         }).encode()
-        req = urllib.request.Request(
-            "https://openrouter.ai/api/v1/chat/completions",
-            data=payload,
-            headers={
-                "Authorization": f"Bearer {key}",
-                "Content-Type": "application/json",
-            },
-        )
-        with urllib.request.urlopen(req, timeout=30) as r:
-            data = json.loads(r.read())
-        return data["choices"][0]["message"]["content"]
+        last_err = None
+        for attempt in range(5):
+            try:
+                req = urllib.request.Request(
+                    "https://openrouter.ai/api/v1/chat/completions",
+                    data=payload,
+                    headers={
+                        "Authorization": f"Bearer {key}",
+                        "Content-Type": "application/json",
+                    },
+                )
+                with urllib.request.urlopen(req, timeout=120) as r:
+                    data = json.loads(r.read())
+                return data["choices"][0]["message"]["content"]
+            except urllib.error.HTTPError as e:
+                last_err = e
+                if e.code == 429:
+                    wait = 2 ** attempt
+                    print(f"    [rate limit] retry {attempt+1}/5 in {wait}s...", flush=True)
+                    time.sleep(wait)
+                else:
+                    raise
+            except Exception as e:
+                last_err = e
+                wait = 2 ** attempt
+                print(f"    [network error] retry {attempt+1}/5 in {wait}s: {e}", flush=True)
+                time.sleep(wait)
+        raise RateLimitExhausted(str(last_err))
 
 
 class MockLLM(LLMInterface):
@@ -303,6 +348,11 @@ class TurnEvaluator:
         # Optimal via exhaustive search
         opt_dmg, opt_seq = _exhaustive_best_sequence(snapshot)
 
+        # Illegal sequence: credit partial damage but cap ratio at 0 so it
+        # doesn't artificially inflate the score for a sequence that cheated.
+        if not llm_legal:
+            llm_dmg = 0
+
         return TurnScore(
             optimal_damage=opt_dmg,
             llm_damage=llm_dmg,
@@ -328,6 +378,8 @@ class CombatEvaluator:
         from .combat import start_combat, play_card, end_player_turn, is_combat_over, end_combat
 
         start_combat(state, enemies)
+        # Greedy baseline on the identical post-start state (own RNG copy)
+        optimal_hp = _greedy_combat_hp(state, self.max_turns)
         parse_errors = 0
         cards_played = 0
         turns = 0
@@ -405,7 +457,7 @@ class CombatEvaluator:
             won=won,
             turns=turns,
             hp_remaining=state.player.hp,
-            optimal_hp_remaining=None,
+            optimal_hp_remaining=optimal_hp,
             cards_played=cards_played,
             parse_errors=parse_errors,
         )
@@ -415,27 +467,62 @@ class CombatEvaluator:
 
 # Expert archetype labels: map of key card names → archetype
 _ARCHETYPES = {
-    "Strength": ["Limit Break", "Inflame", "Demon Form", "Heavy Blade", "Whirlwind"],
-    "Block": ["Barricade", "Entrench", "Body Slam", "Juggernaut", "Impervious"],
-    "Exhaust": ["Feel No Pain", "Dark Embrace", "Corruption", "Dead Branch", "Offering"],
-    "Aggro": ["Perfected Strike", "Twin Strike", "Wild Strike", "Pommel Strike", "Clash"],
+    "Strength": [
+        "Limit Break", "Inflame", "Demon Form", "Heavy Blade", "Whirlwind",
+        "Flex", "Sword Boomerang", "Dropkick", "Thunderclap", "Uppercut",
+        "Bludgeon", "Carnage", "Anger", "Hemokinesis",
+    ],
+    "Block": [
+        "Barricade", "Entrench", "Body Slam", "Juggernaut", "Impervious",
+        "Iron Wave", "Shrug It Off", "True Grit", "Ghostly Armor", "Sentinel",
+        "Power Through", "Second Wind", "Warcry", "Seeing Red",
+    ],
+    "Exhaust": [
+        "Feel No Pain", "Dark Embrace", "Corruption", "Dead Branch", "Offering",
+        "Armaments", "Fiend Fire", "Immolate", "Reaper", "Brutality",
+        "Evolve", "Headbutt", "Sever Soul",
+    ],
+    "Aggro": [
+        "Perfected Strike", "Twin Strike", "Wild Strike", "Pommel Strike", "Clash",
+        "Cleave", "Clothesline", "Reckless Charge", "Blood for Blood",
+        "Rampage", "Searing Blow", "Havoc", "Battle Trance",
+    ],
 }
+
+# Signature "payoff" cards that define an archetype far more strongly than generic
+# support cards. A single payoff outweighs several commons in classification — this
+# fixes the bias where the over-stuffed Aggro bucket (full of generic Strike-variants
+# that appear in any random draft) captured nearly every deck.
+_ARCHETYPE_PAYOFFS = {
+    "Strength": {"Demon Form", "Limit Break", "Inflame", "Heavy Blade", "Whirlwind"},
+    "Block":    {"Barricade", "Body Slam", "Juggernaut", "Entrench", "Impervious"},
+    "Exhaust":  {"Corruption", "Feel No Pain", "Dark Embrace", "Dead Branch", "Fiend Fire"},
+    "Aggro":    {"Perfected Strike", "Rampage", "Blood for Blood", "Reckless Charge"},
+}
+
+_PAYOFF_WEIGHT = 3.0
+_SUPPORT_WEIGHT = 1.0
 
 
 def _classify_archetype(deck: List, relics: List) -> str:
-    """Heuristically label the deck's dominant archetype."""
+    """Heuristically label the deck's dominant archetype.
+
+    Payoff cards are weighted 3x over generic support cards so the label reflects
+    what the deck is actually built around, not which bucket has the most filler
+    commons. Duplicates count once (presence, not quantity)."""
     relic_names = {r.name for r in relics}
-    scores: Dict[str, int] = {arch: 0 for arch in _ARCHETYPES}
-    card_names = [c.name for c in deck]
+    scores: Dict[str, float] = {arch: 0.0 for arch in _ARCHETYPES}
+    deck_set = {c.name for c in deck}
     for arch, keys in _ARCHETYPES.items():
+        payoffs = _ARCHETYPE_PAYOFFS.get(arch, set())
         for key in keys:
-            if key in card_names:
-                scores[arch] += 1
+            if key in deck_set:
+                scores[arch] += _PAYOFF_WEIGHT if key in payoffs else _SUPPORT_WEIGHT
     # Relic bonuses
     if "Barricade" in relic_names or "Calipers" in relic_names:
-        scores["Block"] += 2
-    if "Demon Form" in card_names or "Brimstone" in relic_names:
-        scores["Strength"] += 2
+        scores["Block"] += 2.0
+    if "Brimstone" in relic_names:
+        scores["Strength"] += 2.0
     best = max(scores, key=lambda k: scores[k])
     return best if scores[best] > 0 else "Aggro"
 
@@ -449,6 +536,101 @@ def _draft_coherence(deck: List, archetype: str) -> float:
         return 0.0
     hits = sum(1 for c in non_basic if c.name in keys)
     return hits / len(non_basic)
+
+
+def _expert_best_card_index(offers: List, deck: List, relics: List) -> int:
+    """Heuristic 'expert' best pick: favors the dominant archetype, then rarity."""
+    from .enums import CardRarity
+    archetype = _classify_archetype(deck, relics)
+    keys = set(_ARCHETYPES.get(archetype, []))
+    rarity_w = {
+        CardRarity.RARE: 2.0, CardRarity.UNCOMMON: 1.0, CardRarity.COMMON: 0.0,
+        CardRarity.BASIC: -1.0, CardRarity.SPECIAL: -5.0, CardRarity.CURSE: -10.0,
+    }
+    best_i, best_score = 0, float("-inf")
+    for i, c in enumerate(offers):
+        score = rarity_w.get(c.rarity, 0.0)
+        if c.name in keys:
+            score += 3.0
+        if getattr(c, "upgraded", False):
+            score += 0.5
+        if score > best_score:
+            best_score, best_i = score, i
+    return best_i
+
+
+def _archetype_draft_fn(target_archetype: str):
+    """Return a card_choice_fn that drafts *toward* a target archetype.
+
+    Prefers the archetype's payoff cards, then its support cards, then falls back
+    to the highest-rarity non-curse offer. This produces a deck with a coherent,
+    identifiable strategy — so 'archetype accuracy' tests real recognition instead
+    of agreement on a random pile of greedy first-picks."""
+    from .enums import CardRarity, CardType
+    keys = set(_ARCHETYPES.get(target_archetype, []))
+    payoffs = _ARCHETYPE_PAYOFFS.get(target_archetype, set())
+    rarity_w = {
+        CardRarity.RARE: 2.0, CardRarity.UNCOMMON: 1.0, CardRarity.COMMON: 0.0,
+        CardRarity.BASIC: -1.0, CardRarity.SPECIAL: -5.0, CardRarity.CURSE: -10.0,
+    }
+
+    def pick(offers):
+        best, best_score = None, float("-inf")
+        for c in offers:
+            if c.type == CardType.CURSE:
+                continue
+            score = rarity_w.get(c.rarity, 0.0)
+            if c.name in payoffs:
+                score += 20.0
+            elif c.name in keys:
+                score += 10.0
+            if score > best_score:
+                best_score, best = score, c
+        return best
+
+    return pick
+
+
+def _expert_worst_card_name(deck: List) -> Optional[str]:
+    """Heuristic 'expert' removal target: curses first, then basic Strike, then Defend."""
+    from .enums import CardType
+    for c in deck:
+        if c.type == CardType.CURSE:
+            return c.name
+    for target in ("Strike", "Defend"):
+        for c in deck:
+            if c.name == target:
+                return c.name
+    return None
+
+
+def _greedy_combat_hp(state_after_start, max_turns: int = 50) -> int:
+    """
+    Non-LLM reference: play the same combat with a simple greedy AI
+    (play every playable card each turn) on a deep copy. Returns HP remaining
+    (0 on loss). Used as the 'optimal' baseline for CombatScore.hp_ratio.
+    """
+    from .combat import play_card, end_player_turn, is_combat_over
+    import copy
+    s = copy.deepcopy(state_after_start)
+    for _ in range(max_turns):
+        if is_combat_over(s):
+            break
+        played = True
+        while played:
+            played = False
+            for card in list(s.combat.hand):
+                target = next((e for e in s.combat.enemies if e.hp > 0), None)
+                if target and card.can_play(s):
+                    play_card(s, card, target)
+                    played = True
+                    if is_combat_over(s):
+                        break
+                    break
+        if is_combat_over(s):
+            break
+        end_player_turn(s)
+    return max(0, s.player.hp)
 
 
 class SynergyEvaluator:
@@ -465,6 +647,12 @@ class SynergyEvaluator:
                  expert_remove_name: Optional[str] = None) -> SynergyScore:
 
         expert_archetype = _classify_archetype(state.player.deck, state.player.relics)
+        # Derive real expert labels when callers don't supply hand-labeled data
+        if expert_pick_idx is None and card_offers:
+            expert_pick_idx = _expert_best_card_index(
+                card_offers, state.player.deck, state.player.relics)
+        if expert_remove_name is None:
+            expert_remove_name = _expert_worst_card_name(state.player.deck)
 
         if self.prompt_format == "raw":
             context = deck_relic_raw(state) + "\n\n" + card_reward_raw(
@@ -707,7 +895,9 @@ class RunEvaluator:
                     llm_calls=llm_calls,
                 )
 
-            next_nodes = run.available_next_nodes()
+            # Exclude the boss; it is fought once in the dedicated block below
+            next_nodes = [n for n in run.available_next_nodes()
+                          if n is not game_map.boss_node]
             if next_nodes:
                 queue.append(next_nodes[0])
 
@@ -773,15 +963,23 @@ class BenchmarkResult:
             "card_pick_acc": avg([float(s.card_pick_correct)
                                   for s in self.synergy_scores
                                   if s.card_pick_correct is not None]),
+            "removal_acc": avg([float(s.removal_correct)
+                                for s in self.synergy_scores
+                                if s.removal_correct is not None]),
             "parse_ok_rate": avg([float(s.parse_ok) for s in self.synergy_scores]),
         } if self.synergy_scores else None
 
+        ACT1_FLOORS = 15
+        survivors = [s for s in self.run_scores if s.survived]
         run = {
             "n": len(self.run_scores),
             "survival_rate": avg([float(s.survived) for s in self.run_scores]),
-            "avg_hp_fraction": avg([s.hp_fraction for s in self.run_scores]),
+            # HP fraction only meaningful for survivors; 0 on death misleads
+            "avg_hp_fraction": avg([s.hp_fraction for s in survivors]) if survivors else 0.0,
             "avg_draft_coherence": avg([s.draft_coherence for s in self.run_scores]),
             "avg_floors_reached": avg([s.floors_reached for s in self.run_scores]),
+            # Progress fraction: floors reached ÷ total act floors (rewards partial credit)
+            "avg_progress": avg([min(1.0, s.floors_reached / ACT1_FLOORS) for s in self.run_scores]),
         } if self.run_scores else None
 
         return {
@@ -820,13 +1018,14 @@ class BenchmarkHarness:
 
         evaluator = TurnEvaluator(self.llm, self.prompt_format)
         scores = []
-        for seed in seeds:
+        for i, seed in enumerate(seeds):
+            print(f"  [turn {i+1}/{len(seeds)}] seed={seed}", flush=True)
             state = new_ironclad_game(seed)
             enemy = Cultist(state.rng.hp_rng)
             start_combat(state, [enemy])
-            # Let one enemy turn pass so there's some context
             score = evaluator.evaluate(state)
             scores.append(score)
+            print(f"    dmg_ratio={score.damage_ratio:.2f}  parse_ok={score.parse_ok}  legal={score.legal}", flush=True)
         return scores
 
     def run_combat_eval(self, seeds: List[int]) -> List[CombatScore]:
@@ -838,11 +1037,13 @@ class BenchmarkHarness:
         scores = []
         enemy_types = [Cultist, JawWorm]
         for i, seed in enumerate(seeds):
-            state = new_ironclad_game(seed)
             enemy_cls = enemy_types[i % len(enemy_types)]
+            print(f"  [combat {i+1}/{len(seeds)}] seed={seed}  enemy={enemy_cls.__name__}", flush=True)
+            state = new_ironclad_game(seed)
             enemy = enemy_cls(state.rng.hp_rng)
             score = evaluator.evaluate(state, [enemy])
             scores.append(score)
+            print(f"    won={score.won}  hp_ratio={score.hp_ratio:.2f}  turns={score.turns}", flush=True)
         return scores
 
     def run_synergy_eval(self, seeds: List[int]) -> List[SynergyScore]:
@@ -850,18 +1051,26 @@ class BenchmarkHarness:
         from slay_bench import new_ironclad_game
         from slay_bench.rewards import generate_card_reward
         from slay_bench.run_loop import run_act
+        from .enums import CardType
         import copy
+
+        # Cycle target archetypes so every sample drafts toward a coherent,
+        # identifiable strategy (and all four archetypes get tested over a run).
+        targets = list(_ARCHETYPES)  # ["Strength", "Block", "Exhaust", "Aggro"]
 
         evaluator = SynergyEvaluator(self.llm, self.prompt_format)
         scores = []
-        for seed in seeds:
+        for i, seed in enumerate(seeds):
+            target = targets[i % len(targets)]
+            print(f"  [synergy {i+1}/{len(seeds)}] seed={seed}  drafting->{target}", flush=True)
             state = new_ironclad_game(seed)
-            # Quick greedy run to get a mid-run deck state
-            run_act(state, act=1)
+            run_act(state, act=1, card_choice_fn=_archetype_draft_fn(target))
             offers = generate_card_reward(state, 3)
-            # Expert label: pick first offer (simplified — real eval would use hand-labeled data)
-            score = evaluator.evaluate(state, offers, expert_pick_idx=0)
+            score = evaluator.evaluate(state, offers)
             scores.append(score)
+            label = _classify_archetype(state.player.deck, state.player.relics)
+            print(f"    expert_label={label}  archetype_ok={score.archetype_correct}  "
+                  f"card_pick_ok={score.card_pick_correct}  removal_ok={score.removal_correct}", flush=True)
         return scores
 
     def run_run_eval(self, seeds: List[int]) -> List[RunScore]:
@@ -870,10 +1079,17 @@ class BenchmarkHarness:
 
         evaluator = RunEvaluator(self.llm, self.prompt_format)
         scores = []
-        for seed in seeds:
+        for i, seed in enumerate(seeds):
+            print(f"  [run {i+1}/{len(seeds)}] seed={seed}", flush=True)
             state = new_ironclad_game(seed)
-            score = evaluator.evaluate(state, act=1)
+            try:
+                score = evaluator.evaluate(state, act=1)
+            except RateLimitExhausted as e:
+                print(f"    [rate limit] stopping run-level after {len(scores)} "
+                      f"completed run(s); keeping partial results. ({e})", flush=True)
+                break
             scores.append(score)
+            print(f"    survived={score.survived}  floors={score.floors_reached}  hp={score.final_hp}/{score.max_hp}", flush=True)
         return scores
 
     def run_all(self, seed: int = 42, n_turn: int = 5, n_combat: int = 3,
@@ -891,10 +1107,18 @@ class BenchmarkHarness:
         synergy_seeds = list(range(seed + 200, seed + 200 + n_synergy))
         run_seeds = list(range(seed + 300, seed + 300 + n_run))
 
-        result.turn_scores = self.run_turn_eval(turn_seeds)
-        result.combat_scores = self.run_combat_eval(combat_seeds)
-        result.synergy_scores = self.run_synergy_eval(synergy_seeds)
-        result.run_scores = self.run_run_eval(run_seeds)
+        try:
+            print("── Turn-level ──────────────────────────", flush=True)
+            result.turn_scores = self.run_turn_eval(turn_seeds)
+            print("── Combat-level ────────────────────────", flush=True)
+            result.combat_scores = self.run_combat_eval(combat_seeds)
+            print("── Synergy ─────────────────────────────", flush=True)
+            result.synergy_scores = self.run_synergy_eval(synergy_seeds)
+            print("── Run-level ───────────────────────────", flush=True)
+            result.run_scores = self.run_run_eval(run_seeds)
+        except RateLimitExhausted as e:
+            print(f"\n[rate limit] aborting remaining dimensions; saving partial "
+                  f"results collected so far. ({e})", flush=True)
         result.elapsed_seconds = time.time() - t0
 
         return result

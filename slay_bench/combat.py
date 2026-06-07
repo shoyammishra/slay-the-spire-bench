@@ -17,7 +17,10 @@ def start_combat(state: GameState, enemies: List[Enemy]) -> None:
     from .cards import _draw_cards
     from .powers import register_power_hooks
 
-    # Fresh combat state
+    # Fresh combat state. Also drop any listeners left over from prior combats:
+    # relic/power hooks are re-registered below, and without clearing they would
+    # stack across a run (e.g. Burning Blood healing 6, then 12, then 18 ...).
+    state.bus.clear()
     state.combat = CombatState(enemies=enemies)
 
     # Shuffle master deck into draw pile
@@ -264,9 +267,6 @@ def _check_enemy_deaths(state: GameState) -> None:
             enemy.alive = False
             enemy.hp = 0
             state.bus.emit(Event.ENEMY_DEATH, state, target=enemy)
-            # Check HP threshold splits
-            if hasattr(enemy, 'on_hp_threshold'):
-                pass  # called pre-death in execute_move for slimes
 
 
 def is_combat_over(state: GameState) -> str | None:

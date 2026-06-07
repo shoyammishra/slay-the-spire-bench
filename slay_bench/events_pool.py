@@ -503,6 +503,25 @@ def _scrap_ooze(state: GameState) -> str:
             return _obtain_relic_event(state)
     return "Failed to grab relic."
 
+def _shining_light(state: GameState) -> str:
+    # Lose 30% max HP, upgrade 2 random un-upgraded cards.
+    loss = (state.player.max_hp * 30) // 100
+    from .cards import _damage_player
+    _damage_player(state, loss, is_hp_loss=True)
+    upgradeable = [c for c in state.player.deck if not getattr(c, "upgraded", False)]
+    upgraded = 0
+    for _ in range(2):
+        if not upgradeable:
+            break
+        idx = state.rng.event_rng.next_int(len(upgradeable))
+        card = upgradeable.pop(idx)
+        try:
+            card.upgrade()
+            upgraded += 1
+        except NotImplementedError:
+            pass
+    return f"Lost {loss} HP, upgraded {upgraded} cards."
+
 def _nloths_trade(state: GameState) -> str:
     if len(state.player.relics) < 2:
         return "Not enough relics."

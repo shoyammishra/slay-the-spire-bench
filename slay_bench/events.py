@@ -42,6 +42,12 @@ class EventBus:
     def __init__(self) -> None:
         self._listeners: dict[Event, list[Callable]] = {e: [] for e in Event}
 
+    def clear(self) -> None:
+        """Drop all listeners. Called at combat start so per-combat relic/power
+        hooks are re-registered fresh instead of stacking across the run."""
+        for e in self._listeners:
+            self._listeners[e].clear()
+
     def subscribe(self, event: Event, callback: Callable) -> None:
         self._listeners[event].append(callback)
 

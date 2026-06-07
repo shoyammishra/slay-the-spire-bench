@@ -103,6 +103,12 @@ def _apply_damage_to_enemy(state: GameState, target: Enemy, amount: int) -> int:
             target.add_block(target.powers[PowerId.MALLEABLE])
         target.hp -= real_dmg
         state.bus.emit(Event.DAMAGE_DEALT, state, target=target, amount=real_dmg)
+        # Curl Up: gain block the first time attack damage lands
+        if hasattr(target, 'on_damage_taken'):
+            target.on_damage_taken(state, real_dmg)
+        # Split (slimes): check HP threshold while still alive
+        if target.hp > 0 and hasattr(target, 'on_hp_threshold'):
+            target.on_hp_threshold(state)
     return amount  # return total (blocked+unblocked) for display purposes
 
 
@@ -214,7 +220,6 @@ class Slimed(Card):
         super().__init__("Slimed", "Slimed", CardType.STATUS, CardRarity.SPECIAL, 1, exhaust=True)
 
     def play(self, state, target=None):
-        state.player.energy -= 1
         _exhaust_card(state, self)
 
     def upgrade(self): pass
@@ -296,7 +301,6 @@ class Pride(CurseBase):
         super().__init__("Pride", "Pride", CardType.CURSE, CardRarity.CURSE, 1, innate=True, exhaust=True)
 
     def play(self, state, target=None):
-        state.player.energy -= 1
         state.combat.hand.append(Pride())
         _exhaust_card(state, self)
 
@@ -336,7 +340,6 @@ class Strike(Card):
         super().__init__("Strike_R", "Strike", CardType.ATTACK, CardRarity.BASIC, 1, upgraded)
 
     def play(self, state, target=None):
-        state.player.energy -= 1
         dmg = 9 if self.upgraded else 6
         _deal_damage(state, target, dmg)
 
@@ -349,7 +352,6 @@ class Defend(Card):
         super().__init__("Defend_R", "Defend", CardType.SKILL, CardRarity.BASIC, 1, upgraded)
 
     def play(self, state, target=None):
-        state.player.energy -= 1
         _gain_block(state, 8 if self.upgraded else 5)
 
     def upgrade(self):
@@ -362,7 +364,6 @@ class Bash(Card):
 
     def play(self, state, target=None):
         from .enums import PowerId
-        state.player.energy -= 2
         dmg = 10 if self.upgraded else 8
         vuln = 3 if self.upgraded else 2
         _deal_damage(state, target, dmg)
@@ -393,7 +394,6 @@ class Armaments(Card):
         super().__init__("Armaments", "Armaments", CardType.SKILL, CardRarity.COMMON, 1, upgraded)
 
     def play(self, state, target=None):
-        state.player.energy -= 1
         _gain_block(state, 5)
         if self.upgraded:
             for c in state.combat.hand:
@@ -414,7 +414,6 @@ class BodySlam(Card):
                          0 if upgraded else 1, upgraded)
 
     def play(self, state, target=None):
-        state.player.energy -= self.effective_cost()
         _deal_damage(state, target, state.player.block)
 
     def upgrade(self):
@@ -444,7 +443,6 @@ class Cleave(Card):
         super().__init__("Cleave", "Cleave", CardType.ATTACK, CardRarity.COMMON, 1, upgraded)
 
     def play(self, state, target=None):
-        state.player.energy -= 1
         dmg = 11 if self.upgraded else 8
         for e in state.combat.enemies:
             if e.hp > 0:
@@ -460,7 +458,6 @@ class Clothesline(Card):
 
     def play(self, state, target=None):
         from .enums import PowerId
-        state.player.energy -= 2
         dmg = 14 if self.upgraded else 12
         weak = 3 if self.upgraded else 2
         _deal_damage(state, target, dmg)
@@ -491,7 +488,6 @@ class Havoc(Card):
                          0 if upgraded else 1, upgraded)
 
     def play(self, state, target=None):
-        state.player.energy -= self.effective_cost()
         if state.combat.draw_pile:
             card = state.combat.draw_pile[-1]
             # play the top card without paying cost, then exhaust
@@ -510,7 +506,6 @@ class Headbutt(Card):
         super().__init__("Headbutt", "Headbutt", CardType.ATTACK, CardRarity.COMMON, 1, upgraded)
 
     def play(self, state, target=None):
-        state.player.energy -= 1
         dmg = 10 if self.upgraded else 9
         _deal_damage(state, target, dmg)
         if state.combat.discard_pile:
@@ -529,7 +524,6 @@ class HeavyBlade(Card):
 
     def play(self, state, target=None):
         from .enums import PowerId
-        state.player.energy -= 2
         strength = state.player.powers.get(PowerId.STRENGTH, 0)
         multiplier = 5 if self.upgraded else 3
         _deal_damage(state, target, 14 + strength * (multiplier - 1))
@@ -543,7 +537,6 @@ class IronWave(Card):
         super().__init__("Iron Wave", "Iron Wave", CardType.ATTACK, CardRarity.COMMON, 1, upgraded)
 
     def play(self, state, target=None):
-        state.player.energy -= 1
         amount = 7 if self.upgraded else 5
         _gain_block(state, amount)
         _deal_damage(state, target, amount)
@@ -557,8 +550,7 @@ class PerfectedStrike(Card):
         super().__init__("Perfected Strike", "Perfected Strike", CardType.ATTACK, CardRarity.COMMON, 2, upgraded)
 
     def play(self, state, target=None):
-        state.player.energy -= 2
-        bonus = 2 if self.upgraded else 2
+        bonus = 3 if self.upgraded else 2
         strike_count = sum(
             1 for c in (state.combat.draw_pile + state.combat.hand +
                         state.combat.discard_pile + state.combat.exhaust_pile)
@@ -575,7 +567,6 @@ class PommelStrike(Card):
         super().__init__("Pommel Strike", "Pommel Strike", CardType.ATTACK, CardRarity.COMMON, 1, upgraded)
 
     def play(self, state, target=None):
-        state.player.energy -= 1
         dmg = 10 if self.upgraded else 9
         draw = 2 if self.upgraded else 1
         _deal_damage(state, target, dmg)
@@ -590,7 +581,6 @@ class ShrugItOff(Card):
         super().__init__("Shrug It Off", "Shrug It Off", CardType.SKILL, CardRarity.COMMON, 1, upgraded)
 
     def play(self, state, target=None):
-        state.player.energy -= 1
         _gain_block(state, 11 if self.upgraded else 8)
         _draw_cards(state, 1)
 
@@ -603,7 +593,6 @@ class SwordBoomerang(Card):
         super().__init__("Sword Boomerang", "Sword Boomerang", CardType.ATTACK, CardRarity.COMMON, 1, upgraded)
 
     def play(self, state, target=None):
-        state.player.energy -= 1
         times = 4 if self.upgraded else 3
         for _ in range(times):
             alive = [e for e in state.combat.enemies if e.hp > 0]
@@ -621,7 +610,6 @@ class Thunderclap(Card):
 
     def play(self, state, target=None):
         from .enums import PowerId
-        state.player.energy -= 1
         for e in state.combat.enemies:
             if e.hp > 0:
                 _deal_damage(state, e, 7 if self.upgraded else 4)
@@ -636,7 +624,6 @@ class TrueGrit(Card):
         super().__init__("True Grit", "True Grit", CardType.SKILL, CardRarity.COMMON, 1, upgraded)
 
     def play(self, state, target=None):
-        state.player.energy -= 1
         _gain_block(state, 9 if self.upgraded else 7)
         if self.upgraded:
             # exhaust a card of choice — auto pick a status/curse or last
@@ -660,7 +647,6 @@ class TwinStrike(Card):
         super().__init__("Twin Strike", "Twin Strike", CardType.ATTACK, CardRarity.COMMON, 1, upgraded)
 
     def play(self, state, target=None):
-        state.player.energy -= 1
         dmg = 7 if self.upgraded else 5
         _deal_damage(state, target, dmg, times=2)
 
@@ -691,7 +677,6 @@ class WildStrike(Card):
         super().__init__("Wild Strike", "Wild Strike", CardType.ATTACK, CardRarity.COMMON, 1, upgraded)
 
     def play(self, state, target=None):
-        state.player.energy -= 1
         dmg = 17 if self.upgraded else 12
         _deal_damage(state, target, dmg)
         state.combat.draw_pile.insert(0, Wound())
@@ -752,7 +737,6 @@ class BurningPact(Card):
         super().__init__("Burning Pact", "Burning Pact", CardType.SKILL, CardRarity.UNCOMMON, 1, upgraded)
 
     def play(self, state, target=None):
-        state.player.energy -= 1
         # exhaust a card from hand
         candidates = [c for c in state.combat.hand if c is not self]
         if candidates:
@@ -769,7 +753,6 @@ class Carnage(Card):
         super().__init__("Carnage", "Carnage", CardType.ATTACK, CardRarity.UNCOMMON, 2, upgraded, ethereal=True)
 
     def play(self, state, target=None):
-        state.player.energy -= 2
         dmg = 28 if self.upgraded else 20
         _deal_damage(state, target, dmg)
 
@@ -783,7 +766,6 @@ class Combust(Card):
 
     def play(self, state, target=None):
         from .enums import PowerId
-        state.player.energy -= 1
         amount = 7 if self.upgraded else 5
         state.player.powers[PowerId.COMBUST] = state.player.powers.get(PowerId.COMBUST, 0) + amount
 
@@ -797,7 +779,6 @@ class DarkEmbrace(Card):
 
     def play(self, state, target=None):
         from .enums import PowerId
-        state.player.energy -= self.effective_cost()
         state.player.powers[PowerId.DARK_EMBRACE] = state.player.powers.get(PowerId.DARK_EMBRACE, 0) + 1
 
     def upgrade(self):
@@ -811,7 +792,6 @@ class Disarm(Card):
 
     def play(self, state, target=None):
         from .enums import PowerId
-        state.player.energy -= 1
         amount = 3 if self.upgraded else 2
         if target:
             target.powers[PowerId.STRENGTH] = target.powers.get(PowerId.STRENGTH, 0) - amount
@@ -827,7 +807,6 @@ class Dropkick(Card):
 
     def play(self, state, target=None):
         from .enums import PowerId
-        state.player.energy -= 1
         dmg = 8 if self.upgraded else 5
         _deal_damage(state, target, dmg)
         if target and PowerId.VULNERABLE in target.powers:
@@ -843,7 +822,6 @@ class DualWield(Card):
         super().__init__("Dual Wield", "Dual Wield", CardType.SKILL, CardRarity.UNCOMMON, 1, upgraded)
 
     def play(self, state, target=None):
-        state.player.energy -= 1
         attacks = [c for c in state.combat.hand if c.type == CardType.ATTACK and c is not self]
         if attacks:
             copies = 2 if self.upgraded else 1
@@ -860,7 +838,6 @@ class Entrench(Card):
                          1 if upgraded else 2, upgraded)
 
     def play(self, state, target=None):
-        state.player.energy -= self.effective_cost()
         state.player.block *= 2
 
     def upgrade(self):
@@ -874,7 +851,6 @@ class Evolve(Card):
 
     def play(self, state, target=None):
         from .enums import PowerId
-        state.player.energy -= 1
         amount = 2 if self.upgraded else 1
         state.player.powers[PowerId.EVOLVE] = state.player.powers.get(PowerId.EVOLVE, 0) + amount
 
@@ -888,7 +864,6 @@ class FeelNoPain(Card):
 
     def play(self, state, target=None):
         from .enums import PowerId
-        state.player.energy -= 1
         amount = 4 if self.upgraded else 3
         state.player.powers[PowerId.FEEL_NO_PAIN] = state.player.powers.get(PowerId.FEEL_NO_PAIN, 0) + amount
 
@@ -902,7 +877,6 @@ class FireBreathing(Card):
 
     def play(self, state, target=None):
         from .enums import PowerId
-        state.player.energy -= 1
         amount = 10 if self.upgraded else 6
         state.player.powers[PowerId.FIRE_BREATHING] = state.player.powers.get(PowerId.FIRE_BREATHING, 0) + amount
 
@@ -916,7 +890,6 @@ class FlameBarrier(Card):
 
     def play(self, state, target=None):
         from .enums import PowerId
-        state.player.energy -= 2
         _gain_block(state, 12 if self.upgraded else 8)
         amount = 6 if self.upgraded else 4
         state.player.powers[PowerId.FLAME_BARRIER] = state.player.powers.get(PowerId.FLAME_BARRIER, 0) + amount
@@ -930,7 +903,6 @@ class GhostlyArmor(Card):
         super().__init__("Ghostly Armor", "Ghostly Armor", CardType.SKILL, CardRarity.UNCOMMON, 1, upgraded, ethereal=True)
 
     def play(self, state, target=None):
-        state.player.energy -= 1
         _gain_block(state, 13 if self.upgraded else 10)
 
     def upgrade(self):
@@ -942,7 +914,6 @@ class Hemokinesis(Card):
         super().__init__("Hemokinesis", "Hemokinesis", CardType.ATTACK, CardRarity.UNCOMMON, 1, upgraded)
 
     def play(self, state, target=None):
-        state.player.energy -= 1
         _damage_player(state, 2, is_hp_loss=True)
         dmg = 20 if self.upgraded else 15
         _deal_damage(state, target, dmg)
@@ -957,7 +928,6 @@ class InfernalBlade(Card):
                          0 if upgraded else 1, upgraded, exhaust=True)
 
     def play(self, state, target=None):
-        state.player.energy -= self.effective_cost()
         # Add a random attack to hand (simplified: add a Strike)
         state.combat.hand.append(Strike())
         _exhaust_card(state, self)
@@ -973,7 +943,6 @@ class Inflame(Card):
 
     def play(self, state, target=None):
         from .enums import PowerId
-        state.player.energy -= 1
         amount = 3 if self.upgraded else 2
         state.player.powers[PowerId.STRENGTH] = state.player.powers.get(PowerId.STRENGTH, 0) + amount
 
@@ -1003,7 +972,6 @@ class Metallicize(Card):
 
     def play(self, state, target=None):
         from .enums import PowerId
-        state.player.energy -= 1
         amount = 4 if self.upgraded else 3
         state.player.powers[PowerId.METALLICIZE] = state.player.powers.get(PowerId.METALLICIZE, 0) + amount
 
@@ -1016,7 +984,6 @@ class PowerThrough(Card):
         super().__init__("Power Through", "Power Through", CardType.SKILL, CardRarity.UNCOMMON, 1, upgraded)
 
     def play(self, state, target=None):
-        state.player.energy -= 1
         _gain_block(state, 20 if self.upgraded else 15)
         state.combat.hand.append(Wound())
         state.combat.hand.append(Wound())
@@ -1030,7 +997,6 @@ class Pummel(Card):
         super().__init__("Pummel", "Pummel", CardType.ATTACK, CardRarity.UNCOMMON, 1, upgraded, exhaust=True)
 
     def play(self, state, target=None):
-        state.player.energy -= 1
         times = 5 if self.upgraded else 4
         _deal_damage(state, target, 2, times=times)
         _exhaust_card(state, self)
@@ -1058,7 +1024,6 @@ class Rampage(Card):
         self._bonus = 0
 
     def play(self, state, target=None):
-        state.player.energy -= 1
         inc = 8 if self.upgraded else 5
         self._bonus += inc
         _deal_damage(state, target, 8 + self._bonus - inc)  # base 8 + accumulated
@@ -1091,7 +1056,6 @@ class Rupture(Card):
 
     def play(self, state, target=None):
         from .enums import PowerId
-        state.player.energy -= 1
         amount = 2 if self.upgraded else 1
         state.player.powers[PowerId.RUPTURE] = state.player.powers.get(PowerId.RUPTURE, 0) + amount
 
@@ -1109,7 +1073,6 @@ class SearingBlow(Card):
         return (n * n + 7 * n + 12) // 2 + (n % 2) * 1  # formula from game
 
     def play(self, state, target=None):
-        state.player.energy -= 2
         _deal_damage(state, target, self._damage())
 
     def upgrade(self):
@@ -1122,7 +1085,6 @@ class SecondWind(Card):
         super().__init__("Second Wind", "Second Wind", CardType.SKILL, CardRarity.UNCOMMON, 1, upgraded)
 
     def play(self, state, target=None):
-        state.player.energy -= 1
         block_per = 6 if self.upgraded else 5
         non_attacks = [c for c in state.combat.hand if c.type != CardType.ATTACK and c is not self]
         for c in non_attacks:
@@ -1139,7 +1101,6 @@ class SeeingRed(Card):
                          0 if upgraded else 1, upgraded, exhaust=True)
 
     def play(self, state, target=None):
-        state.player.energy -= self.effective_cost()
         state.player.energy += 2
         _exhaust_card(state, self)
 
@@ -1154,7 +1115,6 @@ class Sentinel(Card):
 
     def play(self, state, target=None):
         from .enums import PowerId
-        state.player.energy -= 1
         _gain_block(state, 8 if self.upgraded else 5)
         state.player.powers[PowerId.SENTINEL] = state.player.powers.get(PowerId.SENTINEL, 0) + (3 if self.upgraded else 2)
 
@@ -1167,7 +1127,6 @@ class SeverSoul(Card):
         super().__init__("Sever Soul", "Sever Soul", CardType.ATTACK, CardRarity.UNCOMMON, 2, upgraded)
 
     def play(self, state, target=None):
-        state.player.energy -= 2
         non_attacks = [c for c in state.combat.hand if c.type != CardType.ATTACK and c is not self]
         for c in non_attacks:
             _exhaust_card(state, c)
@@ -1184,7 +1143,6 @@ class Shockwave(Card):
 
     def play(self, state, target=None):
         from .enums import PowerId
-        state.player.energy -= 2
         amount = 5 if self.upgraded else 3
         for e in state.combat.enemies:
             if e.hp > 0:
@@ -1203,7 +1161,6 @@ class SpotWeakness(Card):
     def play(self, state, target=None):
         from .enums import PowerId
         from .enums import IntentType
-        state.player.energy -= 1
         if target and target.current_move and target.current_move.intent in (
             IntentType.ATTACK, IntentType.ATTACK_BUFF, IntentType.ATTACK_DEBUFF, IntentType.ATTACK_DEFEND
         ):
@@ -1220,7 +1177,6 @@ class Uppercut(Card):
 
     def play(self, state, target=None):
         from .enums import PowerId
-        state.player.energy -= 2
         _deal_damage(state, target, 13)
         if target and target.hp > 0:
             amount = 2 if self.upgraded else 1
@@ -1256,7 +1212,6 @@ class Barricade(Card):
                          2 if not upgraded else 1, upgraded)
 
     def play(self, state, target=None):
-        state.player.energy -= self.effective_cost()
         state.player.barricade = True
 
     def upgrade(self):
@@ -1283,7 +1238,6 @@ class Bludgeon(Card):
         super().__init__("Bludgeon", "Bludgeon", CardType.ATTACK, CardRarity.RARE, 3, upgraded)
 
     def play(self, state, target=None):
-        state.player.energy -= 3
         _deal_damage(state, target, 42 if self.upgraded else 32)
 
     def upgrade(self):
@@ -1309,7 +1263,6 @@ class Corruption(Card):
                          3 if not upgraded else 2, upgraded)
 
     def play(self, state, target=None):
-        state.player.energy -= self.effective_cost()
         state.player.corruption = True
 
     def upgrade(self):
@@ -1323,7 +1276,6 @@ class DemonForm(Card):
 
     def play(self, state, target=None):
         from .enums import PowerId
-        state.player.energy -= 3
         amount = 3 if self.upgraded else 2
         state.player.powers[PowerId.DEMON_FORM] = state.player.powers.get(PowerId.DEMON_FORM, 0) + amount
 
@@ -1337,7 +1289,6 @@ class DoubleTap(Card):
 
     def play(self, state, target=None):
         from .enums import PowerId
-        state.player.energy -= 1
         amount = 2 if self.upgraded else 1
         state.player.powers[PowerId.DOUBLE_TAP] = state.player.powers.get(PowerId.DOUBLE_TAP, 0) + amount
 
@@ -1351,7 +1302,6 @@ class Exhume(Card):
                          0 if upgraded else 1, upgraded, exhaust=True)
 
     def play(self, state, target=None):
-        state.player.energy -= self.effective_cost()
         if state.combat.exhaust_pile:
             card = state.combat.exhaust_pile.pop()
             state.combat.hand.append(card)
@@ -1367,7 +1317,6 @@ class Feed(Card):
         super().__init__("Feed", "Feed", CardType.ATTACK, CardRarity.RARE, 1, upgraded, exhaust=True)
 
     def play(self, state, target=None):
-        state.player.energy -= 1
         dmg = 12 if self.upgraded else 10
         hp_gain = 4 if self.upgraded else 3
         _deal_damage(state, target, dmg)
@@ -1385,7 +1334,6 @@ class FiendFire(Card):
         super().__init__("Fiend Fire", "Fiend Fire", CardType.ATTACK, CardRarity.RARE, 2, upgraded, exhaust=True)
 
     def play(self, state, target=None):
-        state.player.energy -= 2
         cards = [c for c in state.combat.hand if c is not self]
         dmg = 7 if self.upgraded else 6
         for c in cards:
@@ -1402,7 +1350,6 @@ class Immolate(Card):
         super().__init__("Immolate", "Immolate", CardType.ATTACK, CardRarity.RARE, 2, upgraded)
 
     def play(self, state, target=None):
-        state.player.energy -= 2
         dmg = 28 if self.upgraded else 21
         for e in state.combat.enemies:
             if e.hp > 0:
@@ -1418,7 +1365,6 @@ class Impervious(Card):
         super().__init__("Impervious", "Impervious", CardType.SKILL, CardRarity.RARE, 2, upgraded, exhaust=True)
 
     def play(self, state, target=None):
-        state.player.energy -= 2
         _gain_block(state, 40 if self.upgraded else 30)
         _exhaust_card(state, self)
 
@@ -1432,7 +1378,6 @@ class Juggernaut(Card):
 
     def play(self, state, target=None):
         from .enums import PowerId
-        state.player.energy -= 2
         amount = 7 if self.upgraded else 5
         state.player.powers[PowerId.JUGGERNAUT] = state.player.powers.get(PowerId.JUGGERNAUT, 0) + amount
 
@@ -1447,7 +1392,6 @@ class LimitBreak(Card):
 
     def play(self, state, target=None):
         from .enums import PowerId
-        state.player.energy -= 1
         strength = state.player.powers.get(PowerId.STRENGTH, 0)
         state.player.powers[PowerId.STRENGTH] = strength * 2
         if not self.upgraded:
@@ -1478,7 +1422,6 @@ class Reaper(Card):
         super().__init__("Reaper", "Reaper", CardType.ATTACK, CardRarity.RARE, 2, upgraded, exhaust=True)
 
     def play(self, state, target=None):
-        state.player.energy -= 2
         dmg = 5 if self.upgraded else 4
         for e in state.combat.enemies:
             if e.hp > 0:
@@ -1542,7 +1485,17 @@ def make_card(name: str, upgraded: bool = False) -> Card:
     cls = IRONCLAD_CARD_CLASSES.get(name)
     if cls is None:
         raise ValueError(f"Unknown card: {name}")
-    return cls(upgraded)
+    try:
+        return cls(upgraded)
+    except TypeError:
+        # Curses and other fixed cards take no `upgraded` argument.
+        card = cls()
+        if upgraded:
+            try:
+                card.upgrade()
+            except NotImplementedError:
+                pass
+        return card
 
 
 def starter_deck() -> list[Card]:

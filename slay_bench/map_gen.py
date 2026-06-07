@@ -126,24 +126,19 @@ def generate_map(act: int, rng: StsRandom) -> GameMap:
     num_cols = 7
     game_map = GameMap(act=act)
 
-    # Generate nodes floor by floor
+    # Decide the active columns for every floor up front. This is critical:
+    # edges must point at the columns that actually exist on the next floor.
+    # (Previously each floor's columns were re-rolled when wiring vs. when
+    # building, so edges referenced non-existent nodes and paths dead-ended.)
+    active_per_floor: List[List[int]] = [
+        _choose_active_cols(rng, floor, num_floors) for floor in range(num_floors)
+    ]
+
+    # Generate nodes floor by floor, wiring edges to the real next-floor columns.
     for floor in range(num_floors):
         floor_nodes: List[MapNode] = []
 
-        # Determine how many paths exist at this floor (1-3 wide)
-        # Simplified: generate 5-7 nodes per floor, then prune unreachable ones
-        # Real StS uses a path-based generation; we use column-based with connectivity
-
-        # Generate all 7 columns, assign types
-        prev_col_types: dict[int, NodeType] = {}
-        if floor > 0:
-            for prev_node in game_map.floors[floor - 1]:
-                for edge_col in prev_node.edges:
-                    prev_col_types[edge_col] = None
-
-        active_cols = _choose_active_cols(rng, floor, num_floors)
-
-        for col in active_cols:
+        for col in active_per_floor[floor]:
             # Find what prev node connects here to determine adjacency constraint
             prev_type = None
             if floor > 0:
@@ -155,12 +150,14 @@ def generate_map(act: int, rng: StsRandom) -> GameMap:
             node_type = _roll_node_type(rng, floor, act, prev_type)
             floor_nodes.append(MapNode(floor=floor, col=col, node_type=node_type))
 
-        # Wire edges: each node connects to 1-2 nodes on next floor
-        if floor < num_floors - 1:
-            next_active = _choose_active_cols(rng, floor + 1, num_floors)
-            _wire_edges(rng, floor_nodes, next_active)
-
         game_map.floors.append(floor_nodes)
+
+        # Wire edges from the floor we just built to the real next-floor columns.
+        if floor < num_floors - 1:
+            _wire_edges(rng, floor_nodes, active_per_floor[floor + 1])
+
+    # Guarantee every node has a path upward (no orphan columns / dead ends).
+    _ensure_connectivity(game_map)
 
     # Boss node
     game_map.boss_node = MapNode(floor=num_floors, col=3, node_type=NodeType.BOSS)
@@ -195,15 +192,39 @@ def _wire_edges(rng: StsRandom, current_floor: List[MapNode],
     if not next_cols:
         return
     for node in current_floor:
-        # Each node connects to 1-2 adjacent cols on next floor
-        # Find nearby cols
+        # Each node connects to 1-2 of the nearest columns on the next floor.
         candidates = sorted(next_cols, key=lambda c: abs(c - node.col))
         num_edges = 1 + (1 if rng.next_int(3) == 0 else 0)
-        chosen = candidates[:num_edges]
-        node.edges = chosen
-        for edge_col in chosen:
-            for nxt in current_floor:  # will be set on actual next floor
-                pass
+        node.edges = sorted(candidates[:num_edges])
+
+
+def _ensure_connectivity(game_map: GameMap) -> None:
+    """Guarantee every node reaches the next floor and every next-floor node
+    has a parent, so the greedy traversal never dead-ends below the boss."""
+    floors = game_map.floors
+    for fi in range(len(floors) - 1):
+        cur = floors[fi]
+        nxt_cols = [n.col for n in floors[fi + 1]]
+        if not nxt_cols:
+            continue
+        # Every current node must have at least one edge to a real next node.
+        for node in cur:
+            valid = [c for c in node.edges if c in nxt_cols]
+            if not valid:
+                nearest = min(nxt_cols, key=lambda c: abs(c - node.col))
+                valid = [nearest]
+            node.edges = sorted(valid)
+        # Every next-floor node must have at least one parent.
+        reached = {c for node in cur for c in node.edges}
+        for child_col in nxt_cols:
+            if child_col not in reached:
+                parent = min(cur, key=lambda n: abs(n.col - child_col))
+                parent.edges = sorted(set(parent.edges) | {child_col})
+    # Recompute parents for completeness.
+    for fi in range(1, len(floors)):
+        prev = floors[fi - 1]
+        for node in floors[fi]:
+            node.parents = sorted(p.col for p in prev if node.col in p.edges)
 
 
 def _ensure_node_type(game_map: GameMap, node_type: NodeType,

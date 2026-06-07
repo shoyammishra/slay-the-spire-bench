@@ -10,7 +10,6 @@ import argparse
 import json
 import os
 import sys
-from datetime import datetime
 from pathlib import Path
 
 from dotenv import load_dotenv
@@ -51,9 +50,20 @@ def main():
     parser.add_argument("--n-turn", type=int, default=5)
     parser.add_argument("--n-combat", type=int, default=3)
     parser.add_argument("--n-synergy", type=int, default=3)
-    parser.add_argument("--n-run", type=int, default=1)
+    parser.add_argument("--n-run", type=int, default=5)
+    parser.add_argument("--only", nargs="+", choices=["turn", "combat", "synergy", "run"],
+                        metavar="DIM",
+                        help="Run only these dimensions (e.g. --only synergy run). "
+                             "Previous results for skipped dims are merged from disk.")
     parser.add_argument("--out-dir", default="results")
     args = parser.parse_args()
+
+    if args.only:
+        only = set(args.only)
+        if "turn"    not in only: args.n_turn    = 0
+        if "combat"  not in only: args.n_combat  = 0
+        if "synergy" not in only: args.n_synergy = 0
+        if "run"     not in only: args.n_run     = 0
 
     llm = build_llm(args.provider, args.model)
 
@@ -80,11 +90,28 @@ def main():
     # Save to results/
     out_dir = Path(args.out_dir)
     out_dir.mkdir(exist_ok=True)
-    ts = datetime.now().strftime("%Y%m%d_%H%M%S")
     safe_model = args.model.replace("/", "-").replace(":", "-")
-    fname = out_dir / f"{ts}_{safe_model}_{args.fmt}_seed{args.seed}.json"
+    stem = f"{safe_model}_{args.fmt}_seed{args.seed}"
+    fname = out_dir / f"{stem}.json"
+
+    # Merge with any existing result: a dimension skipped this run (n=0 → null)
+    # must NOT clobber valid data from a previous run with the same stem.
+    if fname.exists():
+        try:
+            prev = json.loads(fname.read_text())
+            for dim in ("turn", "combat", "synergy", "run"):
+                if summary.get(dim) is None and prev.get(dim) is not None:
+                    summary[dim] = prev[dim]
+                    print(f"  (kept existing '{dim}' results from previous run)")
+        except (json.JSONDecodeError, OSError):
+            pass
+
     fname.write_text(json.dumps(summary, indent=2))
-    print(f"\nSaved to {fname}")
+    print(f"\nSaved JSON  -> {fname}")
+
+    # Save text report + charts
+    from slay_bench.visualize import save_all
+    save_all(summary, stem, out_dir)
 
 
 if __name__ == "__main__":
