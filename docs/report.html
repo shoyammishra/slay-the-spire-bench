@@ -3,326 +3,389 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>slay-bench — Initial Pilot Report</title>
+<title>slay-bench — Pilot Report</title>
 <style>
   :root{
-    --bg:#0f1115; --panel:#171a21; --panel2:#1d212b; --ink:#e7eaf0; --muted:#9aa3b2;
-    --line:#2a2f3a; --accent:#6ea8fe; --good:#3fb27f; --warn:#e0a13a; --bad:#e0604a;
-    --chip:#222836;
+    --bg:#f7f8fa; --paper:#ffffff; --ink:#1d2330; --soft:#5b6473; --faint:#8a93a3;
+    --line:#e4e7ec; --line2:#eef0f3; --accent:#3b6fd4; --accent-soft:#eaf1fc;
+    --good:#1f9d6b; --good-bg:#e7f6ef; --warn:#c8881d; --warn-bg:#fbf2e0; --bad:#d24b3a; --bad-bg:#fbeae7;
+    --shadow:0 1px 2px rgba(16,24,40,.04),0 4px 16px rgba(16,24,40,.06);
   }
   *{box-sizing:border-box}
   html{scroll-behavior:smooth}
   body{
     margin:0; background:var(--bg); color:var(--ink);
-    font:16px/1.6 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+    font:16px/1.65 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+    -webkit-font-smoothing:antialiased;
   }
-  .wrap{max-width:960px; margin:0 auto; padding:48px 24px 96px}
-  header.title{border-bottom:1px solid var(--line); padding-bottom:28px; margin-bottom:36px}
-  h1{font-size:30px; margin:0 0 6px; letter-spacing:-.4px}
-  .sub{color:var(--muted); font-size:15px}
-  .meta{display:flex; flex-wrap:wrap; gap:8px; margin-top:16px}
-  .chip{background:var(--chip); border:1px solid var(--line); color:var(--muted);
-    padding:4px 10px; border-radius:999px; font-size:12.5px}
-  h2{font-size:22px; margin:48px 0 14px; padding-top:8px; letter-spacing:-.3px}
-  h3{font-size:17px; margin:28px 0 10px; color:var(--ink)}
-  p{margin:12px 0}
+  .wrap{max-width:880px; margin:0 auto; padding:56px 24px 110px}
+  header.title{margin-bottom:18px}
+  .eyebrow{font-size:13px; letter-spacing:.12em; text-transform:uppercase; color:var(--accent); font-weight:700}
+  h1{font-size:34px; line-height:1.15; margin:10px 0 8px; letter-spacing:-.6px; font-weight:800}
+  .sub{color:var(--soft); font-size:17px; max-width:62ch}
+  .meta{display:flex; flex-wrap:wrap; gap:8px; margin-top:20px}
+  .chip{background:var(--paper); border:1px solid var(--line); color:var(--soft);
+    padding:5px 12px; border-radius:999px; font-size:12.5px; box-shadow:var(--shadow)}
+  h2{font-size:15px; letter-spacing:.1em; text-transform:uppercase; color:var(--faint);
+    margin:52px 0 6px; font-weight:700}
+  h3{font-size:24px; margin:6px 0 14px; letter-spacing:-.3px; font-weight:750}
+  p{margin:13px 0}
   a{color:var(--accent); text-decoration:none}
   a:hover{text-decoration:underline}
-  .lead{font-size:17px; color:#cdd3de}
-  table{width:100%; border-collapse:collapse; margin:14px 0; font-size:14.5px}
-  th,td{padding:9px 12px; text-align:left; border-bottom:1px solid var(--line)}
-  th{color:var(--muted); font-weight:600; font-size:12.5px; text-transform:uppercase; letter-spacing:.4px}
+  .lead{font-size:18px; color:#2c3444; line-height:1.6}
+  table{width:100%; border-collapse:collapse; margin:16px 0; font-size:14.5px; background:var(--paper);
+    border:1px solid var(--line); border-radius:12px; overflow:hidden; box-shadow:var(--shadow)}
+  th,td{padding:11px 14px; text-align:left; border-bottom:1px solid var(--line2)}
+  tbody tr:last-child td{border-bottom:none}
+  th{color:var(--faint); font-weight:700; font-size:11.5px; text-transform:uppercase; letter-spacing:.06em;
+    background:#fafbfc}
   td.num,th.num{text-align:right; font-variant-numeric:tabular-nums}
-  tbody tr:hover{background:#1b1f29}
-  .panel{background:var(--panel); border:1px solid var(--line); border-radius:12px; padding:20px 22px; margin:18px 0}
-  .grid2{display:grid; grid-template-columns:1fr 1fr; gap:18px}
-  @media(max-width:720px){.grid2{grid-template-columns:1fr}}
-  .badge{display:inline-block; padding:2px 9px; border-radius:6px; font-size:12px; font-weight:600}
-  .b-good{background:rgba(63,178,127,.15); color:#7fe0b3; border:1px solid rgba(63,178,127,.35)}
-  .b-warn{background:rgba(224,161,58,.15); color:#f0c878; border:1px solid rgba(224,161,58,.35)}
-  .b-bad{background:rgba(224,96,74,.15); color:#f0a090; border:1px solid rgba(224,96,74,.35)}
-  .callout{border-left:3px solid var(--accent); background:var(--panel2); padding:14px 18px; border-radius:0 10px 10px 0; margin:18px 0}
-  .callout.warn{border-left-color:var(--warn)}
-  .callout.bad{border-left-color:var(--bad)}
+  tbody tr:hover{background:#fafbfd}
+  .panel{background:var(--paper); border:1px solid var(--line); border-radius:14px; padding:4px 26px 22px;
+    margin:22px 0; box-shadow:var(--shadow)}
+  .stepgrid{display:grid; grid-template-columns:1fr; gap:0}
+  .step{border-left:2px solid var(--line); padding:4px 0 4px 22px; margin:18px 0; position:relative}
+  .step::before{content:""; position:absolute; left:-7px; top:9px; width:12px; height:12px; border-radius:50%;
+    background:var(--accent); box-shadow:0 0 0 4px var(--accent-soft)}
+  .step .lbl{font-size:12px; letter-spacing:.1em; text-transform:uppercase; color:var(--accent); font-weight:700}
+  .step p{margin:5px 0 0}
+  .badge{display:inline-block; padding:2px 9px; border-radius:6px; font-size:12px; font-weight:700; white-space:nowrap}
+  .b-good{background:var(--good-bg); color:var(--good)}
+  .b-warn{background:var(--warn-bg); color:var(--warn)}
+  .b-bad{background:var(--bad-bg); color:var(--bad)}
+  .callout{border:1px solid var(--line); border-left:4px solid var(--accent); background:var(--paper);
+    padding:15px 20px; border-radius:0 12px 12px 0; margin:20px 0; box-shadow:var(--shadow)}
+  .callout.warn{border-left-color:var(--warn)} .callout.bad{border-left-color:var(--bad)}
   .callout.good{border-left-color:var(--good)}
-  .callout strong{color:#fff}
-  ul{margin:12px 0; padding-left:22px} li{margin:6px 0}
-  code{background:#0c0e12; border:1px solid var(--line); border-radius:5px; padding:1px 6px; font-size:13px;
-    font-family:"SF Mono",ui-monospace,Menlo,Consolas,monospace; color:#cdd3de}
-  .toc{columns:2; column-gap:32px; font-size:14.5px}
-  @media(max-width:600px){.toc{columns:1}}
-  .toc a{display:block; padding:3px 0; color:var(--muted)}
+  .callout .tag{font-size:12px; font-weight:700; letter-spacing:.04em; text-transform:uppercase; color:var(--faint)}
+  ul{margin:12px 0; padding-left:22px} li{margin:7px 0}
+  code{background:#f0f2f5; border:1px solid var(--line); border-radius:5px; padding:1px 6px; font-size:13px;
+    font-family:"SF Mono",ui-monospace,Menlo,Consolas,monospace; color:#36405a}
+  .kpi{display:grid; grid-template-columns:repeat(4,1fr); gap:14px; margin:22px 0}
+  @media(max-width:680px){.kpi{grid-template-columns:repeat(2,1fr)}}
+  .kpi .card{background:var(--paper); border:1px solid var(--line); border-radius:12px; padding:18px 14px;
+    text-align:center; box-shadow:var(--shadow)}
+  .kpi .big{font-size:28px; font-weight:800; letter-spacing:-.5px; color:var(--accent)}
+  .kpi .lbl{font-size:12px; color:var(--soft); margin-top:4px}
+  .toc{font-size:14.5px}
+  .toc a{display:block; padding:6px 0; color:var(--soft); border-bottom:1px solid var(--line2)}
+  .toc a:last-child{border-bottom:none}
   .toc a:hover{color:var(--accent)}
-  .barwrap{display:flex; align-items:center; gap:10px; margin:5px 0}
-  .barlabel{width:170px; font-size:13px; color:var(--muted); flex:none}
-  .bartrack{flex:1; background:#0c0e12; border-radius:5px; height:18px; overflow:hidden; border:1px solid var(--line)}
-  .barfill{height:100%; border-radius:5px}
-  .barval{width:52px; text-align:right; font-size:13px; font-variant-numeric:tabular-nums; flex:none}
-  footer{margin-top:64px; padding-top:20px; border-top:1px solid var(--line); color:var(--muted); font-size:13px}
-  .kpi{display:grid; grid-template-columns:repeat(4,1fr); gap:14px; margin:18px 0}
-  @media(max-width:720px){.kpi{grid-template-columns:repeat(2,1fr)}}
-  .kpi .card{background:var(--panel); border:1px solid var(--line); border-radius:10px; padding:16px; text-align:center}
-  .kpi .big{font-size:26px; font-weight:700; letter-spacing:-.5px}
-  .kpi .lbl{font-size:12px; color:var(--muted); margin-top:4px}
+  .toc .n{color:var(--faint); font-variant-numeric:tabular-nums; margin-right:10px}
+  .barwrap{display:flex; align-items:center; gap:10px; margin:7px 0}
+  .barlabel{width:180px; font-size:13px; color:var(--soft); flex:none}
+  .bartrack{flex:1; background:#eef1f5; border-radius:6px; height:20px; overflow:hidden}
+  .barfill{height:100%; border-radius:6px}
+  .barval{width:48px; text-align:right; font-size:13px; font-variant-numeric:tabular-nums; flex:none; font-weight:600}
+  .expnum{display:inline-flex; align-items:center; justify-content:center; width:30px; height:30px;
+    border-radius:8px; background:var(--accent); color:#fff; font-weight:800; font-size:15px; margin-right:10px;
+    vertical-align:middle}
+  footer{margin-top:70px; padding-top:22px; border-top:1px solid var(--line); color:var(--faint); font-size:13px}
+  hr.div{border:none; border-top:1px solid var(--line); margin:46px 0}
 </style>
 </head>
 <body>
 <div class="wrap">
 
 <header class="title">
-  <h1>slay-bench — Initial Pilot Report</h1>
-  <div class="sub">A multi-dimensional benchmark for LLM planning ability, built on a deterministic <em>Slay the Spire</em> (Ironclad, Act&nbsp;1) simulator.</div>
+  <div class="eyebrow">Pilot Report · Preliminary</div>
+  <h1>slay-bench: measuring LLM planning ability in <em>Slay the Spire</em></h1>
+  <div class="sub">A multi-dimensional benchmark built on a deterministic Ironclad (Act&nbsp;1) simulator,
+    testing language-model planning across four horizons — from a single turn to a full run.</div>
   <div class="meta">
-    <span class="chip">Date: 2026-06-07</span>
-    <span class="chip">Status: Pilot (preliminary)</span>
-    <span class="chip">Branch: synergy-rework</span>
-    <span class="chip">Models: llama-3.1-8b, llama-4-scout-17b</span>
+    <span class="chip">2026-06-07</span>
+    <span class="chip">Status: pilot (directional)</span>
+    <span class="chip">Models: llama-3.1-8b · llama-4-scout-17b</span>
     <span class="chip">Seed: 42</span>
   </div>
 </header>
 
 <div class="callout">
-  <strong>How to read this report.</strong> These are <em>pilot-scale</em> results (small sample sizes,
-  a single seed, two same-family models). They establish that the harness works and surface
-  several real, reproducible behavioural findings — but the numbers are <em>directional</em>, not
-  yet statistically conclusive. The path to paper-grade results is laid out in
-  <a href="#next">§7&nbsp;Next Steps</a>.
+  <div class="tag">How to read this</div>
+  <p style="margin-top:6px">These are <strong>pilot-scale</strong> results — small samples, one seed, two
+  same-family models. They establish that the harness works end-to-end and surface several real,
+  reproducible behaviours, but the numbers are <strong>directional, not yet statistically conclusive</strong>.
+  Each experiment below follows the same template: <strong>Motivation → Research question →
+  Implementation → Result.</strong></p>
 </div>
 
-<h2 id="toc">Contents</h2>
+<h2>Contents</h2>
 <nav class="toc panel">
-  <a href="#overview">1. What this project is</a>
-  <a href="#design">2. Benchmark design</a>
-  <a href="#valid">3. Data validity at a glance</a>
-  <a href="#results">4. Results</a>
-  <a href="#findings">5. Key findings</a>
-  <a href="#limits">6. Limitations</a>
-  <a href="#next">7. Next steps to paper-grade</a>
+  <a href="#bigpicture"><span class="n">A</span>The big picture: motivation &amp; setup</a>
+  <a href="#methods"><span class="n">B</span>Shared method: simulator, formats, scoring</a>
+  <a href="#e1"><span class="n">1</span>Experiment 1 — Turn-level planning</a>
+  <a href="#e2"><span class="n">2</span>Experiment 2 — Combat-level planning</a>
+  <a href="#e3"><span class="n">3</span>Experiment 3 — Synergy &amp; archetype reasoning</a>
+  <a href="#e4"><span class="n">4</span>Experiment 4 — Run-level planning</a>
+  <a href="#cross"><span class="n">C</span>Cross-cutting findings</a>
+  <a href="#limits"><span class="n">D</span>Limitations</a>
+  <a href="#next"><span class="n">E</span>Next steps to paper-grade</a>
 </nav>
 
-<h2 id="overview">1. What this project is</h2>
+<hr class="div">
+
+<h2 id="bigpicture">A · The big picture</h2>
+<h3>Why <em>Slay the Spire</em> as a planning benchmark?</h3>
 <p class="lead">
-  slay-bench asks a concrete question: <em>how well can a language model actually plan?</em>
-  Not on multiple-choice trivia, but inside a game that demands sequencing actions under a
-  resource budget, building a deck over dozens of decisions, and thinking several steps ahead.
+  Most LLM evaluations are static question-answering. Planning is different: it requires sequencing
+  actions under a resource budget, committing to a strategy that pays off many decisions later, and
+  reasoning about consequences that unfold over time. <em>Slay the Spire</em> demands all three — yet it
+  is small enough to simulate exactly and score against ground truth.
 </p>
 <p>
-  The project has two halves. First, a <strong>Python simulator</strong> that faithfully recreates
-  the game's combat engine, map traversal, card drafting, and enemy AI — fully
-  <strong>deterministic</strong> from a single seed, so every experiment is exactly reproducible.
-  Second, a <strong>benchmark harness</strong> that renders the game state into a prompt, collects
-  the model's decision, and scores it against ground truth across four levels of planning horizon.
+  The game gives us a natural <strong>ladder of planning horizons</strong>: a single turn (seconds of
+  foresight), a full combat (a few minutes), deck-building synergy (strategic abstraction), and an
+  entire 15-floor run (sustained consistency). Each rung becomes one experiment, so we can locate
+  <em>exactly where</em> a model's planning ability breaks down rather than producing one opaque score.
 </p>
 <div class="kpi">
-  <div class="card"><div class="big">4</div><div class="lbl">planning dimensions</div></div>
+  <div class="card"><div class="big">4</div><div class="lbl">planning horizons tested</div></div>
   <div class="card"><div class="big">2</div><div class="lbl">prompt formats (ablation)</div></div>
   <div class="card"><div class="big">43</div><div class="lbl">unit tests passing</div></div>
-  <div class="card"><div class="big">9</div><div class="lbl">independent RNG streams</div></div>
+  <div class="card"><div class="big">9</div><div class="lbl">seeded RNG streams</div></div>
 </div>
 
-<h2 id="design">2. Benchmark design</h2>
-<p>Each dimension isolates a different planning horizon and is scored against an explicit ground truth:</p>
-<table>
-  <thead><tr><th>#</th><th>Dimension</th><th>What it tests</th><th>Ground truth</th></tr></thead>
-  <tbody>
-    <tr><td>1</td><td><strong>Turn-level</strong></td><td>Best card sequence within one turn</td><td>Exhaustive search (≤720 permutations)</td></tr>
-    <tr><td>2</td><td><strong>Combat-level</strong></td><td>Win a full fight, turn by turn</td><td>Greedy-bot baseline</td></tr>
-    <tr><td>3</td><td><strong>Synergy</strong></td><td>Identify deck archetype; pick best card; remove worst card</td><td>8 hand-crafted archetype decks</td></tr>
-    <tr><td>4</td><td><strong>Run-level</strong></td><td>Survive all 15 floors + boss of Act 1</td><td>Absolute (survival + progress)</td></tr>
-  </tbody>
-</table>
-<h3>Two prompt formats — a controlled ablation</h3>
-<p>
-  Every model is tested twice on <strong>identical seeds</strong>:
-  <strong>structured</strong> (compact JSON: card names, costs, HP in dicts) and
-  <strong>raw</strong> (verbose natural-English description of the same state). Because the
-  underlying RNG is identical, any score difference is attributable to format alone.
-</p>
-<div class="callout good">
-  <strong>Why a hand-crafted synergy set.</strong> Earlier versions drafted decks randomly, but
-  Act-1 decks are too small and RNG-limited to have a crisp archetype (those crystallise in Acts
-  2–3). The synergy dimension now uses <strong>8 fixed, hand-built decks</strong> — two per archetype
-  (Strength, Block, Exhaust, Aggro), each with 4–5 unmistakable signature cards, a basic Strike as
-  the obvious removal target, and a 3-card offer whose on-archetype card is the expert pick. Ground
-  truth is therefore deterministic and unambiguous.
-</div>
+<h2 id="methods">B · Shared method</h2>
+<h3>The same engine underlies every experiment</h3>
+<p>Three design choices are common to all four experiments and worth stating once:</p>
+<ul>
+  <li><strong>Deterministic simulator.</strong> A faithful Python re-implementation of the combat engine,
+    map traversal, card drafting, and enemy AI. Nine independent seeded RNG streams mean a single seed
+    fixes the entire run — every experiment is exactly reproducible.</li>
+  <li><strong>Two prompt formats, identical seeds.</strong> Every model is tested in <strong>structured</strong>
+    (compact JSON) and <strong>raw</strong> (natural-English) form on the same underlying state, so any
+    score gap is attributable to format alone — a clean ablation.</li>
+  <li><strong>Explicit ground truth per dimension.</strong> Turn = exhaustive search; combat = greedy-bot
+    baseline; synergy = hand-crafted archetype decks; run = absolute survival. No human grading.</li>
+</ul>
 
-<h2 id="valid">3. Data validity at a glance</h2>
-<p>Being explicit about what can and cannot be trusted yet:</p>
-<table>
-  <thead><tr><th>Dimension</th><th>Status</th><th>Notes</th></tr></thead>
-  <tbody>
-    <tr><td>Turn-level</td><td><span class="badge b-good">Valid</span></td><td>Pilot scale (n=5)</td></tr>
-    <tr><td>Combat-level</td><td><span class="badge b-good">Valid</span></td><td>Pilot scale (n=3)</td></tr>
-    <tr><td>Synergy</td><td><span class="badge b-good">Valid</span></td><td>n=8 (one pass over all fixtures); freshest, cleanest data</td></tr>
-    <tr><td>Run-level</td><td><span class="badge b-bad">No valid data</span></td><td>On-disk numbers are from pre-fix code — excluded entirely; clean pass pending</td></tr>
-  </tbody>
-</table>
-<div class="callout bad">
-  <strong>Run-level is intentionally omitted from all results below.</strong> The run-level numbers
-  currently on disk predate three correctness fixes (map dead-end, event-bus listener stacking,
-  null-index handling) and would misrepresent model ability. A clean run-level pass is the first
-  priority once a higher-throughput provider tier is available (see §7).
-</div>
+<hr class="div">
 
-<h2 id="results">4. Results</h2>
-<p>All results: <code>seed=42</code>, <code>n_turn=5</code>, <code>n_combat=3</code>, <code>n_synergy=8</code>. Run-level excluded.</p>
-
-<h3>4.1 — llama-3.1-8b-instant (small baseline)</h3>
-<table>
-  <thead><tr><th>Metric</th><th class="num">Structured</th><th class="num">Raw</th></tr></thead>
-  <tbody>
-    <tr><td>Turn damage ratio</td><td class="num">36.7%</td><td class="num">69.6%</td></tr>
-    <tr><td>Turn legal rate</td><td class="num">60%</td><td class="num">100%</td></tr>
-    <tr><td>Combat win rate</td><td class="num">100%</td><td class="num">100%</td></tr>
-    <tr><td>Combat HP ratio vs bot</td><td class="num">112.3%</td><td class="num">113.8%</td></tr>
-    <tr><td>Synergy archetype acc</td><td class="num">50.0%</td><td class="num">37.5%</td></tr>
-    <tr><td>Synergy card-pick acc</td><td class="num">100%</td><td class="num">62.5%</td></tr>
-    <tr><td>Synergy removal acc</td><td class="num">25.0%</td><td class="num">12.5%</td></tr>
-  </tbody>
-</table>
-
-<h3>4.2 — meta-llama/llama-4-scout-17b (mid baseline)</h3>
-<table>
-  <thead><tr><th>Metric</th><th class="num">Structured</th><th class="num">Raw</th></tr></thead>
-  <tbody>
-    <tr><td>Turn damage ratio</td><td class="num">49.8%</td><td class="num">37.5%</td></tr>
-    <tr><td>Turn legal rate</td><td class="num">100%</td><td class="num">100%</td></tr>
-    <tr><td>Turn parse-ok rate</td><td class="num">80%</td><td class="num">100%</td></tr>
-    <tr><td>Combat win rate</td><td class="num">100%</td><td class="num">100%</td></tr>
-    <tr><td>Combat HP ratio vs bot</td><td class="num">111.4%</td><td class="num">103.5%</td></tr>
-    <tr><td>Synergy archetype acc</td><td class="num">75.0%</td><td class="num">50.0%</td></tr>
-    <tr><td>Synergy card-pick acc</td><td class="num">75.0%</td><td class="num">100%</td></tr>
-    <tr><td>Synergy removal acc</td><td class="num">25.0%</td><td class="num">12.5%</td></tr>
-  </tbody>
-</table>
-
-<h3>4.3 — Synergy archetype accuracy (best structured result per model)</h3>
+<h2 id="e1">Experiment 1</h2>
+<h3><span class="expnum">1</span>Turn-level planning</h3>
 <div class="panel">
-  <div class="barwrap"><div class="barlabel">scout-17b (structured)</div><div class="bartrack"><div class="barfill" style="width:75%;background:var(--good)"></div></div><div class="barval">75%</div></div>
-  <div class="barwrap"><div class="barlabel">llama-8b (structured)</div><div class="bartrack"><div class="barfill" style="width:50%;background:var(--warn)"></div></div><div class="barval">50%</div></div>
-  <div class="barwrap"><div class="barlabel">scout-17b (raw)</div><div class="bartrack"><div class="barfill" style="width:50%;background:var(--warn)"></div></div><div class="barval">50%</div></div>
-  <div class="barwrap"><div class="barlabel">llama-8b (raw)</div><div class="bartrack"><div class="barfill" style="width:37.5%;background:var(--bad)"></div></div><div class="barval">38%</div></div>
+  <div class="stepgrid">
+    <div class="step"><div class="lbl">Motivation</div>
+      <p>The shortest planning horizon. Within a single turn, the order in which cards are played changes
+      the outcome — block before an attack, apply vulnerability before damage, spend energy efficiently.
+      If a model cannot optimise one turn, longer horizons are hopeless. This is the floor of the ladder.</p></div>
+    <div class="step"><div class="lbl">Research question</div>
+      <p>Given a hand, energy, and enemy intent, can the model choose the card <em>sequence</em> that
+      maximises damage — and does it stay within the rules (only legal plays)?</p></div>
+    <div class="step"><div class="lbl">Implementation</div>
+      <p>For each sampled turn we exhaustively search all legal card orderings (≤720 permutations) to find
+      the true optimum. The model proposes a sequence; we score <strong>damage ratio</strong> (its damage ÷
+      optimal) and <strong>legal rate</strong> (fraction of proposals containing only legal plays). Any
+      illegal card in the sequence scores the whole turn 0 — partial credit would reward guessing. n=5 turns.</p></div>
+    <div class="step"><div class="lbl">Result</div>
+      <p>Mid-range and highly format-sensitive. The small model nearly <strong>doubles</strong> its damage
+      ratio in natural English (36.7%→69.6%) and goes from 60%→100% legal. The larger model is more
+      consistent on legality but does not dominate on damage.</p></div>
+  </div>
+  <table>
+    <thead><tr><th>Metric</th><th class="num">llama-8b · struct</th><th class="num">llama-8b · raw</th><th class="num">scout-17b · struct</th><th class="num">scout-17b · raw</th></tr></thead>
+    <tbody>
+      <tr><td>Damage ratio</td><td class="num">36.7%</td><td class="num">69.6%</td><td class="num">49.8%</td><td class="num">37.5%</td></tr>
+      <tr><td>Legal rate</td><td class="num">60%</td><td class="num">100%</td><td class="num">100%</td><td class="num">100%</td></tr>
+      <tr><td>Parse-ok rate</td><td class="num">100%</td><td class="num">100%</td><td class="num">80%</td><td class="num">100%</td></tr>
+    </tbody>
+  </table>
 </div>
 
-<h3>4.4 — Per-archetype identification (all 4 model×format runs combined)</h3>
-<p>The synergy set has two decks per archetype, scored across both models and both formats — 8 attempts per archetype. The pattern is sharp:</p>
-<table>
-  <thead><tr><th>True archetype</th><th class="num">Identified correctly</th><th>What models said instead</th></tr></thead>
-  <tbody>
-    <tr><td><strong>Block</strong></td><td class="num"><span class="badge b-good">7 / 8</span></td><td>(one "Strength")</td></tr>
-    <tr><td><strong>Aggro</strong></td><td class="num"><span class="badge b-good">8 / 8</span></td><td>—</td></tr>
-    <tr><td><strong>Strength</strong></td><td class="num"><span class="badge b-warn">2 / 8</span></td><td>almost always "Aggro"</td></tr>
-    <tr><td><strong>Exhaust</strong></td><td class="num"><span class="badge b-bad">0 / 8</span></td><td><em>always</em> "Aggro"</td></tr>
-  </tbody>
-</table>
+<h2 id="e2">Experiment 2</h2>
+<h3><span class="expnum">2</span>Combat-level planning</h3>
+<div class="panel">
+  <div class="stepgrid">
+    <div class="step"><div class="lbl">Motivation</div>
+      <p>A real fight spans many turns: the model must manage HP, react to changing enemy intents, and
+      trade block against damage across the whole encounter — not just optimise one snapshot. This tests
+      <em>sustained</em> tactical play.</p></div>
+    <div class="step"><div class="lbl">Research question</div>
+      <p>Can the model win a full combat, and does it play <em>efficiently</em> — i.e. does it finish with
+      at least as much HP as a simple greedy baseline bot?</p></div>
+    <div class="step"><div class="lbl">Implementation</div>
+      <p>The model plays a fight turn-by-turn against a scripted enemy until win or death. We record
+      <strong>win rate</strong> and <strong>HP ratio</strong> (model's remaining HP ÷ the greedy bot's, on
+      the identical fight). A ratio &gt; 100% means it outplayed the baseline. n=3 combats.</p></div>
+    <div class="step"><div class="lbl">Result</div>
+      <p><strong>Saturated.</strong> Every model, both formats, wins 100% of fights and <em>beats</em> the
+      greedy bot on HP (103–114%). Single-combat tactics are not where LLM planning struggles — the
+      difficulty lives at the longer horizons below.</p></div>
+  </div>
+  <table>
+    <thead><tr><th>Metric</th><th class="num">llama-8b · struct</th><th class="num">llama-8b · raw</th><th class="num">scout-17b · struct</th><th class="num">scout-17b · raw</th></tr></thead>
+    <tbody>
+      <tr><td>Win rate</td><td class="num">100%</td><td class="num">100%</td><td class="num">100%</td><td class="num">100%</td></tr>
+      <tr><td>HP ratio vs bot</td><td class="num">112.3%</td><td class="num">113.8%</td><td class="num">111.4%</td><td class="num">103.5%</td></tr>
+    </tbody>
+  </table>
+</div>
 
-<h2 id="findings">5. Key findings</h2>
+<h2 id="e3">Experiment 3</h2>
+<h3><span class="expnum">3</span>Synergy &amp; archetype reasoning</h3>
+<div class="panel">
+  <div class="stepgrid">
+    <div class="step"><div class="lbl">Motivation</div>
+      <p>Strong play in <em>Slay the Spire</em> is not card-by-card — it is committing to a <em>strategy</em>
+      (an archetype) and shaping the deck toward it: drafting cards that fit, cutting cards that dilute it.
+      This is the most abstract, human-like planning skill in the game.</p></div>
+    <div class="step"><div class="lbl">Research question</div>
+      <p>Given a deck, can the model (a) <strong>identify its archetype</strong>, (b) <strong>pick the best
+      card to add</strong>, and (c) <strong>choose the right card to remove</strong>? In particular: does it
+      grasp the meta-principle that basic cards should be cut because they dilute draw quality?</p></div>
+    <div class="step"><div class="lbl">Implementation</div>
+      <p>Earlier versions drafted decks randomly, but Act-1 decks are too small to have a crisp archetype.
+      So synergy now uses <strong>8 hand-crafted decks</strong> — two each for Strength, Block, Exhaust, and
+      Aggro — each with 4–5 unmistakable signature cards, a basic Strike as the obvious removal target, and a
+      3-card offer whose on-archetype card is the expert pick. Ground truth is deterministic. We score
+      <strong>archetype accuracy</strong>, <strong>card-pick accuracy</strong>, and <strong>removal accuracy</strong>.
+      n=8 (one pass over all fixtures).</p></div>
+    <div class="step"><div class="lbl">Result</div>
+      <p>The richest experiment. Three distinct, reproducible findings emerged — see the callouts below the
+      tables.</p></div>
+  </div>
+  <table>
+    <thead><tr><th>Metric</th><th class="num">llama-8b · struct</th><th class="num">llama-8b · raw</th><th class="num">scout-17b · struct</th><th class="num">scout-17b · raw</th></tr></thead>
+    <tbody>
+      <tr><td>Archetype accuracy</td><td class="num">50.0%</td><td class="num">37.5%</td><td class="num">75.0%</td><td class="num">50.0%</td></tr>
+      <tr><td>Card-pick accuracy</td><td class="num">100%</td><td class="num">62.5%</td><td class="num">75.0%</td><td class="num">100%</td></tr>
+      <tr><td>Removal accuracy</td><td class="num">25.0%</td><td class="num">12.5%</td><td class="num">25.0%</td><td class="num">12.5%</td></tr>
+    </tbody>
+  </table>
+
+  <p style="margin-top:22px"><strong>Per-archetype identification</strong> — each archetype has 2 decks, scored
+  across both models and both formats (8 attempts each):</p>
+  <table>
+    <thead><tr><th>True archetype</th><th class="num">Identified correctly</th><th>What models said instead</th></tr></thead>
+    <tbody>
+      <tr><td><strong>Aggro</strong></td><td class="num"><span class="badge b-good">8 / 8</span></td><td>—</td></tr>
+      <tr><td><strong>Block</strong></td><td class="num"><span class="badge b-good">7 / 8</span></td><td>one "Strength"</td></tr>
+      <tr><td><strong>Strength</strong></td><td class="num"><span class="badge b-warn">2 / 8</span></td><td>almost always "Aggro"</td></tr>
+      <tr><td><strong>Exhaust</strong></td><td class="num"><span class="badge b-bad">0 / 8</span></td><td><em>always</em> "Aggro"</td></tr>
+    </tbody>
+  </table>
+
+  <div class="barwrap" style="margin-top:18px"><div class="barlabel">Aggro</div><div class="bartrack"><div class="barfill" style="width:100%;background:var(--good)"></div></div><div class="barval">8/8</div></div>
+  <div class="barwrap"><div class="barlabel">Block</div><div class="bartrack"><div class="barfill" style="width:87.5%;background:var(--good)"></div></div><div class="barval">7/8</div></div>
+  <div class="barwrap"><div class="barlabel">Strength</div><div class="bartrack"><div class="barfill" style="width:25%;background:var(--warn)"></div></div><div class="barval">2/8</div></div>
+  <div class="barwrap"><div class="barlabel">Exhaust</div><div class="bartrack"><div class="barfill" style="width:2%;background:var(--bad)"></div></div><div class="barval">0/8</div></div>
+</div>
 
 <div class="callout bad">
-  <strong>Finding 1 — Models cannot recognise the Exhaust archetype.</strong> Across every model and
-  every format, all eight Exhaust decks were labelled "Aggro" (0/8). Strength decks fared little
-  better (2/8). Models reliably name an archetype only when its signature is a simple, common
-  pattern (Block, generic Aggro) — they miss strategies defined by a mechanical interaction
-  (exhausting cards for payoff) even when the deck is stuffed with signature cards. This is a clean,
-  systematic knowledge gap, not random noise.
+  <div class="tag">Finding 3a</div>
+  <p style="margin-top:6px"><strong>Models cannot recognise the Exhaust archetype.</strong> All eight Exhaust
+  decks — across both models and both formats — were labelled "Aggro" (0/8), despite being full of Exhaust
+  signature cards. Strength was nearly as weak (2/8). Models name an archetype reliably only when its
+  signature is a simple <em>surface pattern</em> (lots of attacks → Aggro; lots of block → Block); they miss
+  strategies defined by a <em>mechanical interaction</em> (exhausting cards for a payoff). A clean, systematic
+  knowledge gap.</p>
 </div>
-
 <div class="callout">
-  <strong>Finding 2 — Naming the strategy and playing it are dissociated.</strong> Even on decks
-  whose archetype it could not name, llama-8b (structured) picked the correct best card
-  <strong>100%</strong> of the time, and scout-17b (raw) likewise hit <strong>100%</strong> card-pick.
-  In other words, the models choose the right card for the deck while being unable to articulate
-  <em>why</em> — local card-quality judgement is strong; the abstract strategic label is weak.
+  <div class="tag">Finding 3b</div>
+  <p style="margin-top:6px"><strong>Naming the strategy and playing it are dissociated.</strong> Card-pick
+  accuracy stays high (62.5–100%) even on decks the model cannot label — llama-8b (structured) picks the
+  correct card <strong>100%</strong> of the time while scoring only 50% on archetype ID. Local card-quality
+  judgement is strong; the abstract strategic label is weak. The model often makes the right move for reasons
+  it cannot articulate.</p>
 </div>
-
 <div class="callout warn">
-  <strong>Finding 3 — Card removal is a near-total failure (12–25%).</strong> The expert heuristic
-  removes a basic <code>Strike</code> first — basics dilute draw quality as the deck improves. Models
-  instead almost always propose removing a situational card (Disarm, Battle Trance, Bash), reasoning
-  about a card's <em>standalone quality</em> rather than the deck-cycling principle that makes basics
-  the right cut. A systematic conceptual gap with clear pedagogical value for the paper.
+  <div class="tag">Finding 3c</div>
+  <p style="margin-top:6px"><strong>Card removal is a near-total failure (12.5–25%).</strong> Expert play
+  removes a basic <code>Strike</code> first — basics dilute draw quality as the deck improves. Models instead
+  propose cutting situational cards (Disarm, Battle Trance, Bash), reasoning about a card's <em>standalone
+  quality</em> rather than the deck-cycling principle. The small non-zero scores come only from Block decks
+  where the targets happen to coincide. A systematic conceptual gap, not noise.</p>
 </div>
 
+<h2 id="e4">Experiment 4</h2>
+<h3><span class="expnum">4</span>Run-level planning</h3>
+<div class="panel">
+  <div class="stepgrid">
+    <div class="step"><div class="lbl">Motivation</div>
+      <p>The top of the ladder: an entire 15-floor act plus boss, where every combat, path choice, and draft
+      compounds. This is where planning is genuinely hard — local mistakes accumulate into death.</p></div>
+    <div class="step"><div class="lbl">Research question</div>
+      <p>Can the model survive a full Act 1 — making consistent, mutually-coherent decisions as state builds
+      up over dozens of choices?</p></div>
+    <div class="step"><div class="lbl">Implementation</div>
+      <p>The model drives a full run floor-by-floor (combat, events, rewards, drafting). We score
+      <strong>survival rate</strong>, <strong>floors reached</strong>, and <strong>draft coherence</strong>.</p></div>
+    <div class="step"><div class="lbl">Result</div>
+      <p><span class="badge b-bad">No valid data yet.</span> The run-level numbers currently on disk were
+      produced before three correctness fixes (map dead-end, event-bus listener stacking, null-index handling)
+      and would misrepresent ability, so they are <strong>excluded entirely</strong>. A clean pass is the
+      first priority — currently blocked by free-tier provider rate limits (run-level is by far the most
+      token-heavy dimension). See §E.</p></div>
+  </div>
+</div>
+
+<hr class="div">
+
+<h2 id="cross">C · Cross-cutting findings</h2>
 <div class="callout good">
-  <strong>Finding 4 — Combat competence is saturated; the difficulty lives upstream.</strong> Both
-  models win <strong>100%</strong> of isolated fights and <em>beat the greedy bot on remaining HP</em>
-  (103–114%). The hard part of planning is not winning one fight — it is the longer-horizon
-  consistency (deck-building, archetype reasoning) where scores drop sharply.
+  <div class="tag">Difficulty lives upstream</div>
+  <p style="margin-top:6px">Combat is <strong>saturated</strong> (100% win, beats the bot), yet the more
+  abstract synergy reasoning collapses on whole archetypes. The hard part of planning is not winning a fight —
+  it is the strategic, longer-horizon reasoning.</p>
 </div>
-
 <div class="callout">
-  <strong>Finding 5 — Prompt format matters, and the better format depends on the task.</strong>
-  Natural-English prompts help <em>reasoning</em>: llama-8b's turn damage ratio nearly doubles
-  (36.7%→69.6%) and its legal-play rate rises 60%→100% in raw. But structured JSON helps
-  <em>index-based output</em>: scout-17b identifies archetypes far better in structured (75% vs 50%).
-  Format is a real, measurable lever — not a wash.
+  <div class="tag">Prompt format is a real lever — and task-dependent</div>
+  <p style="margin-top:6px">Natural-English prompts help <em>reasoning</em>: llama-8b's turn damage ratio
+  nearly doubles (36.7%→69.6%) and legality rises 60%→100% in raw. But structured JSON can help
+  <em>index-based output</em>: scout-17b identifies archetypes better in structured (75% vs 50%). Which format
+  wins depends on the task — not a wash, and worth controlling for in any future LLM-planning study.</p>
 </div>
 
 <h3>Dimension difficulty ranking (pilot)</h3>
 <table>
   <thead><tr><th class="num">Rank</th><th>Dimension</th><th>Observation</th></tr></thead>
   <tbody>
-    <tr><td class="num">1 (easiest)</td><td>Combat</td><td>100% win rate; beats the bot on HP</td></tr>
-    <tr><td class="num">2</td><td>Synergy — card pick</td><td>62–100%; surprisingly strong</td></tr>
-    <tr><td class="num">3</td><td>Synergy — archetype ID</td><td>38–75%; collapses on Exhaust/Strength</td></tr>
+    <tr><td class="num">1 · easiest</td><td>Combat</td><td>100% win rate; beats the bot on HP</td></tr>
+    <tr><td class="num">2</td><td>Synergy — card pick</td><td>62.5–100%; surprisingly strong</td></tr>
+    <tr><td class="num">3</td><td>Synergy — archetype ID</td><td>37.5–75%; collapses on Exhaust/Strength</td></tr>
     <tr><td class="num">4</td><td>Turn-level</td><td>37–70% damage ratio; format-sensitive</td></tr>
-    <tr><td class="num">5 (hardest)</td><td>Synergy — removal</td><td>12–25%; systematic conceptual failure</td></tr>
+    <tr><td class="num">5 · hardest</td><td>Synergy — removal</td><td>12.5–25%; systematic conceptual failure</td></tr>
+    <tr><td class="num">—</td><td>Run-level</td><td>hardest in principle; no valid data yet</td></tr>
   </tbody>
 </table>
 
-<h2 id="limits">6. Limitations</h2>
+<h2 id="limits">D · Limitations</h2>
 <ul>
-  <li><strong>Sample size.</strong> n=3–8 per dimension. Numbers are directional; no statistical
-    significance is claimed. (Synergy n=8 is a fixed deterministic set, so it has no sampling variance
-    — a clean mini-exam rather than a distribution.)</li>
-  <li><strong>Single seed.</strong> All runs use <code>seed=42</code> — one fixed map/enemy/draw
-    layout. Multiple seeds are needed to rule out RNG artefacts.</li>
-  <li><strong>Model breadth.</strong> Two models, both from the Llama family. A cross-family ladder
-    (and ideally a reasoning model) is needed for a capability story.</li>
+  <li><strong>Sample size.</strong> n=3–8 per dimension. Numbers are directional; no significance claimed.
+    (Synergy's n=8 is a fixed deterministic set — clean signal, but no sampling variance to compute a std over.)</li>
+  <li><strong>Single seed.</strong> All runs use <code>seed=42</code>; multiple seeds are needed to rule out
+    RNG artefacts.</li>
+  <li><strong>Model breadth.</strong> Two models, both Llama-family. A cross-family ladder — ideally with a
+    reasoning model — is needed for a capability story.</li>
   <li><strong>No run-level data.</strong> The hardest dimension currently has no valid measurement.</li>
-  <li><strong>Reasoning model deferred.</strong> A 32B reasoning model (qwen3) was attempted but
-    could not be run on free-tier providers (token-per-minute caps truncate its reasoning; the
-    alternative tier was too slow). It needs a paid tier — left as future work.</li>
+  <li><strong>Reasoning model deferred.</strong> A 32B reasoning model was attempted but could not run on
+    free-tier providers (rate caps truncate its reasoning; the alternative was too slow). Needs a paid tier.</li>
 </ul>
-<p>
-  None of these are harness defects — the simulator, ground truth, and scoring are paper-ready and
-  the code is fully tested. The remaining work is <strong>scale and breadth of runs</strong>, which is
-  compute-bound, not code-bound.
-</p>
+<p>None of these are harness defects — the simulator, ground truth, and scoring are paper-ready and fully
+tested. The remaining work is <strong>scale and breadth of runs</strong> — compute-bound, not code-bound.</p>
 
-<h2 id="next">7. Next steps to paper-grade</h2>
-<p>A concrete, checklist-style run matrix:</p>
-<div class="grid2">
-  <div class="panel">
-    <h3 style="margin-top:0">Scale</h3>
-    <ul>
-      <li><strong>n ≥ 20–30</strong> per dimension per model</li>
-      <li><strong>≥ 5 seeds</strong> (e.g. 42, 142, 242, 342, 442)</li>
-      <li><strong>Both formats</strong> on identical seeds</li>
-      <li>Report <strong>mean ± std / 95% CI</strong>, no point estimates</li>
-    </ul>
-  </div>
-  <div class="panel">
-    <h3 style="margin-top:0">Breadth</h3>
-    <ul>
-      <li>Add a <strong>3rd model from another family</strong> (cross-family signal)</li>
-      <li>Optionally a <strong>reasoning model</strong> on a paid tier</li>
-      <li><strong>Run-level first</strong> — it has no valid data and is the longest pole</li>
-      <li>Then expand the synergy fixture set for error bars</li>
-    </ul>
-  </div>
-</div>
+<h2 id="next">E · Next steps to paper-grade</h2>
+<table>
+  <thead><tr><th>Lever</th><th>Pilot</th><th>Paper-grade target</th></tr></thead>
+  <tbody>
+    <tr><td>Samples per dimension</td><td>3–8</td><td><strong>≥ 20–30</strong>, reported as mean ± std / CI</td></tr>
+    <tr><td>Seeds</td><td>1 (seed 42)</td><td><strong>≥ 5</strong> (42, 142, 242, 342, 442)</td></tr>
+    <tr><td>Models</td><td>2 (Llama only)</td><td><strong>3+, ≥2 families</strong> (+ optional reasoning model)</td></tr>
+    <tr><td>Run-level</td><td>no valid data</td><td><strong>clean pass first</strong> — longest pole</td></tr>
+    <tr><td>Synergy variance</td><td>fixed 8 decks</td><td>more fixtures or k-sampling for error bars</td></tr>
+  </tbody>
+</table>
 <div class="callout">
-  <strong>The single blocker</strong> is provider throughput: the run-heavy dimension exhausts
-  free-tier rate limits. A paid, higher-throughput tier unblocks the entire matrix above in one pass.
+  <div class="tag">The single blocker</div>
+  <p style="margin-top:6px">Provider throughput. The run-heavy dimension exhausts free-tier rate limits; a
+  paid, higher-throughput tier unblocks the entire matrix above in one pass.</p>
 </div>
 
 <footer>
-  Generated 2026-06-07 · slay-bench pilot · simulator + harness by Shoyam Mishra ·
-  full detail in the repository (<code>docs/findings.md</code>, <code>docs/roadmap.md</code>,
-  <code>docs/report.md</code>). All figures computed from <code>results/*.json</code> at
-  <code>seed=42</code>.
+  Generated 2026-06-07 · slay-bench pilot · simulator + harness by Shoyam Mishra.
+  All figures computed from <code>results/*.json</code> at <code>seed=42</code>.
+  Full technical detail in the repository: <code>docs/findings.md</code>, <code>docs/experiment_log.md</code>,
+  <code>docs/roadmap.md</code>.
 </footer>
 
 </div>
