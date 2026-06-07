@@ -6,9 +6,8 @@ Tests LLM planning ability across 4 dimensions: turn-level, combat-level, synerg
 GitHub: https://github.com/shoyammishra/slay-the-spire-bench (private)
 
 ## Security — CRITICAL
-- `.env` contains a real Groq API key. It is gitignored. NEVER commit it.
-- `OPENROUTER_API_KEY` in `.env` is a placeholder only.
-- Never share or print the Groq API key.
+- `.env` contains real API keys for BOTH Groq and OpenRouter. It is gitignored. NEVER commit it.
+- Never share or print any API key from `.env`.
 
 ## Active Context
 
