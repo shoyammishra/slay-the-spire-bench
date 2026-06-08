@@ -26,6 +26,7 @@ GitHub: https://github.com/shoyammishra/slay-the-spire-bench (public)
 - **Remaining run plan:** (1) ~~synergy n=8 ×4~~ DONE; (2) `--only run --n-run ≥20` ×4 — clean run-level pass, blocked on free TPM (needs paid Groq); (3) scale turn/combat to n≥20 + ≥5 seeds; (4) add a 3rd-family model; (5) merge `synergy-rework` → main. Full checklist in `docs/roadmap.md`.
 - **Speed:** Paid Groq (~400–1000 tok/s, no TPM cap) is the real speedup lever for n≥20 — see docs/notes.md.
 - **➡️ Next steps = the paper-grade run matrix in `docs/roadmap.md`** (models, per-dim n≥20, ≥5 seeds, both formats, mean±std, run order). When a paid Groq Dev tier is available: run-level first (no valid data), then scale turn/combat, then expand synergy, then add a 3rd-family model.
+- **Completed 2026-06-09:** Drafted the **Related Work** section in `docs/draft.md` — positions slay-bench against PlanBench, NATURAL PLAN, TravelPlanner, TextWorld/BabyAI/GameBench/AgentBench. Core thesis: prior planning benchmarks test a *single* decision horizon; slay-bench embeds four nested horizons (turn→combat→synergy→run) in one shared simulator so per-dimension score differences isolate planning-horizon effects, not domain shift. Citations still need full venue/year details before submission.
 
 ## Docs
 Detail lives in `docs/` — not here.
