@@ -27,6 +27,7 @@ GitHub: https://github.com/shoyammishra/slay-the-spire-bench (public)
 - **Speed:** Paid Groq (~400–1000 tok/s, no TPM cap) is the real speedup lever for n≥20 — see docs/notes.md.
 - **➡️ Next steps = the paper-grade run matrix in `docs/roadmap.md`** (models, per-dim n≥20, ≥5 seeds, both formats, mean±std, run order). When a paid Groq Dev tier is available: run-level first (no valid data), then scale turn/combat, then expand synergy, then add a 3rd-family model.
 - **Completed 2026-06-09:** Drafted the **Related Work** section in `docs/draft.md` — positions slay-bench against PlanBench, NATURAL PLAN, TravelPlanner, TextWorld/BabyAI/GameBench/AgentBench. Core thesis: prior planning benchmarks test a *single* decision horizon; slay-bench embeds four nested horizons (turn→combat→synergy→run) in one shared simulator so per-dimension score differences isolate planning-horizon effects, not domain shift. Citations still need full venue/year details before submission.
+- **⚠️ Completed 2026-06-09 — NOVELTY REALITY CHECK (`docs/novelty_and_related_work.md`):** Web research found **slay-bench is NOT the first LLM+Slay-the-Spire work.** Direct prior art a reviewer WILL find: (1) **"Language-Driven Play"** (Bateni & Whitehead, **FDG 2024**, MiniSTS engine) — and they ALREADY report that randomizing card names *improves* LLM play, which **overlaps our synergy "name-vs-play dissociation"** → must frame ours as confirming/quantifying, not discovering. (2) **Orak** (arXiv 2506.03610, 2025) — 12-game LLM benchmark that *includes STS*. (3) Modular/hybrid STS combat agents; UrzaGPT (MTG). **Real novelty that survives:** single-domain **multi-horizon decomposition with a per-horizon ground-truth oracle** (every other game bench scores whole-game play [Orak/GameBench] or maps one-game-per-skill [DSGBench/SmartPlay]); **optimality-relative scoring** (vs win/loss); **seed-matched format ablation**. **Top-tier viability:** framing is benchmark-track-shaped but execution is pilot-grade → workshop now; NeurIPS D&B needs n≥20–30, ≥5 seeds, 3+ model families incl. a reasoning model, and **valid run-level data** (currently missing). **Generalizability fix for "too narrow":** reframe contribution as a reusable *method*; cheapest breadth = add another STS character (Silent/Defect/Watcher, same engine); cite Monster Train / Into the Breach / NetHack as next instantiations. Full ranked game table + ready-to-send professor paragraph in the doc. Direct-STS prior work now also cited in `docs/draft.md` Related Work.
 
 ## Docs
 Detail lives in `docs/` — not here.
@@ -37,6 +38,7 @@ Detail lives in `docs/` — not here.
 - `docs/notes.md` — scratch pad
 - `docs/design.md` — architecture, invariants, interfaces
 - `docs/draft.md` — paper draft
+- `docs/novelty_and_related_work.md` — novelty vs prior STS/game/planning work, top-tier viability, generalizability + candidate games
 
 ## Project Structure
 ```
