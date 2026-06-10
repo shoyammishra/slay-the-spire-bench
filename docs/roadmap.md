@@ -43,8 +43,8 @@
 
 ## What can be done NOW (free tier, before paid Groq)
 
-1. **Merge `synergy-rework` → main.** Code is complete, tested, and mock-verified;
-   nothing pending blocks the merge. Waiting on results to merge code only adds drift risk.
+1. ~~**Merge `synergy-rework` → main.**~~ DONE 2026-06-10 (merge commit `6398bb1`,
+   47/47 tests verified on main). Work continues on main.
 2. **(Optional) refresh synergy at n=20 on the free tier.** Synergy is 1 light call per
    sample — free Groq sustains it (~10–20 min per model×format). Worth doing because the
    n=8 numbers predate the pick-coercion fix (a model answering `"1"` as a string is now
