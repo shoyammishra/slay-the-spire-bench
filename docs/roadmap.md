@@ -31,6 +31,21 @@
   there is no old data worth preserving compatibility with.
 - The multi-seed aggregator bug (null means) was caught BEFORE any paid run.
 
+### M2.7 — Engine-fidelity fix batch (DONE 2026-06-11)
+- All of `docs/bug_audit_2026-06-10.md` Part 2 implemented (~45 fixes: engine flag
+  consumers, relic energy-wipe/counter-lifecycle/stubs, elite relic drops, pool +
+  character gating, MERCHANT greedy shop, rest policies, Maw Bank, prompts, charts).
+- **Part 3:** the pass over previously-unread files found 8 more bugs, two critical:
+  played cards VANISHED when an identical copy was in hand (dataclass `__eq__`),
+  and self-exhausting cards double-exhausted (double CARD_EXHAUST). Full list in
+  the audit doc + CLAUDE.md "Bugs Fixed".
+- 77/77 tests (was 56; +21 regression tests); mock pipeline green both characters.
+- **Data consequence:** combat dynamics changed AGAIN (decks no longer shrink
+  mid-combat; exhaust hooks fire once) — turn/combat numbers were already stale,
+  still are. **Synergy n=20 stays the only valid data**, but the 4 Aggro fixture
+  decks changed (Perfected-Strike removal) → the next synergy run regenerates;
+  aggregates comparable, per-row values not.
+
 ### M3 — Paper-grade evaluation (IN PROGRESS — blocked on paid Groq)
 - n≥20 samples per dimension per model, ≥5 seeds, both formats, mean±std
 - Models: llama-3.1-8b, llama-4-scout-17b + a 3rd family (qwen3-32b dropped —
@@ -58,7 +73,9 @@
    - **seed sweep:** `--only synergy --n-synergy 20 --seeds 42 142 242 342 442` ×8 combos →
      per-seed JSON + auto-aggregated mean±std (the `_aggregate_summaries` path, key-bug-fixed).
    Either yields the mean±std synergy tables the paper needs. **This is the planned next-session
-   task** (along with re-confirming all 8 clean n=20). Turn-level (1 call/sample) is also
+   task** (along with re-confirming all 8 clean n=20 — NOTE: the re-confirm regenerates the
+   numbers anyway, since the 4 Aggro fixture decks changed in the 2026-06-11 batch and the
+   seed↔fixture mapping changed in the 2nd audit). Turn-level (1 call/sample) is also
    free-tier-feasible if a demo is wanted; turn/combat/run paper-grade still need paid Groq.
 
 ## Paper-grade run matrix (M3)
@@ -70,8 +87,8 @@ unblocks all of it. Check items off as runs land.
 ### Models (capability ladder)
 | # | Model | Provider | Status | Notes |
 |---|---|---|---|---|
-| 1 | llama-3.1-8b-instant | Groq | synergy valid (n=8); turn/combat stale (pre-sweep); run none | small baseline |
-| 2 | meta-llama/llama-4-scout-17b | Groq | synergy valid (n=8); turn/combat stale (pre-sweep); run none | mid baseline |
+| 1 | llama-3.1-8b-instant | Groq | synergy valid (n=20, seed-42 point est.); turn/combat stale; run none | small baseline |
+| 2 | meta-llama/llama-4-scout-17b | Groq | synergy valid (n=20, seed-42 point est.); turn/combat stale; run none | mid baseline |
 | 3 | **a 3rd family** (e.g. GPT-4o-mini / Claude Haiku / Gemini Flash) | TBD | **not started** | needed for cross-family signal |
 | 4 | **a reasoning model** (qwen3-32b or similar) | paid OpenRouter/Groq | **dropped on free tier** | optional but strengthens scale story |
 
@@ -82,7 +99,7 @@ Minimum for a credible paper: **3 models across ≥2 families**. Models 1–2 al
 |---|---|---|---|
 | Turn-level | stale (pre-sweep, n=5) | **≥20** | 5 → 20pp steps; need ≥20 for mean±std |
 | Combat-level | stale (pre-sweep, n=3) | **≥20** | 3 → 33pp steps; high-variance win/HP |
-| Synergy | valid n=8 (Ironclad) | **n=20/character** (fixtures ready: 20 IC + 20 Silent) AND/OR k≥5 completions/fixture at `--temperature 0.7` | deterministic fixtures need temp>0 sampling or seed sweeps for error bars |
+| Synergy | valid n=20 ×2 characters (seed-42 point est.; ⚠️ 4 Aggro decks changed 2026-06-11 → next run regenerates) | **n=20/character** AND/OR k≥5 completions/fixture at `--temperature 0.7` | deterministic fixtures need temp>0 sampling or seed sweeps for error bars |
 | Run-level | none | **≥20** | highest variance; most expensive (dozens–hundreds of calls/run) |
 
 ### Seeds
@@ -125,5 +142,7 @@ the most money.
 - Pilot complete: 2026-06-07
 - Harness paper-ready (Silent, multi-act, temp/seeds CLI): 2026-06-10
 - Bug sweep / hardening (21 fixes, 47 tests): 2026-06-10
+- 2nd instrument audit (5 fixes, 56 tests) + synergy n=20 de-biased: 2026-06-10
+- Engine-fidelity batch (audit Part 2 + Part 3, 77 tests): 2026-06-11
 - Paper-grade runs: TBD (gated on paid Groq Dev tier)
 - Draft: TBD

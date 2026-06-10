@@ -1,5 +1,33 @@
 # Decision Log
 
+## 2026-06-11 — Card pile membership is by IDENTITY, never by equality
+**Decision:** All pile mutations for a specific card object go through `cards._remove_identical()` / `any(c is card for c in pile)`. `list.remove(card)` and `card in pile` are banned for combat piles.
+**Why:** `Card` is a `@dataclass` → field-based `__eq__`; equality checks matched identical twins (another Strike), so played cards VANISHED from the game whenever a duplicate was in hand, and `_exhaust_card`/`_discard_from_hand` could remove or duplicate the wrong copy. Starter decks (5 Strikes/4 Defends) hit this constantly.
+
+## 2026-06-11 — CARD_DISCARD means MANUAL discards only
+**Decision:** Playing a card never emits CARD_DISCARD; only `_discard_from_hand` (Silent discard mechanics, Gambling Chip mulligan) does. End-of-turn hand discard also emits nothing.
+**Why:** Real StS discard triggers (Tingsha, Tough Bandages, Hovering Kite) count manual discards during your turn — emitting on every card play made those relics fire constantly.
+
+## 2026-06-11 — Relic counter lifecycles: class attr = per-run, TURN_START reset = per-turn
+**Decision:** Per-RUN counters (Pen Nib, Nunchaku, Sundial, Happy Flower, Incense Burner, Tiny Chest, Omamori) live as class attributes never touched in `register()`; per-TURN counters (Shuriken, Letter Opener, Orange Pellets) reset via a TURN_START subscription; per-COMBAT counters (Centennial Puzzle) reset in `register()` (which runs at every combat start).
+**Why:** `register()` re-runs each combat, so `self._count = 0` there silently made every counter per-combat — Tiny Chest could NEVER fire (needs 4 combat-ends).
+
+## 2026-06-11 — Energy granted at COMBAT_START / TURN_END goes through ENERGIZED
+**Decision:** Relics granting energy outside the player's turn window (Lantern, Ancient Tea Set, Art of War) queue `PowerId.ENERGIZED`, consumed at TURN_START after the energy reset. Direct `player.energy +=` is only valid mid-turn or in TURN_START hooks.
+**Why:** `_begin_player_turn` SETS `energy = energy_per_turn` after COMBAT_START and at every turn start — direct additions before that point were silently wiped (three dead relics).
+
+## 2026-06-11 — Character-gated relic pools via `relic_allowed()`
+**Decision:** `relics_full.relic_allowed(relic_id, character)` + `_DEFECT_ONLY/_WATCHER_ONLY/_IRONCLAD_ONLY/_SILENT_ONLY` sets, applied with owned-relic dedup in `random_relic` and `generate_boss_relic_choices`. Boss relics removed from the chest "rare" pool; Nuclear Battery (Defect) removed from boss pools.
+**Why:** Silent runs were drawing Brimstone/Magic Flower (Ironclad-only) and dead Defect/Watcher relics; boss-pool leakage gave chests run-warping energy relics. Mirrors the existing `card_pool_for` precedent.
+
+## 2026-06-11 — MERCHANT = deterministic greedy shop, shared by both run loops
+**Decision:** `nodes.greedy_shop_visit(state)`: Meal Ticket heal, then pay to remove the worst card (curse → basic Strike → basic Defend), buy nothing else. Used identically by `run_loop.resolve_node` and `RunEvaluator._play_act`.
+**Why:** Shop floors were no-ops (gold accumulated unused — a dead stat). A conservative deterministic policy makes gold matter without injecting policy noise into the LLM-vs-greedy comparison; both sides get the same shop behavior.
+
+## 2026-06-11 — Elite/boss room tags on enemies at spawn
+**Decision:** `spawn_enemies(state, ids, elite=, boss=)` stamps `_elite`/`_boss` on each enemy; Preserved Insect, Slaver's Collar, and elite relic drops key on the tags. Elites now drop 1 relic (2 with Black Star) at real-StS rarity odds (50/33/17) in both run loops.
+**Why:** Room type was invisible to relic hooks (Preserved Insect used a `max_hp>100` proxy that hit bosses); elites dropping no relics removed the core risk/reward of elite routing.
+
 ## 2026-06-10 (2nd audit) — Combat HP scored pre-COMBAT_END
 **Decision:** `CombatEvaluator` captures `hp_remaining` BEFORE `end_combat()`; the greedy baseline keeps its no-COMBAT_END convention. Both sides now exclude post-combat relic heals.
 **Why:** Burning Blood's COMBAT_END heal applied only to the LLM's score → identical play scored hp_ratio 1.095. Symmetric pre-heal reading restores 1.0 = parity.

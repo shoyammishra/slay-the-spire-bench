@@ -48,6 +48,27 @@ slay_bench/
 - **avg_progress**: floors_reached / total_floors, clamped to 1.0. Gives partial credit on death.
 - **Multi-act**: `RunEvaluator.evaluate(state, n_acts)` plays acts 1→n in sequence;
   `_act_transition()` does a full heal + boss relic pick (LLM or greedy) between acts.
+- **Pile membership is by IDENTITY (2026-06-11)**: `Card` is a dataclass → field-based
+  `__eq__`; `list.remove`/`in` on combat piles match identical twins. Use
+  `cards._remove_identical()` / `any(c is card for …)` for any specific card object.
+- **CARD_DISCARD = manual discards only (2026-06-11)**: playing a card and the end-of-turn
+  hand discard emit nothing; only `_discard_from_hand` emits (Tingsha-class triggers).
+- **Relic counter lifecycles (2026-06-11)**: per-RUN counters = class attributes, never
+  reset in `register()`; per-TURN counters = TURN_START-subscription reset; per-COMBAT
+  counters = reset in `register()` (which runs at every combat start).
+- **Out-of-window energy goes through ENERGIZED (2026-06-11)**: COMBAT_START / TURN_END
+  energy grants queue `PowerId.ENERGIZED` (consumed at TURN_START after the energy reset);
+  direct `player.energy +=` is wiped there.
+- **Healing**: combat heals go through `cards._heal_player()` (Magic Flower ×1.5 hook).
+  X-cost values go through `cards._x_value()` (Chemical X +2 hook).
+- **Room tags (2026-06-11)**: `spawn_enemies(..., elite=, boss=)` stamps `_elite`/`_boss`
+  on enemies; Preserved Insect / Slaver's Collar / elite relic drops key on them. Elites
+  drop 1 relic (2 with Black Star) in BOTH run loops.
+- **Relic pools are character-gated**: `relics_full.relic_allowed(id, character)` +
+  owned-relic dedup in `random_relic` and `generate_boss_relic_choices`; boss relics are
+  not in the chest "rare" pool.
+- **MERCHANT nodes** run `nodes.greedy_shop_visit` (deterministic: Meal Ticket heal +
+  worst-card removal) identically in both run loops.
 
 ## Prompt Formats
 - `structured`: compact JSON with card names, costs, HP numbers

@@ -1,5 +1,23 @@
 # Experiment Log
 
+## 2026-06-11 — Engine-fidelity fix batch (NO API runs; mock verification only)
+
+**What ran:** full test suite (77/77, was 56; +21 regression tests) and mock pipeline
+(`--provider mock`, structured, seed 42) for BOTH characters — green end-to-end, charts
+written. No paid/free API calls this session.
+
+**What changed (data-validity consequences):**
+- All of `docs/bug_audit_2026-06-10.md` Part 2 implemented + 9 new Part 3 fixes (2 critical:
+  vanishing played cards via dataclass `__eq__`; double exhaust emit). Combat dynamics
+  changed → turn/combat numbers remain stale (now for a third reason); **synergy n=20
+  below is still the only valid data** (static deck snapshot, no combat involved).
+- ⚠️ The 4 **Aggro fixture decks changed** (Perfected Strike → Cleave/Wild Strike/Clash,
+  audit item 2.8): the next synergy run regenerates point estimates. Aggregates stay
+  comparable (same archetype balance, same offers/picks/removals); per-row values for the
+  4 Aggro fixtures do not line up with the saved seed-42 files.
+- Elites now drop relics, MERCHANT floors act, Maw Bank/Peace Pipe/etc. live → the
+  (still-pending) first valid run-level pass will exercise a substantially richer run loop.
+
 ## 2026-06-10 — Synergy n=20, both characters, DE-BIASED instrument (CURRENT valid synergy data)
 
 **Config:** `--only synergy --n-synergy 20`, seed=42, free Groq, post-bug-sweep code.

@@ -1,5 +1,19 @@
 # Findings
 
+## ⚠️ Played cards VANISHED from combat — every prior combat simulation under-decked (2026-06-11)
+
+The engine-fidelity batch's pass over the card implementations found that `Card` (a
+`@dataclass`, field-based `__eq__`) made `play_card`'s pile bookkeeping match identical
+TWINS: playing a Strike while another Strike was in hand meant the played copy never
+reached the discard pile — it vanished from the combat. With 5 Strikes + 4 Defends in the
+starter deck this fired constantly, so every combat ever simulated ran on a silently
+shrinking deck (fewer reshuffles, weaker late turns — symmetric for the LLM and the greedy
+bot, but not the real game). Sibling bug: self-exhausting cards (31 callsites)
+double-entered the exhaust pile and double-emitted CARD_EXHAUST (Feel No Pain / Dark
+Embrace triggered 2×). Both fixed with identity-based pile ops + regression tests.
+Consequence: pre-2026-06-11 turn/combat numbers (already stale from the debuff-timing fix)
+are doubly non-comparable. Synergy is unaffected (static deck snapshot, no combat).
+
 ## ⚠️ The pilot "LLM beats the greedy bot on HP" result was an instrument artifact (2026-06-10, 2nd audit)
 
 The stale combat-level hp_ratio values >1.0 (103.5–113.8% across both models/formats) were
@@ -14,7 +28,8 @@ Two sibling instrument findings from the same audit (both fixed, both with regre
 Silent's 7-card opening hand (understated the optimum on 6/10 seeds, up to 2×); (2)
 multi-seed synergy runs sent byte-identical prompts for every seed (fixture+rotation came
 from the loop index), so `--seeds` error bars would have reported std≈0 by construction.
-Full audit + the still-pending engine-fidelity fix batch: `docs/bug_audit_2026-06-10.md`.
+Full audit: `docs/bug_audit_2026-06-10.md` (its engine-fidelity fix batch was completed
+2026-06-11 — Part 2 + Part 3 in that doc).
 
 Reassuring negatives from the same audit: the de-biased synergy n=20 results SURVIVE (all 40
 fixtures classify confidently as labeled; no string-matching near-misses in removal scoring —
