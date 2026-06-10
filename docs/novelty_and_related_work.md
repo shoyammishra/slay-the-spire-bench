@@ -97,7 +97,7 @@ The defence against "too narrow" is to **make the contribution the *method*, not
 
 Framed this way, STS is an *instance* of a general recipe, and breadth is demonstrated by **applying the recipe to additional games/characters** (Section 6). Two complementary moves:
 
-- **Cheap breadth (same engine):** add the other three STS characters (Silent, Defect, Watcher). Different archetypes, same horizons → tests whether per-horizon scores transfer across deck identities with *zero* new simulator work conceptually (more card implementations, same harness).
+- **Cheap breadth (same engine):** add the other three STS characters (Silent, Defect, Watcher). Different archetypes, same horizons → tests whether per-horizon scores transfer across deck identities with *zero* new simulator work conceptually (more card implementations, same harness). **UPDATE 2026-06-10: Silent is now implemented** (~73 cards, Poison/Shiv/Discard/Block archetypes, 20 synergy fixtures, `--character silent`) — runs pending paid Groq. Defect/Watcher remain future work.
 - **Genre breadth (new engine, same recipe):** apply the four-horizon decomposition to a structurally different game (Section 6) to show the methodology isn't STS-specific.
 
 ---

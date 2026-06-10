@@ -27,6 +27,13 @@
   is only marginally faster than free (same upstream providers). Revisiting qwen3 (or another
   reasoning model) on a paid tier is FUTURE WORK. Result files deleted.
 
+## Status snapshot (2026-06-10)
+- A* acceptance changes landed (commit d35771e): Silent character, multi-act (`--acts`),
+  `--temperature`, `--seeds` (mean±std aggregation), `--llm-routing`; relic on_pickup/register
+  split; synergy fixtures 8 → 20/character (40 total). All 40 tests pass.
+- Still ZERO valid run-level data — clean pass + everything at n≥20 gated on paid Groq.
+- When paid Groq lands, follow the run order in docs/roadmap.md (run-level first).
+
 ## Status snapshot (2026-06-07, checkpoint)
 - Branch `synergy-rework` pushed to origin (NOT merged to main yet — merge later with
   the synergy re-run results folded in).

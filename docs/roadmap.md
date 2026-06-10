@@ -13,12 +13,21 @@
 - meta-llama/llama-4-scout-17b-16e-instruct: structured + raw, seed=42
 - Key bugs fixed: map dead-end, EventBus stacking, rate-limit crash
 
+### M2.5 — A* acceptance harness extensions (DONE 2026-06-10, code-side)
+- Silent character: full card set (~73), powers, pool, 20 hand-crafted synergy fixtures
+  (Ironclad fixtures also expanded 8 → 20 → 40 total across both characters)
+- Multi-act runs (`--acts 3`): acts 1→3 with full-heal transitions + boss relic picks
+- `--temperature` (sampling variance / error bars), `--seeds` (multi-seed mean±std),
+  `--llm-routing` (LLM picks paths/rest/boss relics in run-level)
+- Relic lifecycle split (on_pickup/register) — fixes relic stacking across a run
+- All 40 tests pass. **No runs yet** — actual data gated on paid Groq (M3).
+
 ### M3 — Paper-grade evaluation (IN PROGRESS)
 - n≥20 samples per dimension per model
 - Models: llama-3.1-8b, llama-4-scout-17b (qwen3-32b dropped — free tiers can't run a
   reasoning model; a 32B+ reasoning model needs a paid tier — future work)
 - Both formats (structured, raw) for each model
-- Statistical summary: mean ± std per metric
+- Statistical summary: mean ± std per metric (`--seeds` CLI now does this natively)
 
 ### M4 — Write-up
 - findings.md → draft.md → final paper/report
@@ -46,7 +55,7 @@ Minimum for a credible paper: **3 models across ≥2 families**. Models 1–2 al
 |---|---|---|---|
 | Turn-level | 5 | **≥20** | 5 → 20pp steps; need ≥20 for mean±std |
 | Combat-level | 3 | **≥20** | 3 → 33pp steps; high-variance win/HP |
-| Synergy | 8 (fixed fixtures) | **n=16–20 fixtures** OR k≥5 sampled completions/fixture at temp>0 | current 8 is deterministic (no variance/std) — need more fixtures or repeated sampling for error bars |
+| Synergy | 8 (fixed fixtures) | **n=20 fixtures/character** (now available: 20 Ironclad + 20 Silent) AND/OR k≥5 sampled completions/fixture at `--temperature >0` | fixture pool expanded 2026-06-10; deterministic fixtures still need temp>0 sampling or seed sweeps for error bars |
 | Run-level | 3 (INVALID, pre-fix) | **≥20** | highest variance; currently NO valid data — re-run first |
 
 ### Seeds
@@ -65,11 +74,14 @@ Minimum for a credible paper: **3 models across ≥2 families**. Models 1–2 al
 1. **Run-level first** — it has no valid data and is the longest pole. `--only run --n-run 20`
    × (2 models × 2 formats), seed-swept.
 2. Scale turn/combat to n≥20 (`--only turn combat`).
-3. Expand synergy (more fixtures or k-sampling).
+3. Expand synergy: `--n-synergy 20` per character (fixtures ready), plus `--character silent`
+   for the breadth story; add `--temperature 0.7` k-sampling for error bars.
 4. Add model #3 (new family); optionally model #4 (reasoning, paid).
-5. Fold all numbers (mean±std) into findings.md → report.md → draft.md.
+5. Optional breadth: `--acts 3` multi-act run-level + `--llm-routing` ablation.
+6. Fold all numbers (mean±std) into findings.md → report.md → draft.md.
 
 ## Timeline
 - Pilot complete: 2026-06-07
+- Harness paper-ready (Silent, multi-act, temp/seeds CLI): 2026-06-10
 - Paper-grade runs: TBD (gated on paid Groq Dev tier)
 - Draft: TBD

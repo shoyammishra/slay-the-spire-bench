@@ -1,5 +1,21 @@
 # Experiment Log
 
+## 2026-06-10 — No new runs; harness extended for A* acceptance (code-only)
+
+**Status:** No experiments — run-level remains blocked on free Groq TPM (paid tier pending).
+Harness changes that affect FUTURE runs (commit d35771e):
+- Silent character (full card set + 20 synergy fixtures; Ironclad fixtures expanded 8 → 20)
+- Multi-act runs (`--acts 3`), `--temperature`, `--seeds` (mean±std), `--llm-routing`
+- Relic lifecycle split (on_pickup/register) — relics no longer stack across a run
+
+**Comparability note:** the relic-stacking fix changes run-level dynamics, so any future
+run-level numbers are NOT comparable to pre-2026-06-10 ones — which is moot, since all
+existing run-level data was already invalid (map dead-end + EventBus bugs). Turn/combat/
+synergy dimensions are unaffected (fresh state per sample). All 40 tests pass
+(20 benchmark + 7 combat + 13 run; needs `PYTHONIOENCODING=utf-8` on Windows consoles).
+
+---
+
 ## 2026-06-07 — Synergy re-run on HAND-CRAFTED fixtures, n=8 (CURRENT valid synergy data)
 
 **Config:** `--only synergy --n-synergy 8`, both formats, both models, seed=42.
