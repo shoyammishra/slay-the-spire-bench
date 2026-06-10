@@ -437,6 +437,68 @@ def test_aggregation_keys_match_summary():
     print("[PASS] Aggregation keys match summary keys (no silent None means)")
 
 
+def test_synergy_fixture_ground_truth_rules():
+    """Executable fixture design rules for BOTH characters: every deck has a
+    Strike (the removal target), the expert pick is on-archetype, and no other
+    offer is on-archetype (no ambiguous ground truth). Catches mislabeled picks
+    like the ironclad#18 Fiend-Fire-vs-Defend bug."""
+    from slay_bench.benchmark import _SYNERGY_FIXTURES, _get_archetype_tables
+    from slay_bench.cards_silent import SILENT_SYNERGY_FIXTURES
+    from slay_bench.cards import make_card_for
+    for char, fixtures in (("ironclad", _SYNERGY_FIXTURES),
+                           ("silent", SILENT_SYNERGY_FIXTURES)):
+        arch_t, _payoffs, _default = _get_archetype_tables(char)
+        for i, (arch, deck, offers, pick) in enumerate(fixtures):
+            deck_names = [make_card_for(char, n).name for n in deck]
+            assert "Strike" in deck_names, f"{char}#{i} ({arch}): no Strike removal target"
+            offer_names = [make_card_for(char, n).name for n in offers]
+            assert offer_names[pick] in arch_t[arch], \
+                f"{char}#{i} ({arch}): expert pick {offer_names[pick]} is off-archetype"
+            for j, name in enumerate(offer_names):
+                if j != pick:
+                    assert name not in arch_t[arch], \
+                        f"{char}#{i} ({arch}): offer[{j}]={name} also on-archetype (ambiguous)"
+    print("[PASS] All 40 synergy fixtures obey the ground-truth design rules")
+
+
+def test_synergy_pick_position_debias():
+    """A model that ALWAYS answers index 0 must score ~chance on card-pick.
+    Before the offer-rotation fix it scored 75% (Ironclad) / 100% (Silent)
+    because the hand-written fixtures put the correct card first."""
+    mock = MockLLM(['{"archetype": "Aggro", "best_card_index": 0, "worst_card_name": "Strike"}'])
+    h = BenchmarkHarness(mock, "m", "structured")
+    scores = h.run_synergy_eval(list(range(500, 520)))  # 20 samples, one fixture pass
+    picks = [s.expert_pick_idx for s in scores]
+    for pos in (0, 1, 2):
+        assert picks.count(pos) >= 6, f"expert pick position {pos} underrepresented: {picks}"
+    acc = sum(1 for s in scores if s.card_pick_correct) / len(scores)
+    assert acc <= 0.4, f"always-0 strategy scored {acc:.2f} — positional bias not fixed"
+    print(f"[PASS] Pick positions uniform {sorted(picks.count(p) for p in (0,1,2))}, "
+          f"always-0 scores {acc:.2f}")
+
+
+def test_synergy_archetype_multi_mention_scored_false():
+    """An answer naming several archetypes (or echoing the option list) must NOT
+    count as correct just because the right name appears as a substring."""
+    from slay_bench import new_game
+    from slay_bench.cards import make_card_for
+    mock = MockLLM(['{"archetype": "Strength, Block, Exhaust, Aggro", '
+                    '"best_card_index": 0, "worst_card_name": "Strike"}',
+                    '{"archetype": "Block", "best_card_index": 0, "worst_card_name": "Strike"}'])
+    ev = SynergyEvaluator(mock, "structured")
+    deck = [make_card_for("ironclad", n) for n in
+            ("Barricade", "Juggernaut", "Entrench", "Impervious", "Strike_R")]
+    offers = [make_card_for("ironclad", n) for n in ("Body Slam", "Anger", "Iron Wave")]
+    state = new_game(82, "ironclad")
+    state.player.deck = deck
+    s1 = ev.evaluate(state, offers, expert_pick_idx=0, expert_remove_name="Strike")
+    assert s1.archetype_correct is False, "option-list echo must not score correct"
+    s2 = ev.evaluate(state, offers, expert_pick_idx=0, expert_remove_name="Strike")
+    assert s2.archetype_correct is True, "a single correct name must still score"
+    assert s2.model_pick == 0 and s2.model_removal == "Strike"  # audit fields persisted
+    print("[PASS] Multi-archetype answers rejected; single correct name accepted")
+
+
 if __name__ == "__main__":
     tests = [
         test_structured_prompt,
@@ -463,6 +525,9 @@ if __name__ == "__main__":
         test_synergy_evaluator_null_fields,
         test_character_propagates_to_evaluators,
         test_aggregation_keys_match_summary,
+        test_synergy_fixture_ground_truth_rules,
+        test_synergy_pick_position_debias,
+        test_synergy_archetype_multi_mention_scored_false,
     ]
     passed = failed = 0
     for test in tests:

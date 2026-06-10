@@ -255,6 +255,9 @@ class SynergyScore:
     expert_archetype: str = ""                 # the heuristic label (for audit)
     archetype_confident: bool = True           # False = ambiguous deck, excluded from acc
     model_archetype: str = ""                  # what the model answered (for audit)
+    expert_pick_idx: Optional[int] = None      # ground-truth pick position (post-rotation)
+    model_pick: Optional[int] = None           # the model's actual pick (for audit)
+    model_removal: str = ""                    # the model's actual removal answer (for audit)
     raw_response: dict = field(default_factory=dict)
 
 
@@ -766,7 +769,7 @@ _SYNERGY_FIXTURES = [
     ("Strength",
      ["Inflame", "Whirlwind", "Heavy Blade", "Demon Form", "Uppercut",
       "Strike_R", "Strike_R", "Defend_R", "Defend_R", "Bash"],
-     ["Limit Break", "Anger", "Defend_R"], 0),           # Limit Break = Strength payoff
+     ["Limit Break", "Shrug It Off", "Defend_R"], 0),    # Limit Break = Strength payoff (Anger removed: it's Strength-listed too → ambiguous)
     ("Block",
      ["Body Slam", "Entrench", "Juggernaut", "Metallicize", "Sentinel",
       "Defend_R", "Defend_R", "Strike_R", "Strike_R", "Bash"],
@@ -774,7 +777,7 @@ _SYNERGY_FIXTURES = [
     ("Exhaust",
      ["Corruption", "Dark Embrace", "Feel No Pain", "Sever Soul", "True Grit",
       "Strike_R", "Strike_R", "Strike_R", "Defend_R"],
-     ["Fiend Fire", "Iron Wave", "Defend_R"], 2),        # Fiend Fire = Exhaust payoff
+     ["Fiend Fire", "Iron Wave", "Defend_R"], 0),        # Fiend Fire = Exhaust payoff (was mislabeled 2=Defend)
     ("Aggro",
      ["Perfected Strike", "Blood for Blood", "Rampage", "Pommel Strike", "Sword Boomerang",
       "Anger", "Strike_R", "Strike_R", "Strike_R", "Defend_R"],
@@ -897,6 +900,8 @@ class SynergyEvaluator:
         card_pick_correct = None
         removal_correct = None
         model_archetype = ""
+        model_pick = None
+        model_removal = ""
 
         if parse_ok:
             # Models sometimes return null / non-string values for any field —
@@ -905,18 +910,23 @@ class SynergyEvaluator:
             # Only score archetype ID when the deck has a real, unambiguous archetype.
             # Ambiguous decks (no signature card, or a tie) stay None → excluded from acc.
             if archetype_confident:
-                # Substring match: accept "Block", "Block deck", "Defensive / Block", etc.
-                # Archetype names are mutually non-overlapping, so `in` is unambiguous.
-                archetype_correct = expert_archetype.lower() in model_archetype.lower()
+                # Correct iff the answer names EXACTLY ONE archetype and it's the
+                # expert's. Plain substring matching would score multi-archetype
+                # answers ("Aggro or Exhaust", an echo of the option list) as
+                # correct whenever the right name appeared anywhere.
+                mentioned = [a for a in archetypes
+                             if a.lower() in model_archetype.lower()]
+                archetype_correct = (len(mentioned) == 1 and
+                                     mentioned[0].lower() == expert_archetype.lower())
 
             if expert_pick_idx is not None:
                 # Accept "1" (string) as 1 — the answer is right, just mistyped
-                pick = _safe_int(resp.get("best_card_index"), default=-1)
-                card_pick_correct = pick == expert_pick_idx
+                model_pick = _safe_int(resp.get("best_card_index"), default=-1)
+                card_pick_correct = model_pick == expert_pick_idx
 
             if expert_remove_name is not None:
-                removal = str(resp.get("worst_card_name") or "")
-                removal_correct = removal.strip().lower() == expert_remove_name.lower()
+                model_removal = str(resp.get("worst_card_name") or "").strip()
+                removal_correct = model_removal.lower() == expert_remove_name.lower()
 
         return SynergyScore(
             archetype_correct=archetype_correct,
@@ -926,6 +936,9 @@ class SynergyEvaluator:
             expert_archetype=expert_archetype,
             archetype_confident=archetype_confident,
             model_archetype=model_archetype,
+            expert_pick_idx=expert_pick_idx,
+            model_pick=model_pick,
+            model_removal=model_removal,
             raw_response=resp,
         )
 
@@ -1316,7 +1329,10 @@ class BenchmarkResult:
                     "model_archetype": s.model_archetype,
                     "confident": s.archetype_confident,
                     "archetype_correct": s.archetype_correct,
+                    "expert_pick_idx": s.expert_pick_idx,
+                    "model_pick": s.model_pick,
                     "card_pick_correct": s.card_pick_correct,
+                    "model_removal": s.model_removal,
                     "removal_correct": s.removal_correct,
                 }
                 for s in self.synergy_scores
@@ -1431,6 +1447,15 @@ class BenchmarkHarness:
         scores = []
         for i, seed in enumerate(seeds):
             archetype, deck_names, offer_names, pick_idx = fixtures[i % len(fixtures)]
+            # De-bias offer position: the hand-written fixtures put the expert pick
+            # at index 0 in 35/40 cases, so a model that always answered 0 scored
+            # 75-100% on card-pick. Rotate each offer list so the correct index
+            # cycles 0,1,2 across samples — uniform by construction, deterministic,
+            # and invisible to the (stateless) model.
+            target_pos = i % len(offer_names)
+            rot = (pick_idx - target_pos) % len(offer_names)
+            offer_names = list(offer_names[rot:]) + list(offer_names[:rot])
+            pick_idx = target_pos
             print(f"  [synergy {i+1}/{len(seeds)}] deck={archetype}", flush=True)
             state = new_game(seed, self.character)
             state.player.deck = [make_card_for(self.character, n) for n in deck_names]
