@@ -9,7 +9,7 @@ slay_bench/
   prompt_builder.py       GameState → prompt (structured JSON or raw English); system_prompt(kind, character)
   combat.py               Turn engine: draw, play, enemy attack, block; powers reset per combat
   run_loop.py             Full act simulation, floor-by-floor (15 floors + boss per act)
-  game_map.py             Map generation, node types, path traversal
+  map_gen.py              Map generation, node types, path traversal
   cards.py                All Ironclad cards; make_card_for(character, name) dispatcher
   cards_silent.py         All Silent cards (~73), SILENT_POOL, SILENT_SYNERGY_FIXTURES
   enemies.py              Act 1 enemies
@@ -34,6 +34,13 @@ slay_bench/
 - **Powers reset per combat**: `start_combat()` sets `state.player.powers = {}`. Relic-granted
   powers (Vajra, Shuriken, …) re-apply via their COMBAT_START hooks.
 - **Poison bypasses block**: poison tick is `enemy.hp -= amt` directly (matches real StS).
+- **Player debuffs tick at end of ROUND** (after enemy turns), not end of player turn — so
+  Intangible/Vulnerable cover the enemy attacks of the round they're active. Debuffs enemies
+  apply during their phase are flagged `just_applied` and skip their first tick (StS rule).
+- **Thorns retaliates against attack damage only** — `_apply_damage_to_enemy(from_attack=True)`
+  is set solely by `_deal_damage`; Combust/Juggernaut/relic damage doesn't trigger thorns.
+- **`Event.SHUFFLE`** fires when the discard pile is reshuffled into the draw pile
+  (Sundial, The Abacus key on it).
 - **Character-aware factory**: `new_game(seed, character)` builds the right starter deck + relic;
   `make_card_for` / `card_pool_for` / `system_prompt` all dispatch on character.
 - **Illegal plays**: if any card in a sequence is illegal, `damage_ratio = 0`.

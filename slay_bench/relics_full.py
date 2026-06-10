@@ -37,6 +37,8 @@ class CentennialPuzzle(Relic):
     name = "Centennial Puzzle"
     _triggered = False
     def register(self, state):
+        # Once per COMBAT (register runs at every combat start)
+        self._triggered = False
         def on_damage(gs, **kw):
             if not self._triggered:
                 self._triggered = True
@@ -114,8 +116,8 @@ class MealTicket(Relic):
 class Omamori(Relic):
     id = "Omamori"
     name = "Omamori"
+    _charges = 2  # per RUN, not per combat — must not reset in register()
     def register(self, state):
-        self._charges = 2
         def on_card_add(gs, card=None, **kw):
             from .enums import CardType
             if card and card.type == CardType.CURSE and self._charges > 0:
@@ -632,9 +634,12 @@ class Pocketwatch(Relic):
     name = "Pocketwatch"
     def register(self, state):
         def on_turn_end(gs, **kw):
+            # Draw 3 additional cards NEXT turn (drawing now would be pointless:
+            # the hand is discarded right after TURN_END)
             if gs.combat and gs.combat.cards_played_this_turn <= 3:
-                from .cards import _draw_cards
-                _draw_cards(gs, 3)
+                from .enums import PowerId
+                gs.player.powers[PowerId.NEXT_TURN_DRAW] = \
+                    gs.player.powers.get(PowerId.NEXT_TURN_DRAW, 0) + 3
         state.bus.subscribe(Event.TURN_END, on_turn_end)
 
 
@@ -692,7 +697,7 @@ class TheAbacus(Relic):
     def register(self, state):
         def on_shuffle(gs, **kw):
             gs.player.block += 6
-        state.bus.subscribe(Event.CARD_DRAW, on_shuffle)  # approximate
+        state.bus.subscribe(Event.SHUFFLE, on_shuffle)
 
 
 class TheBoot(Relic):
@@ -882,9 +887,12 @@ class CursedKey(Relic):
         state.player.energy_per_turn += 1
 
     def register(self, state):
-        def on_treasure(gs, **kw):
-            from .cards import make_card
-            gs.player.deck.append(make_card("Regret"))
+        def on_treasure(gs, source=None, **kw):
+            # Real Cursed Key: curse only when opening CHESTS — not on boss
+            # relics, shop relics, or its own pickup.
+            if source == "chest":
+                from .cards import make_card
+                gs.player.deck.append(make_card("Regret"))
         state.bus.subscribe(Event.RELIC_OBTAINED, on_treasure)
 
 
@@ -915,6 +923,9 @@ class HolyWater(Relic):
 
 
 class Inserter(Relic):
+    # Defect-only relic (orb slots); kept out of the Ironclad/Silent pools.
+    # Approximated as transient energy — must NOT touch energy_per_turn, which
+    # is a permanent stat and would ramp without bound across a run.
     id = "Inserter"
     name = "Inserter"
     def register(self, state):
@@ -923,7 +934,7 @@ class Inserter(Relic):
             self._count += 1
             if self._count >= 2:
                 self._count = 0
-                gs.player.energy_per_turn += 1
+                gs.player.energy += 1
         state.bus.subscribe(Event.TURN_START, on_turn_start)
 
 
@@ -939,22 +950,24 @@ class PandorasBox(Relic):
     id = "Pandora's Box"
     name = "Pandora's Box"
     def on_pickup(self, state):
-        from .cards import make_card, CardType
-        from .rewards import _IRONCLAD_POOL
+        from .cards import make_card_for
+        from .rewards import card_pool_for
         from .enums import CardRarity
+        character = getattr(state, "character", "ironclad")
+        char_pool = card_pool_for(state)
         deck = state.player.deck
         strikes = [c for c in deck if "strike" in c.id.lower()]
         defends = [c for c in deck if "defend" in c.id.lower()]
         for c in strikes + defends:
             deck.remove(c)
         for _ in range(len(strikes)):
-            pool = _IRONCLAD_POOL[CardRarity.RARE]
+            pool = char_pool[CardRarity.RARE]
             name = pool[state.rng.misc_rng.next_int(len(pool))]
-            deck.append(make_card(name))
+            deck.append(make_card_for(character, name))
         for _ in range(len(defends)):
-            pool = _IRONCLAD_POOL[CardRarity.UNCOMMON]
+            pool = char_pool[CardRarity.UNCOMMON]
             name = pool[state.rng.misc_rng.next_int(len(pool))]
-            deck.append(make_card(name))
+            deck.append(make_card_for(character, name))
 
 
 class PhilosophersStone(Relic):
@@ -1021,7 +1034,7 @@ FULL_RELIC_LIST = [
 BOSS_RELIC_POOL = [
     "Black Blood", "Mark of Pain", "Runic Dome", "Brimstone", "Busted Crown",
     "Calling Bell", "Coffee Dripper", "Cursed Key", "Ectoplasm", "Empty Cage",
-    "Fusion Hammer", "Holy Water", "Inserter", "Nuclear Battery", "Pandora's Box",
+    "Fusion Hammer", "Holy Water", "Nuclear Battery", "Pandora's Box",
     "Philosopher's Stone", "Runic Pyramid", "Sacred Bark", "Slaver's Collar",
     "Snecko Eye", "Sozu", "Velvet Choker",
 ]
@@ -1057,7 +1070,7 @@ _RARITY_POOLS = {
     "boss": [r for r in FULL_RELIC_LIST if r.__name__ in {
         "Brimstone", "BustedCrown", "CallingBell", "CoffeeDripper",
         "CursedKey", "Ectoplasm", "EmptyCage", "FusionHammer", "HolyWater",
-        "Inserter", "NuclearBattery", "PandorasBox", "PhilosophersStone",
+        "NuclearBattery", "PandorasBox", "PhilosophersStone",
         "RunicPyramid", "SacredBark", "Sozu", "VelvetChoker", "VioletLotus",
     }],
 }

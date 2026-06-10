@@ -10,9 +10,18 @@ Harness changes that affect FUTURE runs (commit d35771e):
 
 **Comparability note:** the relic-stacking fix changes run-level dynamics, so any future
 run-level numbers are NOT comparable to pre-2026-06-10 ones — which is moot, since all
-existing run-level data was already invalid (map dead-end + EventBus bugs). Turn/combat/
-synergy dimensions are unaffected (fresh state per sample). All 40 tests pass
-(20 benchmark + 7 combat + 13 run; needs `PYTHONIOENCODING=utf-8` on Windows consoles).
+existing run-level data was already invalid (map dead-end + EventBus bugs).
+
+**Bug sweep (same day, later):** a full logic+code audit fixed 21 bugs (see CLAUDE.md
+"Bugs Fixed"). The player-debuff timing fix (tick at end of round, not before enemy
+attacks) **changes combat-level dynamics too**: enemy-applied Weak/Vulnerable now actually
+affect the player, so the greedy baseline and LLM combats both take more damage (the Act-1
+determinism fixture flipped from survived=True/hp=74 to survived=False/hp=0). ⇒ **Pilot
+turn/combat numbers in the tables below were collected on the pre-sweep engine and are not
+comparable to future runs.** Synergy is unaffected (static deck snapshot, no combat).
+Also fixed before any paid run could be burned: the multi-seed aggregator was emitting
+`null` for most means (wrong metric key names). 47 tests pass (24 benchmark + 10 combat +
+13 run; needs `PYTHONIOENCODING=utf-8` on Windows consoles).
 
 ---
 

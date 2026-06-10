@@ -118,16 +118,10 @@ def register_power_hooks(state: GameState) -> None:
             for card in gs.combat.hand[:player.powers[PowerId.WELL_LAID_PLANS]]:
                 card._temp_retain = True
 
-        # Burn cards in hand deal damage
+        # Burn / curse cards in hand deal their end-of-turn effects
         for card in list(gs.combat.hand):
             if hasattr(card, 'end_of_turn_effect'):
                 card.end_of_turn_effect(gs)
-
-        # Pain curse
-        for card in (gs.combat.draw_pile + gs.combat.hand + gs.combat.discard_pile):
-            if card.__class__.__name__ in ('Decay', 'Doubt', 'Regret', 'Shame') and hasattr(card, 'end_of_turn_effect'):
-                if card in gs.combat.hand or card in gs.combat.draw_pile or card in gs.combat.discard_pile:
-                    pass  # Already handled via hand iteration above for hand cards
 
     bus.subscribe(Event.TURN_END, on_turn_end)
 
@@ -159,8 +153,9 @@ def register_power_hooks(state: GameState) -> None:
             if e.hp > 0 and PowerId.CHOKED in e.powers:
                 e.hp -= e.powers[PowerId.CHOKED]
 
-        # Pain curse: lose 1 hp on any card play
-        for c in (gs.combat.draw_pile + gs.combat.hand + gs.combat.discard_pile):
+        # Pain curse: while in HAND, lose 1 HP on any other card play (StS rule;
+        # copies in the draw/discard piles do nothing)
+        for c in gs.combat.hand:
             if c.__class__.__name__ == 'Pain':
                 from .cards import _damage_player
                 _damage_player(gs, 1, is_hp_loss=True)

@@ -181,8 +181,10 @@ class PenNib(Relic):
                 self._count += 1
                 if self._count >= 10:
                     self._count = 0
-                    from .enums import PowerId
-                    gs.player.powers[PowerId.VIGOR] = gs.player.powers.get(PowerId.VIGOR, 0) + 999  # double next attack
+                    # One-shot flag consumed by _deal_damage: this (10th) attack
+                    # deals double damage. CARD_PLAY fires before card.play(),
+                    # so the flag is up before the damage is rolled.
+                    gs.player._pen_nib_ready = True
         state.bus.subscribe(Event.CARD_PLAY, on_attack)
 
 
@@ -249,7 +251,7 @@ class Sundial(Relic):
             if self._count >= 3:
                 self._count = 0
                 gs.player.energy += 2
-        state.bus.subscribe(Event.CARD_DRAW, on_shuffle)  # approximate
+        state.bus.subscribe(Event.SHUFFLE, on_shuffle)
 
 
 # ── Rare relics ───────────────────────────────────────────────────────────────
@@ -268,7 +270,8 @@ class DeadBranch(Relic):
                 classes = IRONCLAD_CARD_CLASSES
             idx = gs.rng.misc_rng.next_int(len(classes))
             card_name = list(classes.keys())[idx]
-            gs.combat.hand.append(make_card_for(
+            from .cards import _add_card_to_hand
+            _add_card_to_hand(gs, make_card_for(
                 getattr(gs, "character", "ironclad"), card_name))
         state.bus.subscribe(Event.CARD_EXHAUST, on_exhaust)
 

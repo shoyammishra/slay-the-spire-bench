@@ -36,6 +36,7 @@ class Event(Enum):
     ATTACK_PLAY = auto()
     SKILL_PLAY = auto()
     STATUS_DRAW = auto()
+    SHUFFLE = auto()      # discard pile reshuffled into draw pile
 
 
 class EventBus:

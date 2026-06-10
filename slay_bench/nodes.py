@@ -195,7 +195,7 @@ def resolve_treasure(state: GameState, take_gold: bool = True) -> None:
     large = state.rng.misc_rng.next_int(3) == 0
     rarity = "rare" if large else "common"
     relic = random_relic(state, rarity)
-    _obtain_relic(state, relic)
+    _obtain_relic(state, relic, source="chest")
     if take_gold:
         gold = (55 + state.rng.loot_rng.next_int(26)) if large else (25 + state.rng.loot_rng.next_int(26))
         state.player.gold += gold
@@ -205,7 +205,7 @@ def resolve_treasure(state: GameState, take_gold: bool = True) -> None:
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
 
-def _obtain_relic(state: GameState, relic: Relic) -> None:
+def _obtain_relic(state: GameState, relic: Relic, source: Optional[str] = None) -> None:
     state.player.relics.append(relic)
     # One-time pickup effects (max HP, energy/turn, deck changes) happen exactly
     # once here; register() is re-run at the start of every combat and must only
@@ -213,4 +213,5 @@ def _obtain_relic(state: GameState, relic: Relic) -> None:
     relic.on_pickup(state)
     relic.register(state)
     from .events import Event
-    state.bus.emit(Event.RELIC_OBTAINED, state, relic=relic)
+    # source tags where the relic came from ("chest", None) — Cursed Key keys on it
+    state.bus.emit(Event.RELIC_OBTAINED, state, relic=relic, source=source)

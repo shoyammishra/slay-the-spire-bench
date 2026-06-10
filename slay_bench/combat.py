@@ -171,10 +171,13 @@ def play_card(state: GameState, card: Card, target: Optional[Enemy] = None) -> N
     if card.type == CardType.ATTACK:
         combat.attacks_played_this_turn += 1
 
-    # Double Tap: queue attack replay
+    # Double Tap: each stack doubles one attack (1 stack consumed per attack)
     double_tap_count = 0
     if PowerId.DOUBLE_TAP in player.powers and card.type == CardType.ATTACK:
-        double_tap_count = player.powers.pop(PowerId.DOUBLE_TAP)
+        double_tap_count = 1
+        player.powers[PowerId.DOUBLE_TAP] -= 1
+        if player.powers[PowerId.DOUBLE_TAP] <= 0:
+            del player.powers[PowerId.DOUBLE_TAP]
 
     # Burst: next skill(s) played twice (decrements one stack per skill)
     burst_replay = 0
@@ -238,22 +241,31 @@ def end_player_turn(state: GameState) -> None:
             card._bullet_time = False
             card.cost_override = None
 
-    # Reduce debuff durations on player
-    _tick_player_debuffs(state)
-
-    # Enemy turns
-    for enemy in combat.enemies:
-        if enemy.hp > 0:
-            _execute_enemy_turn(state, enemy)
-            _check_enemy_deaths(state)
-        if player.hp <= 0:
-            return  # player died
+    # Enemy turns. Player debuffs (Vulnerable, Intangible, ...) must still be
+    # active here — they tick at the end of the ROUND, below. Debuffs the
+    # enemies apply during this phase are flagged just_applied so they don't
+    # tick the same round (StS rule).
+    combat.enemy_phase = True
+    try:
+        for enemy in combat.enemies:
+            if enemy.hp > 0:
+                _execute_enemy_turn(state, enemy)
+                _check_enemy_deaths(state)
+            if player.hp <= 0:
+                return  # player died
+    finally:
+        combat.enemy_phase = False
 
     # Enemy powers tick (Ritual, Regenerate, Poison)
     for enemy in combat.enemies:
         if enemy.hp > 0:
             _tick_enemy_powers(state, enemy)
     _check_enemy_deaths(state)  # poison can kill
+
+    # End of round: reduce player debuff durations (after enemies acted, so
+    # Wraith Form / Incense Burner Intangible and enemy-applied Vulnerable
+    # actually cover the enemy attacks of this round)
+    _tick_player_debuffs(state)
 
     # Select next enemy moves
     for enemy in combat.enemies:
@@ -265,15 +277,18 @@ def end_player_turn(state: GameState) -> None:
 
 
 def _tick_player_debuffs(state: GameState) -> None:
-    """Reduce turn-based stacks at end of player turn."""
+    """Reduce turn-based stacks at end of round. Debuffs that enemies applied
+    during this round's enemy phase (just_applied) skip their first tick."""
     player = state.player
+    combat = state.combat
     tick_down = {PowerId.WEAK, PowerId.VULNERABLE, PowerId.FRAIL,
                  PowerId.INTANGIBLE, PowerId.DOUBLE_DAMAGE}
     for power in tick_down:
-        if power in player.powers:
+        if power in player.powers and power not in combat.just_applied:
             player.powers[power] -= 1
             if player.powers[power] <= 0:
                 del player.powers[power]
+    combat.just_applied.clear()
 
 
 def _execute_enemy_turn(state: GameState, enemy: Enemy) -> None:

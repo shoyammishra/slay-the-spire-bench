@@ -364,6 +364,79 @@ def test_harness_determinism():
           f"combat hp={r1.combat_scores[0].hp_remaining}")
 
 
+# ── Robustness regression tests (malformed-but-parseable LLM output) ─────────
+
+def test_turn_evaluator_nonint_indices():
+    """String/null/negative indices in "plays" must not crash the evaluator.
+    Numeric strings count as valid plays; null/negatives = illegal sequence."""
+    from slay_bench import new_game, start_combat
+    # String indices: coerced, sequence plays fine
+    mock = MockLLM(['{"plays": ["0", "1"], "reasoning": "r"}'])
+    ev = TurnEvaluator(mock, "structured")
+    state = new_game(80, "ironclad")
+    start_combat(state, [Cultist(state.rng.hp_rng)])
+    score = ev.evaluate(state)
+    assert score.legal, "numeric-string indices should be playable"
+    # Null + negative indices: illegal, not a crash
+    mock2 = MockLLM(['{"plays": [null, -1], "reasoning": "r"}'])
+    ev2 = TurnEvaluator(mock2, "structured")
+    state2 = new_game(80, "ironclad")
+    start_combat(state2, [Cultist(state2.rng.hp_rng)])
+    score2 = ev2.evaluate(state2)
+    assert not score2.legal and score2.llm_damage == 0
+    print("[PASS] Turn evaluator survives string/null/negative indices")
+
+
+def test_synergy_evaluator_null_fields():
+    """null archetype / worst_card_name and string best_card_index must not
+    crash, and a numeric-string pick is scored as the number it means."""
+    from slay_bench import new_game
+    from slay_bench.cards import make_card_for
+    mock = MockLLM(['{"archetype": null, "best_card_index": "1", "worst_card_name": null}'])
+    ev = SynergyEvaluator(mock, "structured")
+    state = new_game(81, "ironclad")
+    offers = [make_card_for("ironclad", n) for n in ("Anger", "Bludgeon", "Iron Wave")]
+    score = ev.evaluate(state, offers, expert_pick_idx=1, expert_remove_name="Strike")
+    assert score.parse_ok
+    assert score.card_pick_correct is True, "string '1' should match expert pick 1"
+    assert score.removal_correct is False
+    print("[PASS] Synergy evaluator survives null/string answer fields")
+
+
+def test_character_propagates_to_evaluators():
+    """BenchmarkHarness must hand its character to ALL evaluators (Silent runs
+    were getting Ironclad system prompts in turn/combat)."""
+    mock = MockLLM(['{"plays": [], "reasoning": "r"}',
+                    '{"action": "end_turn", "reasoning": "r"}'] * 50)
+    h = BenchmarkHarness(mock, "m", "structured", character="silent")
+    h.run_turn_eval([90])
+    h.run_combat_eval([91])
+    assert all("Silent" in sys for sys, _user in mock._calls), \
+        "every system prompt must mention the Silent"
+    print("[PASS] Character propagates to turn/combat evaluators")
+
+
+def test_aggregation_keys_match_summary():
+    """Multi-seed aggregation must use the real summary key names — a mismatch
+    silently yields None means for every metric."""
+    import sys as _sys, os as _os
+    _sys.path.insert(0, _os.path.dirname(_os.path.dirname(_os.path.abspath(__file__))))
+    from run_benchmark import _aggregate_summaries
+    mock = MockLLM(['{"plays": [0], "reasoning": "r"}',
+                    '{"action": "end_turn", "reasoning": "r"}',
+                    '{"archetype": "Aggro", "best_card_index": 0, "worst_card_name": "Strike"}',
+                    '{"pick": 0, "reasoning": "r"}'] * 200)
+    h = BenchmarkHarness(mock, "m", "structured")
+    s1 = h.run_all(seed=42, n_turn=1, n_combat=1, n_synergy=1, n_run=0).summary()
+    s2 = h.run_all(seed=43, n_turn=1, n_combat=1, n_synergy=1, n_run=0).summary()
+    agg = _aggregate_summaries([s1, s2], "m", "structured", "ironclad", [42, 43])
+    assert agg["turn"]["avg_damage_ratio_mean"] is not None
+    assert agg["turn"]["parse_ok_rate_mean"] is not None
+    assert agg["combat"]["avg_hp_ratio_mean"] is not None
+    assert agg["synergy"]["parse_ok_rate_mean"] is not None
+    print("[PASS] Aggregation keys match summary keys (no silent None means)")
+
+
 if __name__ == "__main__":
     tests = [
         test_structured_prompt,
@@ -386,6 +459,10 @@ if __name__ == "__main__":
         test_run_evaluator,
         test_harness_summary,
         test_harness_determinism,
+        test_turn_evaluator_nonint_indices,
+        test_synergy_evaluator_null_fields,
+        test_character_propagates_to_evaluators,
+        test_aggregation_keys_match_summary,
     ]
     passed = failed = 0
     for test in tests:

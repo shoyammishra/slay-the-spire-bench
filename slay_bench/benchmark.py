@@ -288,6 +288,15 @@ class RunScore:
 
 # ── Turn-level evaluator ──────────────────────────────────────────────────────
 
+def _safe_int(v, default: int = 0) -> int:
+    """Coerce an LLM-supplied index to an int. Models sometimes return null, a
+    string, a float, or omit the field — all become `default` (0 = first option)."""
+    try:
+        return int(v)
+    except (TypeError, ValueError):
+        return default
+
+
 def _simulate_play_sequence(state_snapshot, sequence: List[int]) -> Tuple[int, bool]:
     """
     Simulate playing cards in the given index order on a deep-copied state.
@@ -303,8 +312,11 @@ def _simulate_play_sequence(state_snapshot, sequence: List[int]) -> Tuple[int, b
     # Snapshot cards by their original index so hand-shifting doesn't corrupt lookups
     initial_hand = list(c.hand)
 
-    for idx in sequence:
-        if idx >= len(initial_hand):
+    for raw_idx in sequence:
+        # LLMs return strings/null/floats; negative ints would silently index
+        # from the end. Anything that isn't a valid hand index = illegal play.
+        idx = _safe_int(raw_idx, default=-1)
+        if idx < 0 or idx >= len(initial_hand):
             return (initial_enemy_hp - sum(e.hp for e in c.enemies if e.hp > 0), False)
         card = initial_hand[idx]
         if card not in c.hand:
@@ -406,15 +418,6 @@ class TurnEvaluator:
 
 
 # ── Combat-level evaluator ─────────────────────────────────────────────────────
-
-def _safe_int(v, default: int = 0) -> int:
-    """Coerce an LLM-supplied index to an int. Models sometimes return null, a
-    string, a float, or omit the field — all become `default` (0 = first option)."""
-    try:
-        return int(v)
-    except (TypeError, ValueError):
-        return default
-
 
 class CombatEvaluator:
     """LLM plays a full combat from start to finish, turn by turn."""
@@ -534,7 +537,7 @@ _ARCHETYPES = {
         "Power Through", "Second Wind", "Warcry", "Seeing Red",
     ],
     "Exhaust": [
-        "Feel No Pain", "Dark Embrace", "Corruption", "Dead Branch", "Offering",
+        "Feel No Pain", "Dark Embrace", "Corruption", "Offering",
         "Armaments", "Fiend Fire", "Immolate", "Reaper", "Brutality",
         "Evolve", "Headbutt", "Sever Soul",
     ],
@@ -552,7 +555,7 @@ _ARCHETYPES = {
 _ARCHETYPE_PAYOFFS = {
     "Strength": {"Demon Form", "Limit Break", "Inflame", "Heavy Blade", "Whirlwind"},
     "Block":    {"Barricade", "Body Slam", "Juggernaut", "Entrench", "Impervious"},
-    "Exhaust":  {"Corruption", "Feel No Pain", "Dark Embrace", "Dead Branch", "Fiend Fire"},
+    "Exhaust":  {"Corruption", "Feel No Pain", "Dark Embrace", "Fiend Fire"},
     "Aggro":    {"Perfected Strike", "Rampage", "Blood for Blood", "Reckless Charge"},
 }
 
@@ -578,6 +581,8 @@ def _relic_archetype_hints(relics: List) -> Dict[str, float]:
         hints["Strength"] = hints.get("Strength", 0) + 2.0
     if "Snecko Skull" in relic_names:
         hints["Poison"] = hints.get("Poison", 0) + 2.0
+    if "Dead Branch" in relic_names:  # relic, not a card — signals Exhaust payoff
+        hints["Exhaust"] = hints.get("Exhaust", 0) + 2.0
     return hints
 
 
@@ -894,7 +899,9 @@ class SynergyEvaluator:
         model_archetype = ""
 
         if parse_ok:
-            model_archetype = resp.get("archetype", "").strip()
+            # Models sometimes return null / non-string values for any field —
+            # coerce defensively instead of crashing the whole sample.
+            model_archetype = str(resp.get("archetype") or "").strip()
             # Only score archetype ID when the deck has a real, unambiguous archetype.
             # Ambiguous decks (no signature card, or a tie) stay None → excluded from acc.
             if archetype_confident:
@@ -903,11 +910,12 @@ class SynergyEvaluator:
                 archetype_correct = expert_archetype.lower() in model_archetype.lower()
 
             if expert_pick_idx is not None:
-                pick = resp.get("best_card_index")
+                # Accept "1" (string) as 1 — the answer is right, just mistyped
+                pick = _safe_int(resp.get("best_card_index"), default=-1)
                 card_pick_correct = pick == expert_pick_idx
 
             if expert_remove_name is not None:
-                removal = resp.get("worst_card_name", "")
+                removal = str(resp.get("worst_card_name") or "")
                 removal_correct = removal.strip().lower() == expert_remove_name.lower()
 
         return SynergyScore(
@@ -962,8 +970,8 @@ class RunEvaluator:
         )
         resp = self.llm.complete_json(self.system_run, user_prompt,
                                       temperature=self.temperature)
-        idx = resp.get("pick", -1)
-        if isinstance(idx, int) and 0 <= idx < len(offers):
+        idx = _safe_int(resp.get("pick", -1), default=-1)
+        if 0 <= idx < len(offers):
             return offers[idx]
         return None
 
@@ -1019,10 +1027,11 @@ class RunEvaluator:
         idx = _safe_int(resp.get("pick", 0))
         return idx if 0 <= idx < len(relic_ids) else 0
 
-    def _llm_combat(self, state) -> Tuple[bool, int]:
-        """Run a full combat with LLM decisions. Returns (won, turns)."""
+    def _llm_combat(self, state, counters: Optional[dict] = None) -> Tuple[bool, int]:
+        """Run a full combat with LLM decisions. Returns (won, turns).
+        Parse errors and LLM calls are accumulated into `counters` if given."""
         from .combat import play_card, end_player_turn, is_combat_over, end_combat
-        parse_errors = 0
+        counters = counters if counters is not None else {}
         turns = 0
 
         for _ in range(self.max_combat_turns):
@@ -1049,10 +1058,11 @@ class RunEvaluator:
                 )
                 resp = self.llm.complete_json(self.system_combat, user_prompt,
                                               temperature=self.temperature)
+                counters["llm_calls"] = counters.get("llm_calls", 0) + 1
 
                 if "error" in resp or resp.get("action") == "end_turn":
                     if "error" in resp:
-                        parse_errors += 1
+                        counters["parse_errors"] = counters.get("parse_errors", 0) + 1
                     end_player_turn(state)
                     turn_done = True
                 elif resp.get("action") == "play":
@@ -1065,11 +1075,11 @@ class RunEvaluator:
                             enemies_alive[0] if enemies_alive else None)
                         play_card(state, hand[idx], target)
                     else:
-                        parse_errors += 1
+                        counters["parse_errors"] = counters.get("parse_errors", 0) + 1
                         end_player_turn(state)
                         turn_done = True
                 else:
-                    parse_errors += 1
+                    counters["parse_errors"] = counters.get("parse_errors", 0) + 1
                     end_player_turn(state)
                     turn_done = True
 
@@ -1135,7 +1145,7 @@ class RunEvaluator:
                 enemy_ids = roll_encounter(state, ntype)
                 enemies = spawn_enemies(state, enemy_ids)
                 start_combat(state, enemies)
-                won, turns = self._llm_combat(state)
+                won, turns = self._llm_combat(state, counters)
                 if won:
                     gold = gold_reward(state, enemy_type)
                     state.player.gold += gold
@@ -1369,7 +1379,8 @@ class BenchmarkHarness:
         from slay_bench.enemies import Cultist, JawWorm
 
         evaluator = TurnEvaluator(self.llm, self.prompt_format,
-                                  temperature=self.temperature)
+                                  temperature=self.temperature,
+                                  character=self.character)
         scores = []
         for i, seed in enumerate(seeds):
             print(f"  [turn {i+1}/{len(seeds)}] seed={seed}", flush=True)
@@ -1387,7 +1398,8 @@ class BenchmarkHarness:
         from slay_bench.enemies import Cultist, JawWorm
 
         evaluator = CombatEvaluator(self.llm, self.prompt_format,
-                                    temperature=self.temperature)
+                                    temperature=self.temperature,
+                                    character=self.character)
         scores = []
         enemy_types = [Cultist, JawWorm]
         for i, seed in enumerate(seeds):

@@ -180,6 +180,8 @@ def main():
             summary = _merge_existing(fname, summary)
             fname.write_text(json.dumps(summary, indent=2))
             print(f"  Saved -> {fname}")
+            from slay_bench.visualize import save_all
+            save_all(summary, stem, out_dir)
             per_seed_summaries.append(summary)
 
         # Aggregate
@@ -218,10 +220,12 @@ def _aggregate_summaries(summaries: list, model: str, fmt: str,
         out["n_seeds"] = len(dim_dicts)
         return out
 
-    turn = _agg_dim("turn", ["damage_ratio", "legal_rate", "parse_ok"])
-    combat = _agg_dim("combat", ["win_rate", "hp_ratio", "avg_turns", "parse_ok"])
+    # Metric keys MUST match BenchmarkResult.summary() exactly, or every
+    # aggregated mean silently comes out None.
+    turn = _agg_dim("turn", ["avg_damage_ratio", "legal_rate", "parse_ok_rate"])
+    combat = _agg_dim("combat", ["win_rate", "avg_hp_ratio", "avg_parse_errors"])
     synergy = _agg_dim("synergy", [
-        "archetype_acc", "card_pick_acc", "removal_acc", "parse_ok",
+        "archetype_acc", "card_pick_acc", "removal_acc", "parse_ok_rate",
         "archetype_n_scored", "archetype_n_ambiguous",
     ])
     run = _agg_dim("run", ["survival_rate", "avg_hp_fraction",

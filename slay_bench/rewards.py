@@ -111,6 +111,9 @@ def gold_reward(state: GameState, enemy_type: str = "normal") -> int:
     base = {"normal": (10, 20), "elite": (25, 35), "boss": (95, 105)}
     lo, hi = base.get(enemy_type, (10, 20))
     gold = lo + state.rng.loot_rng.next_int(hi - lo + 1)
+    # Ectoplasm: no gold (roll first so the RNG stream stays seed-stable)
+    if getattr(state.player, "_no_gold", False):
+        return 0
     # Golden Idol: +25%
     return gold
 
@@ -119,5 +122,8 @@ def potion_drop(state: GameState, enemy_type: str = "normal") -> bool:
     """Should a potion drop? Returns True/False."""
     # Base 40% for normal, 50% for elite
     chance = 40 if enemy_type == "normal" else 50
-    # Sozu relic: no potions
-    return state.rng.potion_rng.next_int(100) < chance
+    dropped = state.rng.potion_rng.next_int(100) < chance
+    # Sozu: no potions (roll first so the RNG stream stays seed-stable)
+    if getattr(state.player, "_no_potions", False):
+        return False
+    return dropped

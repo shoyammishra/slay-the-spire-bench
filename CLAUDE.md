@@ -48,7 +48,7 @@ slay_bench/
   enemies.py        — Enemies: Cultist, JawWorm, AcidSlimeL, SpikeSlimeL, etc.
   enemies_act2.py   — Act 2/3 enemies (Gremlin, Book of Stabbing, etc.)
   combat.py         — Turn engine: draw, play, enemy attack, block; powers reset per combat
-  game_map.py       — Map generation, node types, path traversal
+  map_gen.py        — Map generation, node types, path traversal
   run_loop.py       — Full act simulation floor-by-floor
   rng.py            — Java-compatible LCG, 9 independent seeded streams
   prompt_builder.py — GameState → text prompt; system_prompt(kind, character)
@@ -64,10 +64,10 @@ slay_bench/
   __init__.py       — new_game(seed, character); CHARACTERS tuple; new_ironclad_game (compat)
 run_benchmark.py    — CLI entry point; --character --acts --temperature --llm-routing --seeds
 tests/
-  test_benchmark.py — 20 harness tests (MockLLM, no API calls)
-  test_combat.py    — 7 combat-engine tests
+  test_benchmark.py — 24 harness tests (MockLLM, no API calls)
+  test_combat.py    — 10 combat-engine tests
   test_run.py       — 13 map/run/relic tests
-  (40 total, all passing; run each file directly — no pytest installed. On Windows consoles
+  (47 total, all passing; run each file directly — no pytest installed. On Windows consoles
    set PYTHONIOENCODING=utf-8 first or the box-drawing prints crash 2 tests spuriously.)
 results/            — Output files (gitignored): .json, .txt, .png, _radar.png
 docs/               — Project documentation (roadmap, decisions, findings, draft)
@@ -149,6 +149,7 @@ Output files per run (overwrites if same model+format+seed):
 - **Temperature:** all evaluators accept `temperature` kwarg — passed through to `LLMInterface.complete`. Use `--temperature 0.7` for sampling variance / error bars.
 
 ## Bugs Fixed (session history)
+- **2026-06-10 full bug sweep (logic + code), post-A*-changes.** Engine: (1) **player debuff timing** — Weak/Vuln/Frail/Intangible ticked at end of PLAYER turn, before enemies attacked, so Wraith Form/Apparition Intangible never covered an enemy attack and Incense Burner did literally nothing; now ticked at end of ROUND with a StS-style `just_applied` guard (CombatState.enemy_phase + _apply_power marks enemy-applied debuffs to skip their first tick). This CHANGES combat dynamics — pre-sweep combat numbers not comparable. (2) Double Tap popped ALL stacks for one attack → consumes 1/attack. (3) Pain curse triggered from draw/discard piles → hand only. (4) Thorns retaliated against Combust/Juggernaut/etc. → attack damage only (`from_attack` param). (5) Pen Nib was +999 Vigor → proper 2× via one-shot `_pen_nib_ready` consumed in `_deal_damage`. Relics: (6) **Inserter permanently ramped `energy_per_turn` every 2 turns across the whole run** (same stacking class the on_pickup/register split was meant to kill) → transient energy + removed from boss pools (Defect-only). (7) Omamori recharged 2 charges every combat → per-run class attr. (8) Centennial Puzzle never reset → per-combat. (9) Sundial/The Abacus fired per card DRAW → new `Event.SHUFFLE` emitted on reshuffle. (10) Pocketwatch drew 3 at TURN_END straight into the discard → queues NEXT_TURN_DRAW. (11) Cursed Key cursed on EVERY relic (incl. its own pickup + boss relics) → only chests (source="chest" tag on RELIC_OBTAINED). (12) Pandora's Box used the Ironclad pool for Silent → character-aware. (13) Dead Branch bypassed the hand limit. (14) Ectoplasm/Sozu flags were never enforced → gold_reward/potion_drop respect them (RNG still rolled for seed-stability). Harness: (15) **`run_turn_eval`/`run_combat_eval` didn't pass `character`** — Silent got Ironclad system prompts. (16) **Turn evaluator crashed on string/null indices in `plays`** (TypeError) and accepted negative indices as end-of-hand plays → sanitized, non-ints/negatives = illegal. (17) **Synergy evaluator crashed on `null` archetype/worst_card_name** (None.strip) → coerced; string `"1"` best_card_index now scored as 1. (18) `RunScore.parse_errors`/`llm_calls` were never populated (combat errors lost) → `_llm_combat` accumulates into counters. (19) "Dead Branch" listed as a CARD in Exhaust archetype tables (it's a relic — never matched) → moved to `_relic_archetype_hints`. CLI: (20) **multi-seed `_aggregate_summaries` used wrong metric key names** (`damage_ratio`/`hp_ratio`/`parse_ok` vs real `avg_damage_ratio`/`avg_hp_ratio`/`parse_ok_rate`) — every affected mean came out `null`; would have silently gutted the first paid mean±std run. (21) Multi-seed path claimed per-seed charts were saved but never called `save_all`. 7 regression tests added (47 total).
 - Double energy charge: each card was subtracting energy AND play_card() was — removed 63 redundant lines
 - Curl Up never triggered: `on_damage_taken` was defined but never called in `_apply_damage_to_enemy`
 - Slimes never split: `on_hp_threshold` in combat.py was a no-op pass — wired into `_apply_damage_to_enemy`

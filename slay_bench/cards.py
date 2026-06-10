@@ -78,11 +78,15 @@ def _deal_damage(state: GameState, target: Enemy, base: int, times: int = 1) -> 
         per_hit += state.player.powers.pop(PowerId.VIGOR)
     if PowerId.DOUBLE_DAMAGE in state.player.powers:  # Phantasmal Killer
         per_hit *= 2
+    # Pen Nib: the 10th attack deals double damage (one-shot flag set by the relic)
+    if getattr(state.player, '_pen_nib_ready', False):
+        per_hit *= 2
+        state.player._pen_nib_ready = False
     envenom = state.player.powers.get(PowerId.ENVENOM, 0)
     total = 0
     for _ in range(times):
         hp_before = target.hp
-        dmg = _apply_damage_to_enemy(state, target, per_hit)
+        dmg = _apply_damage_to_enemy(state, target, per_hit, from_attack=True)
         total += dmg
         # Envenom: unblocked attack damage applies poison
         if envenom and target.hp < hp_before:
@@ -92,14 +96,15 @@ def _deal_damage(state: GameState, target: Enemy, base: int, times: int = 1) -> 
     return total
 
 
-def _apply_damage_to_enemy(state: GameState, target: Enemy, amount: int) -> int:
+def _apply_damage_to_enemy(state: GameState, target: Enemy, amount: int,
+                           from_attack: bool = False) -> int:
     from .enums import PowerId
     from .events import Event
     if PowerId.INTANGIBLE in target.powers:
         amount = 1
-    # Thorns
+    # Thorns retaliates against ATTACK damage only (not Combust/Juggernaut/etc.)
     thorns = target.powers.get(PowerId.THORNS, 0)
-    if thorns > 0:
+    if from_attack and thorns > 0:
         _damage_player(state, thorns)
     blocked = min(target.block, amount)
     target.block -= blocked
@@ -175,6 +180,11 @@ def _apply_power(state: GameState, target, power_id, amount: int) -> None:
                 del target.powers[PowerId.ARTIFACT]
             return
     target.powers[power_id] = target.powers.get(power_id, 0) + amount
+    # StS justApplied rule: debuffs enemies put on the player during the enemy
+    # phase must survive the end-of-round tick of that same round.
+    if (target is state.player and state.combat is not None
+            and state.combat.enemy_phase):
+        state.combat.just_applied.add(power_id)
 
 
 _HAND_LIMIT = 10
@@ -191,6 +201,7 @@ def _draw_cards(state: GameState, n: int) -> None:
             state.combat.draw_pile = state.combat.discard_pile[:]
             state.combat.discard_pile.clear()
             state.rng.shuffle_rng.shuffle(state.combat.draw_pile)
+            state.bus.emit(Event.SHUFFLE, state)
         card = state.combat.draw_pile.pop()
         state.combat.hand.append(card)
         state.bus.emit(Event.CARD_DRAW, state, card=card)
