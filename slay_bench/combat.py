@@ -21,6 +21,10 @@ def start_combat(state: GameState, enemies: List[Enemy]) -> None:
     # relic/power hooks are re-registered below, and without clearing they would
     # stack across a run (e.g. Burning Blood healing 6, then 12, then 18 ...).
     state.bus.clear()
+    # Powers are per-combat in StS: without this reset, power cards played in an
+    # earlier fight (Demon Form, Inflame, Metallicize, ...) would carry over and
+    # snowball across a run. Relic-granted powers re-apply via COMBAT_START hooks.
+    state.player.powers = {}
     state.combat = CombatState(enemies=enemies)
 
     # Shuffle master deck into draw pile
@@ -59,15 +63,42 @@ def start_combat(state: GameState, enemies: List[Enemy]) -> None:
 
 
 def _begin_player_turn(state: GameState) -> None:
-    from .cards import _draw_cards, _gain_block
+    from .cards import _draw_cards, _gain_block, _add_card_to_hand
     player = state.player
     combat = state.combat
     combat.turn += 1
     combat.cards_played_this_turn = 0
+    combat.attacks_played_this_turn = 0
+    combat.discarded_this_turn = 0
 
-    # Reset block (unless Barricade)
+    # Reset block (unless Barricade / Blur / Calipers)
     if not player.barricade:
-        player.block = 0
+        if PowerId.BLUR in player.powers:
+            player.powers[PowerId.BLUR] -= 1
+            if player.powers[PowerId.BLUR] <= 0:
+                del player.powers[PowerId.BLUR]
+        elif getattr(player, '_calipers', False):
+            player.block = min(player.block, 15)
+        else:
+            player.block = 0
+
+    # Queued next-turn effects (Dodge and Roll, Predator, Doppelganger)
+    if PowerId.NEXT_TURN_BLOCK in player.powers:
+        _gain_block(state, player.powers.pop(PowerId.NEXT_TURN_BLOCK))
+    # Phantasmal Killer: double damage becomes active the turn after play
+    if PowerId.PHANTASMAL in player.powers:
+        stacks = player.powers.pop(PowerId.PHANTASMAL)
+        player.powers[PowerId.DOUBLE_DAMAGE] = player.powers.get(PowerId.DOUBLE_DAMAGE, 0) + stacks
+    # Nightmare: add the queued copies
+    queued = getattr(combat, '_nightmare_card', None)
+    if queued is not None:
+        for _ in range(3):
+            _add_card_to_hand(state, queued.copy())
+        combat._nightmare_card = None
+    # Clear single-turn retain marks from Well-Laid Plans
+    for c in combat.hand:
+        if getattr(c, '_temp_retain', False):
+            c._temp_retain = False
 
     # Reset Entangled
     if PowerId.ENTANGLED in player.powers:
@@ -89,8 +120,12 @@ def _begin_player_turn(state: GameState) -> None:
     # Draw cards (default 5, No Draw prevents)
     if PowerId.NO_DRAW not in player.powers:
         _draw_cards(state, 5)
+        # Queued extra draws (Predator, Doppelganger)
+        if PowerId.NEXT_TURN_DRAW in player.powers:
+            _draw_cards(state, player.powers.pop(PowerId.NEXT_TURN_DRAW))
     else:
         del player.powers[PowerId.NO_DRAW]
+        player.powers.pop(PowerId.NEXT_TURN_DRAW, None)
 
     # Confused: randomize card costs
     if PowerId.CONFUSED in player.powers:
@@ -133,17 +168,27 @@ def play_card(state: GameState, card: Card, target: Optional[Enemy] = None) -> N
     combat.cards_played_this_turn += 1
     combat.cards_played_this_combat += 1
     player.cards_played_this_combat += 1
+    if card.type == CardType.ATTACK:
+        combat.attacks_played_this_turn += 1
 
     # Double Tap: queue attack replay
     double_tap_count = 0
     if PowerId.DOUBLE_TAP in player.powers and card.type == CardType.ATTACK:
         double_tap_count = player.powers.pop(PowerId.DOUBLE_TAP)
 
+    # Burst: next skill(s) played twice (decrements one stack per skill)
+    burst_replay = 0
+    if PowerId.BURST in player.powers and card.type == CardType.SKILL:
+        burst_replay = 1
+        player.powers[PowerId.BURST] -= 1
+        if player.powers[PowerId.BURST] <= 0:
+            del player.powers[PowerId.BURST]
+
     # Execute card effect
     card.play(state, target)
 
-    # Double Tap replay
-    for _ in range(double_tap_count):
+    # Double Tap / Burst replay
+    for _ in range(double_tap_count + burst_replay):
         card.play(state, target)
 
     # Exhaust logic
@@ -172,18 +217,26 @@ def end_player_turn(state: GameState) -> None:
     # Emit turn end (Combust, Flex, Constricted, Burn cards, etc.)
     state.bus.emit(Event.TURN_END, state)
 
-    # Discard hand (ethereal cards exhaust instead)
+    # Discard hand (ethereal cards exhaust instead; Runic Pyramid keeps the hand)
+    runic_pyramid = getattr(player, '_runic_pyramid', False)
     for card in list(combat.hand):
         if card.ethereal:
             from .cards import _exhaust_card
             combat.hand.remove(card)
             combat.exhaust_pile.append(card)
             state.bus.emit(Event.CARD_EXHAUST, state, card=card)
-        elif getattr(card, 'retain', False):
+        elif runic_pyramid or getattr(card, 'retain', False) \
+                or getattr(card, '_temp_retain', False):
             pass  # stay in hand
         else:
             combat.hand.remove(card)
             combat.discard_pile.append(card)
+
+    # Bullet Time: restore costs zeroed for this turn only
+    for card in combat.hand + combat.discard_pile + combat.draw_pile:
+        if getattr(card, '_bullet_time', False):
+            card._bullet_time = False
+            card.cost_override = None
 
     # Reduce debuff durations on player
     _tick_player_debuffs(state)
@@ -196,10 +249,11 @@ def end_player_turn(state: GameState) -> None:
         if player.hp <= 0:
             return  # player died
 
-    # Enemy powers tick (Ritual, Regenerate)
+    # Enemy powers tick (Ritual, Regenerate, Poison)
     for enemy in combat.enemies:
         if enemy.hp > 0:
             _tick_enemy_powers(state, enemy)
+    _check_enemy_deaths(state)  # poison can kill
 
     # Select next enemy moves
     for enemy in combat.enemies:
@@ -211,9 +265,10 @@ def end_player_turn(state: GameState) -> None:
 
 
 def _tick_player_debuffs(state: GameState) -> None:
-    """Reduce turn-based debuff stacks at end of player turn."""
+    """Reduce turn-based stacks at end of player turn."""
     player = state.player
-    tick_down = {PowerId.WEAK, PowerId.VULNERABLE, PowerId.FRAIL}
+    tick_down = {PowerId.WEAK, PowerId.VULNERABLE, PowerId.FRAIL,
+                 PowerId.INTANGIBLE, PowerId.DOUBLE_DAMAGE}
     for power in tick_down:
         if power in player.powers:
             player.powers[power] -= 1
@@ -251,10 +306,14 @@ def _tick_enemy_powers(state: GameState, enemy: Enemy) -> None:
         enemy.hp = min(enemy.max_hp, enemy.hp + enemy.powers[PowerId.REGENERATE])
 
     # Malleable: increases each time blocked — reset stacking here if needed
-    # Poison on enemies
+    # Poison on enemies: direct HP loss, ignores block (StS rule)
     if PowerId.POISON in enemy.powers:
-        from .cards import _apply_damage_to_enemy
-        _apply_damage_to_enemy(state, enemy, enemy.powers[PowerId.POISON])
+        from .events import Event
+        amt = enemy.powers[PowerId.POISON]
+        if PowerId.INTANGIBLE in enemy.powers:
+            amt = 1
+        enemy.hp -= amt
+        state.bus.emit(Event.DAMAGE_DEALT, state, target=enemy, amount=amt)
         enemy.powers[PowerId.POISON] -= 1
         if enemy.powers[PowerId.POISON] <= 0:
             del enemy.powers[PowerId.POISON]

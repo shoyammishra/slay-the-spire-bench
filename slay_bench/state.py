@@ -21,6 +21,8 @@ class CombatState:
     turn: int = 0
     cards_played_this_turn: int = 0
     cards_played_this_combat: int = 0
+    attacks_played_this_turn: int = 0   # Finisher
+    discarded_this_turn: int = 0        # Sneaky Strike / Eviscerate
 
 
 @dataclass
@@ -55,4 +57,5 @@ class GameState:
     # non-combat state
     floor: int = 0
     act: int = 1
+    character: str = "ironclad"
     act_boss_relic_choices: list = field(default_factory=list)

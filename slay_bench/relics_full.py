@@ -190,7 +190,7 @@ class SneckoSkull(Relic):
 class Strawberry(Relic):
     id = "Strawberry"
     name = "Strawberry"
-    def register(self, state):
+    def on_pickup(self, state):
         state.player.max_hp += 7
         state.player.hp += 7
 
@@ -430,7 +430,7 @@ class Pantograph(Relic):
 class Pear(Relic):
     id = "Pear"
     name = "Pear"
-    def register(self, state):
+    def on_pickup(self, state):
         state.player.max_hp += 10
         state.player.hp += 10
 
@@ -470,17 +470,18 @@ class WhiteBeastStatue(Relic):
 class Astrolabe(Relic):
     id = "Astrolabe"
     name = "Astrolabe"
-    def register(self, state):
+    def on_pickup(self, state):
         # Transform 3 cards in starting deck, upgrade them
-        from .cards import make_card
-        from .rewards import _IRONCLAD_POOL
+        from .cards import make_card_for
+        from .rewards import card_pool_for
         from .enums import CardRarity
-        pool = _IRONCLAD_POOL[CardRarity.UNCOMMON]
+        character = getattr(state, "character", "ironclad")
+        pool = card_pool_for(state)[CardRarity.UNCOMMON]
         for _ in range(3):
             if state.player.deck:
                 idx = state.rng.misc_rng.next_int(len(state.player.deck))
                 name = pool[state.rng.misc_rng.next_int(len(pool))]
-                state.player.deck[idx] = make_card(name, upgraded=True)
+                state.player.deck[idx] = make_card_for(character, name, upgraded=True)
 
 
 class BlackStar(Relic):
@@ -496,7 +497,7 @@ class BlackStar(Relic):
 class BustedCrown(Relic):
     id = "Busted Crown"
     name = "Busted Crown"
-    def register(self, state):
+    def on_pickup(self, state):
         state.player.energy_per_turn += 1
         state.player._busted_crown = True  # only 2 card reward choices
 
@@ -554,8 +555,8 @@ class DuVuDoll(Relic):
 class EmptyCage(Relic):
     id = "Empty Cage"
     name = "Empty Cage"
-    def register(self, state):
-        # Remove 2 cards from deck on obtain — handled at obtain time
+    def on_pickup(self, state):
+        # Remove 2 cards from deck on obtain
         for _ in range(2):
             if state.player.deck:
                 idx = state.rng.misc_rng.next_int(len(state.player.deck))
@@ -592,7 +593,7 @@ class HoveringKite(Relic):
 class LeesWaffle(Relic):
     id = "Lee's Waffle"
     name = "Lee's Waffle"
-    def register(self, state):
+    def on_pickup(self, state):
         state.player.max_hp += 7
         state.player.hp = state.player.max_hp
 
@@ -607,7 +608,7 @@ class MagicFlower(Relic):
 class Mango(Relic):
     id = "Mango"
     name = "Mango"
-    def register(self, state):
+    def on_pickup(self, state):
         state.player.max_hp += 14
         state.player.hp += 14
 
@@ -615,7 +616,7 @@ class Mango(Relic):
 class OldCoin(Relic):
     id = "Old Coin"
     name = "Old Coin"
-    def register(self, state):
+    def on_pickup(self, state):
         state.player.gold += 300
 
 
@@ -680,7 +681,7 @@ class SlaverCollar(Relic):
 class Sozu(Relic):
     id = "Sozu"
     name = "Sozu"
-    def register(self, state):
+    def on_pickup(self, state):
         state.player.energy_per_turn += 1
         state.player._no_potions = True
 
@@ -766,7 +767,7 @@ class UnceasingTop(Relic):
 class VelvetChoker(Relic):
     id = "Velvet Choker"
     name = "Velvet Choker"
-    def register(self, state):
+    def on_pickup(self, state):
         state.player.energy_per_turn += 1
         state.player._velvet_choker = True  # can only play 6 cards per turn
 
@@ -776,7 +777,7 @@ class VelvetChoker(Relic):
 class Cauldron(Relic):
     id = "Cauldron"
     name = "Cauldron"
-    def register(self, state):
+    def on_pickup(self, state):
         from .potions import random_potion
         for _ in range(5):
             if len(state.player.potions) < 3:
@@ -824,7 +825,7 @@ class MembershipCard(Relic):
 class TinyHouse(Relic):
     id = "Tiny House"
     name = "Tiny House"
-    def register(self, state):
+    def on_pickup(self, state):
         state.player.gold += 50
         state.player.max_hp += 5
         state.player.hp += 5
@@ -856,7 +857,7 @@ class Brimstone(Relic):
 class CallingBell(Relic):
     id = "Calling Bell"
     name = "Calling Bell"
-    def register(self, state):
+    def on_pickup(self, state):
         # Obtain 3 random relics (common/uncommon/rare), add Curse: Injury
         from .nodes import _obtain_relic
         from .relics import random_relic
@@ -869,7 +870,7 @@ class CallingBell(Relic):
 class CoffeeDripper(Relic):
     id = "Coffee Dripper"
     name = "Coffee Dripper"
-    def register(self, state):
+    def on_pickup(self, state):
         state.player.energy_per_turn += 1
         state.player._no_rest_heal = True
 
@@ -877,8 +878,10 @@ class CoffeeDripper(Relic):
 class CursedKey(Relic):
     id = "Cursed Key"
     name = "Cursed Key"
-    def register(self, state):
+    def on_pickup(self, state):
         state.player.energy_per_turn += 1
+
+    def register(self, state):
         def on_treasure(gs, **kw):
             from .cards import make_card
             gs.player.deck.append(make_card("Regret"))
@@ -888,7 +891,7 @@ class CursedKey(Relic):
 class Ectoplasm(Relic):
     id = "Ectoplasm"
     name = "Ectoplasm"
-    def register(self, state):
+    def on_pickup(self, state):
         state.player.energy_per_turn += 1
         state.player._no_gold = True
 
@@ -896,7 +899,7 @@ class Ectoplasm(Relic):
 class FusionHammer(Relic):
     id = "Fusion Hammer"
     name = "Fusion Hammer"
-    def register(self, state):
+    def on_pickup(self, state):
         state.player.energy_per_turn += 1
         state.player._no_smith = True
 
@@ -904,7 +907,7 @@ class FusionHammer(Relic):
 class HolyWater(Relic):
     id = "Holy Water"
     name = "Holy Water"
-    def register(self, state):
+    def on_pickup(self, state):
         from .potions import random_potion
         for _ in range(3):
             if len(state.player.potions) < 3:
@@ -927,7 +930,7 @@ class Inserter(Relic):
 class NuclearBattery(Relic):
     id = "Nuclear Battery"
     name = "Nuclear Battery"
-    def register(self, state):
+    def on_pickup(self, state):
         state.player.energy_per_turn += 1
         state.player._nuclear_battery = True
 
@@ -935,7 +938,7 @@ class NuclearBattery(Relic):
 class PandorasBox(Relic):
     id = "Pandora's Box"
     name = "Pandora's Box"
-    def register(self, state):
+    def on_pickup(self, state):
         from .cards import make_card, CardType
         from .rewards import _IRONCLAD_POOL
         from .enums import CardRarity
@@ -957,9 +960,11 @@ class PandorasBox(Relic):
 class PhilosophersStone(Relic):
     id = "Philosopher's Stone"
     name = "Philosopher's Stone"
+    def on_pickup(self, state):
+        state.player.energy_per_turn += 1
+
     def register(self, state):
         from .enums import PowerId
-        state.player.energy_per_turn += 1
         def on_combat_start(gs, **kw):
             for e in gs.combat.enemies:
                 e.powers[PowerId.STRENGTH] = e.powers.get(PowerId.STRENGTH, 0) + 1

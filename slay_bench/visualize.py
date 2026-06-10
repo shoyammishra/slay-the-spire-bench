@@ -35,8 +35,10 @@ def write_text_report(summary: Dict[str, Any], out_path: Path) -> None:
     a("=" * 60)
     a(f"  Model   : {summary['model']}")
     a(f"  Format  : {summary['prompt_format']}")
-    a(f"  Seed    : {summary['seed']}")
-    a(f"  Elapsed : {summary['elapsed_seconds']}s")
+    seed_val = summary.get("seeds") or summary.get("seed", "?")
+    a(f"  Seed    : {seed_val}")
+    elapsed = summary.get("elapsed_seconds")
+    a(f"  Elapsed : {elapsed}s" if elapsed is not None else "  Elapsed : —")
     a("")
 
     # Turn
@@ -296,7 +298,7 @@ def write_radar(summary: Dict[str, Any], out_path: Path) -> None:
 
     overall = sum(values) / len(values)
     ax.set_title(
-        f"{summary['model']}\n{summary['prompt_format']} · seed {summary['seed']}\n"
+        f"{summary['model']}\n{summary['prompt_format']} · seed {summary.get('seeds') or summary.get('seed', '?')}\n"
         f"Overall: {overall*100:.1f}%",
         color="white", size=10, fontweight="bold", pad=18)
 

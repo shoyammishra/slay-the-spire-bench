@@ -76,10 +76,17 @@ def _deal_damage(state: GameState, target: Enemy, base: int, times: int = 1) -> 
         per_hit = math.floor(per_hit * 1.5)
     if PowerId.VIGOR in state.player.powers:
         per_hit += state.player.powers.pop(PowerId.VIGOR)
+    if PowerId.DOUBLE_DAMAGE in state.player.powers:  # Phantasmal Killer
+        per_hit *= 2
+    envenom = state.player.powers.get(PowerId.ENVENOM, 0)
     total = 0
     for _ in range(times):
+        hp_before = target.hp
         dmg = _apply_damage_to_enemy(state, target, per_hit)
         total += dmg
+        # Envenom: unblocked attack damage applies poison
+        if envenom and target.hp < hp_before:
+            _apply_power(state, target, PowerId.POISON, envenom)
         if target.hp <= 0:
             break
     return total
@@ -170,9 +177,14 @@ def _apply_power(state: GameState, target, power_id, amount: int) -> None:
     target.powers[power_id] = target.powers.get(power_id, 0) + amount
 
 
+_HAND_LIMIT = 10
+
+
 def _draw_cards(state: GameState, n: int) -> None:
     from .events import Event
     for _ in range(n):
+        if len(state.combat.hand) >= _HAND_LIMIT:
+            break  # hand full — extra draws are lost (StS rule)
         if not state.combat.draw_pile and not state.combat.discard_pile:
             break
         if not state.combat.draw_pile:
@@ -182,6 +194,8 @@ def _draw_cards(state: GameState, n: int) -> None:
         card = state.combat.draw_pile.pop()
         state.combat.hand.append(card)
         state.bus.emit(Event.CARD_DRAW, state, card=card)
+        if hasattr(card, 'on_drawn'):
+            card.on_drawn(state)  # e.g. Endless Agony copies itself
         if card.type == CardType.STATUS:
             state.bus.emit(Event.STATUS_DRAW, state, card=card)
 
@@ -192,6 +206,45 @@ def _exhaust_card(state: GameState, card: Card) -> None:
         state.combat.hand.remove(card)
     state.combat.exhaust_pile.append(card)
     state.bus.emit(Event.CARD_EXHAUST, state, card=card)
+
+
+def _add_card_to_hand(state: GameState, card: Card) -> None:
+    """Add a generated card to hand, overflowing to the discard pile (StS rule)."""
+    if len(state.combat.hand) < _HAND_LIMIT:
+        state.combat.hand.append(card)
+    else:
+        state.combat.discard_pile.append(card)
+
+
+def _discard_from_hand(state: GameState, card: Card) -> None:
+    """Manually discard a card from hand (Silent mechanic). Triggers
+    on-discard effects (Reflex, Tactician) and the CARD_DISCARD event."""
+    from .events import Event
+    if card not in state.combat.hand:
+        return
+    state.combat.hand.remove(card)
+    state.combat.discard_pile.append(card)
+    state.combat.discarded_this_turn += 1
+    if hasattr(card, 'on_manual_discard'):
+        card.on_manual_discard(state)
+    state.bus.emit(Event.CARD_DISCARD, state, card=card)
+
+
+def _auto_discard_choice(state: GameState) -> Optional[Card]:
+    """Deterministic pick of the least valuable hand card to discard:
+    statuses/curses first, then basic Strikes, then Defends, then the first card.
+    (Stand-in for the human choice; keeps simulation deterministic.)"""
+    hand = state.combat.hand
+    if not hand:
+        return None
+    for c in hand:
+        if c.type in (CardType.STATUS, CardType.CURSE):
+            return c
+    for name in ("Strike", "Defend"):
+        for c in hand:
+            if c.name == name:
+                return c
+    return hand[0]
 
 
 # ── Status / Curse cards ──────────────────────────────────────────────────────
@@ -1496,6 +1549,14 @@ def make_card(name: str, upgraded: bool = False) -> Card:
             except NotImplementedError:
                 pass
         return card
+
+
+def make_card_for(character: str, name: str, upgraded: bool = False) -> Card:
+    """Character-aware card factory ('ironclad' | 'silent')."""
+    if character == "silent":
+        from .cards_silent import make_silent_card
+        return make_silent_card(name, upgraded)
+    return make_card(name, upgraded)
 
 
 def starter_deck() -> list[Card]:

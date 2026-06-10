@@ -307,7 +307,7 @@ def test_run_evaluator():
     mock = MockLLM([combat_resp, card_resp] * 500)
     evaluator = RunEvaluator(mock, max_combat_turns=5)
     state = new_ironclad_game(60)
-    score = evaluator.evaluate(state, act=1)
+    score = evaluator.evaluate(state, n_acts=1)
     assert isinstance(score, RunScore)
     assert score.floors_reached >= 0
     assert 0.0 <= score.hp_fraction <= 1.0

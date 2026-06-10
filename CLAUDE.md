@@ -1,7 +1,7 @@
 # slay-bench — Project Context for Claude
 
 ## What This Is
-A Python simulator + LLM benchmark harness for Slay the Spire (Ironclad only).
+A Python simulator + LLM benchmark harness for Slay the Spire (Ironclad + Silent; Acts 1–3).
 Tests LLM planning ability across 4 dimensions: turn-level, combat-level, synergy, and run-level.
 GitHub: https://github.com/shoyammishra/slay-the-spire-bench (public)
 
@@ -11,7 +11,7 @@ GitHub: https://github.com/shoyammishra/slay-the-spire-bench (public)
 
 ## Active Context
 
-- **Status:** In progress — synergy REDESIGNED to hand-crafted decks + RE-RUN at n=8 (done). Run-level re-run BLOCKED by free-tier Groq TPM (see below). qwen3 DROPPED.
+- **Status:** In progress — synergy REDESIGNED to hand-crafted decks + RE-RUN at n=8 (done). Run-level re-run BLOCKED by free-tier Groq TPM (see below). qwen3 DROPPED. **A* acceptance changes IMPLEMENTED (2026-06-10):** Silent character + multi-act + temperature + multi-seed CLI — all code-side. Awaiting paid Groq for actual runs.
 - **Current task:** Run-level n=3 re-run is blocked on free Groq's 6000 TPM cap (run-level is too token-heavy — hundreds of stateful calls; one prompt alone requests ~3367 tok and trips 429 on nearly every call). Need PAID Groq Dev tier to scale run-level + everything else to n≥20. Synergy n=8 already re-run with hand-crafted fixtures.
 - **⛔ ALL existing run-level numbers INVALID (2026-06-07):** the run-level data in `results/*.json` (llama 20%/40%, 13.4 floors; scout floors=5) is from OLD pre-fix code (predates map dead-end + EventBus stacking + `_safe_int` fixes). IGNORE it — run-level has NO valid data yet. A clean pass is pending + blocked on free TPM. (report.md/findings.md/report.html now all EXCLUDE run-level — do not re-introduce the old 13.4/20–40% figures.)
 - **⚠️ Run-level blocked on free tier (2026-06-07):** `--only run --n-run 3` on llama-3.1-8b hit the 6000 TPM wall — structured completed 0 runs (kept prior valid run results via partial-save), raw hung in an infinite retry loop and was Ctrl-C'd. Free Groq sustains ~2 calls/min; a single run needs dozens-to-hundreds → infeasible. Partial-save logic worked: existing run-level + fresh synergy results both intact. **Unblock = paid Groq Dev tier** (the 429 error itself recommends it). This is the same lever needed for paper-grade n≥20.
@@ -44,17 +44,27 @@ Detail lives in `docs/` — not here.
 ```
 slay_bench/
   cards.py          — All Ironclad cards with exact effects
+  cards_silent.py   — All Silent cards (~73), archetypes, SILENT_POOL, SILENT_SYNERGY_FIXTURES
   enemies.py        — Enemies: Cultist, JawWorm, AcidSlimeL, SpikeSlimeL, etc.
-  combat.py         — Turn engine: draw, play, enemy attack, block
+  enemies_act2.py   — Act 2/3 enemies (Gremlin, Book of Stabbing, etc.)
+  combat.py         — Turn engine: draw, play, enemy attack, block; powers reset per combat
   game_map.py       — Map generation, node types, path traversal
   run_loop.py       — Full act simulation floor-by-floor
   rng.py            — Java-compatible LCG, 9 independent seeded streams
-  prompt_builder.py — GameState → text prompt (structured JSON or raw English)
-  benchmark.py      — 4-dimension benchmark harness + LLM interface
+  prompt_builder.py — GameState → text prompt; system_prompt(kind, character)
+  benchmark.py      — 4-dimension benchmark harness + LLM interface; character/temperature/n_acts
   visualize.py      — PNG charts + ASCII text reports from results
-run_benchmark.py    — CLI entry point
+  relics.py         — Relic base class (on_pickup + register split); BurningBlood, RingOfTheSnake, …
+  relics_full.py    — Full relic registry; 20 relics corrected to on_pickup for non-idempotent effects
+  rewards.py        — card_pool_for(state): character-aware card pool; generate_card_reward
+  nodes.py          — _obtain_relic calls on_pickup then register; shop uses card_pool_for
+  enums.py          — PowerId entries for Silent powers added
+  state.py          — CombatState.attacks_played_this_turn, .discarded_this_turn; GameState.character
+  powers.py         — Silent power hooks (Noxious Fumes, Infinite Blades, Wraith Form, etc.)
+  __init__.py       — new_game(seed, character); CHARACTERS tuple; new_ironclad_game (compat)
+run_benchmark.py    — CLI entry point; --character --acts --temperature --llm-routing --seeds
 tests/
-  test_benchmark.py — 40 unit tests (all passing, no API calls)
+  test_benchmark.py — 23 unit tests (all passing, no API calls)
 results/            — Output files (gitignored): .json, .txt, .png, _radar.png
 docs/               — Project documentation (roadmap, decisions, findings, draft)
 ```
@@ -64,14 +74,23 @@ docs/               — Project documentation (roadmap, decisions, findings, dra
 # Mock run (instant, no API)
 python run_benchmark.py --provider mock --model mock --format structured --seed 42
 
-# Real run — structured format
-python run_benchmark.py --provider groq --model llama-3.1-8b-instant --n-turn 5 --n-combat 3 --n-synergy 3 --n-run 5 --format structured
+# Real run — structured format, Ironclad, Act 1 (default)
+python run_benchmark.py --provider groq --model llama-3.1-8b-instant --n-turn 5 --n-combat 3 --n-synergy 8 --n-run 5 --format structured
 
-# Real run — raw format (ablation)
-python run_benchmark.py --provider groq --model llama-3.1-8b-instant --n-turn 5 --n-combat 3 --n-synergy 3 --n-run 5 --format raw
+# Silent character
+python run_benchmark.py --provider groq --model llama-3.1-8b-instant --character silent --n-synergy 8 --format structured
 
-# Another model
-python run_benchmark.py --provider groq --model meta-llama/llama-4-scout-17b-16e-instruct --n-turn 5 --n-combat 3 --n-synergy 3 --n-run 5 --format structured
+# Multi-act run (Acts 1→2→3)
+python run_benchmark.py --provider groq --model llama-3.1-8b-instant --acts 3 --n-run 5 --format structured
+
+# Multi-seed run (mean ± std — paper-grade)
+python run_benchmark.py --provider groq --model llama-3.1-8b-instant --seeds 42 43 44 45 46 --n-turn 20 --n-combat 20 --n-synergy 20 --n-run 5 --format structured
+
+# Sampling temperature (for synergy variance / error bars)
+python run_benchmark.py --provider groq --model llama-3.1-8b-instant --temperature 0.7 --only synergy --n-synergy 20
+
+# LLM routing (LLM picks paths/rest/boss relics in run-level instead of greedy)
+python run_benchmark.py --provider groq --model llama-3.1-8b-instant --llm-routing --only run --n-run 5
 
 # Re-run only one dimension (merges others from disk)
 python run_benchmark.py --provider groq --model llama-3.1-8b-instant --format structured --only synergy
@@ -90,8 +109,8 @@ Output files per run (overwrites if same model+format+seed):
 |---|---|---|---|
 | 1 | Turn-level | Best card sequence in one turn | Exhaustive search (≤720 permutations) |
 | 2 | Combat-level | Win a full fight turn-by-turn | Greedy bot baseline |
-| 3 | Synergy | Archetype ID, best pick, worst removal | Hand-crafted archetype decks (8 fixtures) |
-| 4 | Run-level | Survive full Act 1 (15 floors) | Absolute (survival + progress) |
+| 3 | Synergy | Archetype ID, best pick, worst removal | Hand-crafted archetype decks (20/character × 2 characters = 40 total) |
+| 4 | Run-level | Survive Acts 1–N (15 floors/act) | Absolute (survival + progress per act) |
 
 ## Key Metrics
 - `damage_ratio` — LLM damage / optimal damage (0–1, illegal plays score 0)
@@ -117,6 +136,13 @@ Output files per run (overwrites if same model+format+seed):
 - Illegal play scoring: if any card in the sequence is illegal, `damage_ratio = 0`
 - Draft coherence: uses expanded `_ARCHETYPES` dict (~14 cards per archetype)
 - Run HP fraction: only averaged over survivors; deaths contribute 0 and are excluded
+- **Relic lifecycle split (2026-06-10):** `Relic.on_pickup(state)` = one-time effects at acquisition (max HP, energy/turn, deck mutations). `Relic.register(state)` = subscribe to events only — called at every combat start (bus is cleared first), so only idempotent subscriptions go here. `_obtain_relic()` in nodes.py calls both in order. This fixes relic-stacking across a run.
+- **Powers reset per combat (2026-06-10):** `start_combat()` does `state.player.powers = {}` — relic-granted powers (Vajra/Shuriken/etc.) re-apply via their COMBAT_START hooks. Demon Form, Flex, etc. are correctly per-combat.
+- **Poison bypasses block (2026-06-10):** poison tick is `enemy.hp -= amt` directly (not through block). Matches real StS mechanics.
+- **Character-aware factory:** `new_game(seed, character)` creates the correct starter deck + relic. `make_card_for(character, name)` dispatches to Ironclad or Silent. `card_pool_for(state)` returns the correct rarity pool. `system_prompt(kind, character)` injects character name into system prompts.
+- **Multi-act run:** `RunEvaluator.evaluate(state, n_acts=1)` plays acts 1→n_acts in sequence. `_act_transition()` does full heal + LLM (or greedy) boss relic pick between acts. `RunScore.acts_completed` + `RunScore.total_floors` (16×n_acts) track cross-act progress.
+- **Synergy fixtures:** `_SYNERGY_FIXTURES` (20 Ironclad) + `SILENT_SYNERGY_FIXTURES` (20 Silent) in `_SYNERGY_FIXTURES_BY_CHAR`. Expanded from 8 → 20 (5/archetype) so n≥20 synergy runs are possible without repeating.
+- **Temperature:** all evaluators accept `temperature` kwarg — passed through to `LLMInterface.complete`. Use `--temperature 0.7` for sampling variance / error bars.
 
 ## Bugs Fixed (session history)
 - Double energy charge: each card was subtracting energy AND play_card() was — removed 63 redundant lines

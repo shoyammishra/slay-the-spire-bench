@@ -43,6 +43,14 @@ _IRONCLAD_POOL = {
 }
 
 
+def card_pool_for(state: GameState) -> dict:
+    """Rarity → card-name pool for the state's character."""
+    if getattr(state, "character", "ironclad") == "silent":
+        from .cards_silent import SILENT_POOL
+        return SILENT_POOL
+    return _IRONCLAD_POOL
+
+
 def _roll_rarity(state: GameState) -> CardRarity:
     act = min(state.act, 3) - 1
     common_w = _RARITY_WEIGHTS[CardRarity.COMMON][act]
@@ -61,7 +69,9 @@ def _roll_rarity(state: GameState) -> CardRarity:
 
 def generate_card_reward(state: GameState, count: int = 3) -> List[Card]:
     """Generate a card reward offer (3 cards, no duplicates)."""
-    from .cards import make_card
+    from .cards import make_card_for
+    character = getattr(state, "character", "ironclad")
+    char_pool = card_pool_for(state)
     offers: List[Card] = []
     seen_names = set()
 
@@ -69,7 +79,7 @@ def generate_card_reward(state: GameState, count: int = 3) -> List[Card]:
     while len(offers) < count and attempts < 50:
         attempts += 1
         rarity = _roll_rarity(state)
-        pool = _IRONCLAD_POOL[rarity]
+        pool = char_pool[rarity]
         idx = state.rng.card_rng.next_int(len(pool))
         name = pool[idx]
         if name in seen_names:
@@ -81,7 +91,7 @@ def generate_card_reward(state: GameState, count: int = 3) -> List[Card]:
         if rarity == CardRarity.RARE and state.rng.card_rng.next_int(100) < 25:
             upgraded = True
 
-        offers.append(make_card(name, upgraded))
+        offers.append(make_card_for(character, name, upgraded))
 
     return offers
 
