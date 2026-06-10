@@ -12,6 +12,12 @@ import os
 import sys
 from pathlib import Path
 
+# Force UTF-8 stdout/stderr so the report's box-drawing chars don't crash on
+# Windows consoles (Python defaults to cp1252 there, which can't encode them).
+for _stream in (sys.stdout, sys.stderr):
+    if hasattr(_stream, "reconfigure"):
+        _stream.reconfigure(encoding="utf-8")
+
 from dotenv import load_dotenv
 load_dotenv()
 
