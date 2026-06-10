@@ -170,6 +170,10 @@ def write_charts(summary: Dict[str, Any], out_path: Path) -> None:
         style_ax(ax, title)
         colors = [bar_color(v) for v in values]
         vals   = [v if v is not None else 0 for v in values]
+        # hp_ratio can exceed 1.0 — raise the top so bars aren't clipped
+        top = max(vals + [1.0])
+        if top > 0.93:  # leave headroom for the % labels
+            ax.set_ylim(0, max(1.05, top + 0.12))
         bars   = ax.bar(labels, vals, color=colors, width=0.55, zorder=3)
         ax.yaxis.grid(True, color="#334155", zorder=0)
         for bar, v in zip(bars, values):
@@ -274,6 +278,8 @@ def write_radar(summary: Dict[str, Any], out_path: Path) -> None:
         _avg(r.get("survival_rate"), r.get("avg_progress")),
         _avg(c.get("avg_hp_ratio"), r.get("avg_hp_fraction")),
     ]
+    # Radar axes are fixed 0–1; hp_ratio >1 would spill outside the chart
+    values = [min(1.0, v) for v in values]
 
     N = len(labels)
     angles = [n / float(N) * 2 * np.pi for n in range(N)]

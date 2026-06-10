@@ -21,7 +21,7 @@ from .cards import (
     Card,
     _deal_damage, _apply_damage_to_enemy, _damage_player, _gain_block,
     _apply_power, _draw_cards, _exhaust_card,
-    _add_card_to_hand, _discard_from_hand, _auto_discard_choice,
+    _add_card_to_hand, _discard_from_hand, _auto_discard_choice, _x_value,
 )
 
 
@@ -784,7 +784,7 @@ class Skewer(Card):
         super().__init__("Skewer", "Skewer", CardType.ATTACK, CardRarity.UNCOMMON, -2, upgraded)
 
     def play(self, state, target=None):
-        x = state.player.energy
+        x = _x_value(state)
         state.player.energy = 0
         dmg = 10 if self.upgraded else 7
         for _ in range(x):
@@ -957,7 +957,7 @@ class Doppelganger(Card):
                          upgraded, exhaust=True)
 
     def play(self, state, target=None):
-        x = state.player.energy + (1 if self.upgraded else 0)
+        x = _x_value(state) + (1 if self.upgraded else 0)
         state.player.energy = 0
         p = state.player.powers
         p[PowerId.NEXT_TURN_DRAW] = p.get(PowerId.NEXT_TURN_DRAW, 0) + x
@@ -1022,7 +1022,7 @@ class Malaise(Card):
                          upgraded, exhaust=True)
 
     def play(self, state, target=None):
-        x = state.player.energy + (1 if self.upgraded else 0)
+        x = _x_value(state) + (1 if self.upgraded else 0)
         state.player.energy = 0
         if target:
             target.powers[PowerId.STRENGTH] = target.powers.get(PowerId.STRENGTH, 0) - x

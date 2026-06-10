@@ -28,7 +28,8 @@ class BloodVial(Relic):
     name = "Blood Vial"
     def register(self, state):
         def on_combat_start(gs, **kw):
-            gs.player.hp = min(gs.player.max_hp, gs.player.hp + 2)
+            from .cards import _heal_player
+            _heal_player(gs, 2)
         state.bus.subscribe(Event.COMBAT_START, on_combat_start)
 
 
@@ -40,6 +41,8 @@ class CentennialPuzzle(Relic):
         # Once per COMBAT (register runs at every combat start)
         self._triggered = False
         def on_damage(gs, **kw):
+            if gs.combat is None:  # event HP loss between combats
+                return
             if not self._triggered:
                 self._triggered = True
                 from .cards import _draw_cards
@@ -69,8 +72,8 @@ class DreamCatcher(Relic):
 class HappyFlower(Relic):
     id = "Happy Flower"
     name = "Happy Flower"
+    _count = 0  # persists across combats (real StS) — must not reset in register()
     def register(self, state):
-        self._count = 0
         def on_turn_start(gs, **kw):
             self._count += 1
             if self._count >= 3:
@@ -92,7 +95,11 @@ class Lantern(Relic):
     name = "Lantern"
     def register(self, state):
         def on_combat_start(gs, **kw):
-            gs.player.energy += 1
+            # Direct energy here is WIPED by _begin_player_turn's reset;
+            # ENERGIZED is consumed at TURN_START after the reset.
+            from .enums import PowerId
+            gs.player.powers[PowerId.ENERGIZED] = \
+                gs.player.powers.get(PowerId.ENERGIZED, 0) + 1
         state.bus.subscribe(Event.COMBAT_START, on_combat_start)
 
 
@@ -100,9 +107,8 @@ class MawBank(Relic):
     id = "Maw Bank"
     name = "Maw Bank"
     def register(self, state):
-        def on_gold_gain(gs, amount=0, **kw):
-            # Passive gold gain each floor — handled in run loop
-            pass
+        # +12 gold per floor climbed (RunState.move_to); any shop purchase
+        # clears the flag (nodes.py buy_*/remove_card).
         state.player._maw_bank = True
 
 
@@ -157,8 +163,10 @@ class PreservedInsect(Relic):
     name = "Preserved Insect"
     def register(self, state):
         def on_combat_start(gs, **kw):
+            # Elites only (spawn sites tag _elite) — the old max_hp>100 proxy
+            # also hit bosses.
             for e in gs.combat.enemies:
-                if hasattr(e, 'max_hp') and e.max_hp > 100:
+                if getattr(e, '_elite', False):
                     e.hp = int(e.hp * 0.75)
         state.bus.subscribe(Event.COMBAT_START, on_combat_start)
 
@@ -197,24 +205,11 @@ class Strawberry(Relic):
         state.player.hp += 7
 
 
-class Sundial2(Relic):  # Sundial already defined; this is an alias for completeness
-    id = "Sundial"
-    name = "Sundial"
-    def register(self, state):
-        self._count = 0
-        def on_turn_start(gs, **kw):
-            self._count += 1
-            if self._count >= 3:
-                self._count = 0
-                gs.player.energy += 2
-        state.bus.subscribe(Event.TURN_START, on_turn_start)
-
-
 class TinyChest(Relic):
     id = "Tiny Chest"
     name = "Tiny Chest"
+    _count = 0  # per RUN — resetting in register() meant it could NEVER reach 4
     def register(self, state):
-        self._count = 0
         def on_combat_end(gs, **kw):
             self._count += 1
             if self._count >= 4:
@@ -242,12 +237,14 @@ class BlueCandle(Relic):
 class BottledFlame(Relic):
     id = "Bottled Flame"
     name = "Bottled Flame"
-    def __init__(self, card_name="Bash"):
-        self._card_name = card_name
-    def register(self, state):
-        from .cards import make_card
-        card = make_card(self._card_name)
-        card.innate = True
+    def on_pickup(self, state):
+        # Bottle the first attack in the master deck: innate is honored at
+        # start_combat (deck copies keep the flag).
+        from .enums import CardType
+        for c in state.player.deck:
+            if c.type == CardType.ATTACK:
+                c.innate = True
+                break
 
 
 class DarkstonePeriapt(Relic):
@@ -284,13 +281,10 @@ class GamblingChip(Relic):
     id = "Gambling Chip"
     name = "Gambling Chip"
     def register(self, state):
-        self._used = False
-        def on_combat_start(gs, **kw):
-            if not self._used:
-                self._used = True
-                # Discard any number, redraw
-                pass
-        state.bus.subscribe(Event.COMBAT_START, on_combat_start)
+        # Mulligan of the opening hand happens in _begin_player_turn (the hand
+        # doesn't exist yet at COMBAT_START): basic Strikes/Defends are
+        # discarded and replaced, once per combat.
+        state.player._gambling_chip = True
 
 
 class Ginger(Relic):
@@ -340,8 +334,8 @@ class HandDrill(Relic):
 class IncensesBurner(Relic):
     id = "Incense Burner"
     name = "Incense Burner"
+    _count = 0  # persists across combats (real StS) — must not reset in register()
     def register(self, state):
-        self._count = 0
         def on_turn_start(gs, **kw):
             self._count += 1
             if self._count >= 6:
@@ -356,6 +350,10 @@ class LetterOpener(Relic):
     name = "Letter Opener"
     def register(self, state):
         self._count = 0
+        def on_turn_start(gs, **kw):
+            # Real StS: "3 Skills in a SINGLE turn" — counter resets per turn.
+            self._count = 0
+        state.bus.subscribe(Event.TURN_START, on_turn_start)
         def on_skill_play(gs, card=None, **kw):
             self._count += 1
             if self._count >= 3:
@@ -391,12 +389,14 @@ class MummifiedHand(Relic):
     name = "Mummified Hand"
     def register(self, state):
         def on_power_play(gs, card=None, **kw):
+            # Real StS: whenever a Power is played, ONE random card in hand
+            # costs 0 (not -1 to everything).
             from .enums import CardType
             if card and card.type == CardType.POWER:
-                import random
-                for c in gs.combat.hand:
-                    if c.cost > 0:
-                        c.cost_override = max(0, c.effective_cost() - 1)
+                candidates = [c for c in gs.combat.hand if c.effective_cost() > 0]
+                if candidates:
+                    pick = candidates[gs.rng.misc_rng.next_int(len(candidates))]
+                    pick.cost_override = 0
         state.bus.subscribe(Event.CARD_PLAY, on_power_play)
 
 
@@ -406,6 +406,10 @@ class OrangelPellets(Relic):
     def register(self, state):
         self._attack = False; self._skill = False; self._power = False
         from .enums import CardType
+        def on_turn_start(gs, **kw):
+            # Real StS: Attack+Skill+Power in a SINGLE turn — reset per turn.
+            self._attack = self._skill = self._power = False
+        state.bus.subscribe(Event.TURN_START, on_turn_start)
         def on_card_play(gs, card=None, **kw):
             if card:
                 if card.type == CardType.ATTACK: self._attack = True
@@ -489,11 +493,9 @@ class Astrolabe(Relic):
 class BlackStar(Relic):
     id = "Black Star"
     name = "Black Star"
-    def register(self, state):
-        def on_boss_defeated(gs, **kw):
-            # Two boss relic choices instead of three — handled in reward logic
-            pass
-        state.bus.subscribe(Event.BOSS_DEFEATED, on_boss_defeated)
+    def on_pickup(self, state):
+        # Elites drop an additional relic — read at the elite-win drop sites.
+        state.player._black_star = True
 
 
 class BustedCrown(Relic):
@@ -569,12 +571,10 @@ class FossilizedHelix(Relic):
     id = "Fossilized Helix"
     name = "Fossilized Helix"
     def register(self, state):
-        self._used = False
-        def on_damage(gs, amount=0, **kw):
-            if not self._used:
-                self._used = True
-                # Prevent first hit in combat
-        state.bus.subscribe(Event.DAMAGE_TAKEN, on_damage)
+        def on_combat_start(gs, **kw):
+            # Consumed in _damage_player: the first HP loss each combat → 0.
+            gs.player._helix_ready = True
+        state.bus.subscribe(Event.COMBAT_START, on_combat_start)
 
 
 class HoveringKite(Relic):
@@ -655,6 +655,8 @@ class RunicCube(Relic):
     name = "Runic Cube"
     def register(self, state):
         def on_damage(gs, **kw):
+            if gs.combat is None:  # event HP loss between combats
+                return
             from .cards import _draw_cards
             _draw_cards(gs, 1)
         state.bus.subscribe(Event.DAMAGE_TAKEN, on_damage)
@@ -672,7 +674,11 @@ class SelfFormingClay(Relic):
     name = "Self-Forming Clay"
     def register(self, state):
         def on_damage(gs, **kw):
-            gs.player.block += 3
+            # Real StS: block NEXT turn, not immediately (immediate block would
+            # soak later hits in the same enemy phase).
+            from .enums import PowerId
+            gs.player.powers[PowerId.NEXT_TURN_BLOCK] = \
+                gs.player.powers.get(PowerId.NEXT_TURN_BLOCK, 0) + 3
         state.bus.subscribe(Event.DAMAGE_TAKEN, on_damage)
 
 
@@ -680,7 +686,14 @@ class SlaverCollar(Relic):
     id = "Slaver's Collar"
     name = "Slaver's Collar"
     def register(self, state):
-        state.player._slavers_collar = True  # gain 1 energy at start of boss/elite combats
+        def on_turn_start(gs, **kw):
+            # +1 energy per turn during elite/boss combats (spawn sites tag
+            # enemies). TURN_START fires after the energy reset, so this sticks.
+            enemies = gs.combat.enemies if gs.combat else []
+            if any(getattr(e, '_elite', False) or getattr(e, '_boss', False)
+                   for e in enemies):
+                gs.player.energy += 1
+        state.bus.subscribe(Event.TURN_START, on_turn_start)
 
 
 class Sozu(Relic):
@@ -809,8 +822,18 @@ class ClockworkSouvenir(Relic):
 class DollysMirror(Relic):
     id = "Dolly's Mirror"
     name = "Dolly's Mirror"
-    def register(self, state):
-        state.player._dollys_mirror = True  # get 2 potions at start
+    def on_pickup(self, state):
+        # Real effect: duplicate a card. Deterministic stand-in: copy the first
+        # non-basic, non-curse deck card (fallback: first card).
+        from .enums import CardType
+        deck = state.player.deck
+        if not deck:
+            return
+        basics = {"Strike", "Defend"}
+        pick = next((c for c in deck
+                     if c.name not in basics and c.type != CardType.CURSE),
+                    deck[0])
+        deck.append(pick.copy())
 
 
 class FrozenEye(Relic):
@@ -1034,10 +1057,34 @@ FULL_RELIC_LIST = [
 BOSS_RELIC_POOL = [
     "Black Blood", "Mark of Pain", "Runic Dome", "Brimstone", "Busted Crown",
     "Calling Bell", "Coffee Dripper", "Cursed Key", "Ectoplasm", "Empty Cage",
-    "Fusion Hammer", "Holy Water", "Nuclear Battery", "Pandora's Box",
+    "Fusion Hammer", "Holy Water", "Pandora's Box",
     "Philosopher's Stone", "Runic Pyramid", "Sacred Bark", "Slaver's Collar",
     "Snecko Eye", "Sozu", "Velvet Choker",
 ]
+# Nuclear Battery removed: Defect-only (orbs), same precedent as Inserter.
+
+
+# ── Character gating ─────────────────────────────────────────────────────────
+# Off-class relics must not reach Ironclad/Silent pools (mirrors card_pool_for).
+# Keys are relic IDs.
+
+_DEFECT_ONLY = {"Inserter", "Nuclear Battery", "Captain's Wheel"}
+_WATCHER_ONLY = {"Teardrop Locket", "Cloak Clasp", "Violet Lotus", "Holy Water"}
+_IRONCLAD_ONLY = {"Paper Phrog", "Brimstone", "Black Blood", "Mark of Pain",
+                  "Magic Flower", "Self-Forming Clay"}
+_SILENT_ONLY = {"Paper Krane", "Snecko Skull", "Tough Bandages", "Tingsha",
+                "Hovering Kite", "Ring of the Snake"}
+
+
+def relic_allowed(relic_id: str, character: str) -> bool:
+    """Can this relic appear for this character? (Defect/Watcher relics never.)"""
+    if relic_id in _DEFECT_ONLY or relic_id in _WATCHER_ONLY:
+        return False
+    if character == "silent" and relic_id in _IRONCLAD_ONLY:
+        return False
+    if character != "silent" and relic_id in _SILENT_ONLY:
+        return False
+    return True
 
 _RARITY_POOLS = {
     "common": [r for r in FULL_RELIC_LIST if r.__name__ in {
@@ -1054,14 +1101,16 @@ _RARITY_POOLS = {
         "MoltenEgg", "MummifiedHand", "OrangelPellets", "Pantograph", "Pear",
         "StrikeDummy", "TeardropLocket", "ToxicEgg", "WhiteBeastStatue",
     }],
+    # NOTE: boss relics (Sozu, Busted Crown, Velvet Choker, Sacred Bark,
+    # Empty Cage) must NOT leak into treasure-chest rares — boss pool only.
     "rare": [r for r in FULL_RELIC_LIST if r.__name__ in {
-        "Astrolabe", "BlackStar", "BustedCrown", "Calipers", "CaptainsWheel",
-        "CloakClasp", "CrystalBall", "DuVuDoll", "EmptyCage", "FossilizedHelix",
+        "Astrolabe", "BlackStar", "Calipers", "CaptainsWheel",
+        "CloakClasp", "CrystalBall", "DuVuDoll", "FossilizedHelix",
         "HoveringKite", "LeesWaffle", "MagicFlower", "Mango", "OldCoin",
-        "PeacePipe", "Pocketwatch", "PrayerWheel", "RunicCube", "SacredBark",
-        "SelfFormingClay", "SlaverCollar", "Sozu", "TheAbacus", "TheBoot",
+        "PeacePipe", "Pocketwatch", "PrayerWheel", "RunicCube",
+        "SelfFormingClay", "SlaverCollar", "TheAbacus", "TheBoot",
         "TinghSha", "Torii", "ToughBandages", "ToyOrnithopter", "TungstenRod",
-        "Turnip", "UnceasingTop", "VelvetChoker",
+        "Turnip", "UnceasingTop",
     }],
     "shop": [r for r in FULL_RELIC_LIST if r.__name__ in {
         "Cauldron", "ChemicalX", "ClockworkSouvenir", "DollysMirror",
@@ -1070,7 +1119,7 @@ _RARITY_POOLS = {
     "boss": [r for r in FULL_RELIC_LIST if r.__name__ in {
         "Brimstone", "BustedCrown", "CallingBell", "CoffeeDripper",
         "CursedKey", "Ectoplasm", "EmptyCage", "FusionHammer", "HolyWater",
-        "NuclearBattery", "PandorasBox", "PhilosophersStone",
+        "PandorasBox", "PhilosophersStone",
         "RunicPyramid", "SacredBark", "Sozu", "VelvetChoker", "VioletLotus",
     }],
 }

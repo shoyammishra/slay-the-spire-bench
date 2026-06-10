@@ -39,6 +39,11 @@ class Card:
         from .enums import PowerId
         if PowerId.ENTANGLED in state.player.powers and self.type == CardType.ATTACK:
             return False
+        # Velvet Choker: at most 6 cards per turn
+        if (getattr(state.player, '_velvet_choker', False)
+                and state.combat is not None
+                and state.combat.cards_played_this_turn >= 6):
+            return False
         cost = self.effective_cost()
         if cost == -1:
             return False
@@ -70,10 +75,17 @@ def _deal_damage(state: GameState, target: Enemy, base: int, times: int = 1) -> 
     strength = state.player.powers.get(PowerId.STRENGTH, 0)
     dexterity = state.player.powers.get(PowerId.DEXTERITY, 0)
     per_hit = max(0, base + strength)
+    # Strike Dummy: cards with "Strike" in the name deal +3 (additive, like Strength)
+    if getattr(state.player, '_strike_dummy', False):
+        playing = getattr(state.combat, '_playing_card', None) if state.combat else None
+        if playing is not None and 'strike' in playing.name.lower():
+            per_hit += 3
     if PowerId.WEAK in state.player.powers:
         per_hit = math.floor(per_hit * 0.75)
     if PowerId.VULNERABLE in target.powers:
-        per_hit = math.floor(per_hit * 1.5)
+        # Paper Phrog: Vulnerable enemies take 75% extra damage instead of 50%
+        vuln_mult = 1.75 if getattr(state.player, '_paper_phrog', False) else 1.5
+        per_hit = math.floor(per_hit * vuln_mult)
     if PowerId.VIGOR in state.player.powers:
         per_hit += state.player.powers.pop(PowerId.VIGOR)
     if PowerId.DOUBLE_DAMAGE in state.player.powers:  # Phantasmal Killer
@@ -82,6 +94,9 @@ def _deal_damage(state: GameState, target: Enemy, base: int, times: int = 1) -> 
     if getattr(state.player, '_pen_nib_ready', False):
         per_hit *= 2
         state.player._pen_nib_ready = False
+    # The Boot: attack damage that would be less than 5 is raised to 5
+    if getattr(state.player, '_the_boot', False) and 0 < per_hit < 5:
+        per_hit = 5
     envenom = state.player.powers.get(PowerId.ENVENOM, 0)
     total = 0
     for _ in range(times):
@@ -133,22 +148,64 @@ def _damage_player(state: GameState, amount: int, is_hp_loss: bool = False) -> i
             amount = 1
         if PowerId.VULNERABLE in state.player.powers:
             amount = math.floor(amount * 1.5)
-        # Tungsten Rod relic would go here
     blocked = min(state.player.block, amount)
     state.player.block -= blocked
     real_dmg = amount - blocked
+    # Torii: unblocked attack damage of 5 or less is reduced to 1
+    if (not is_hp_loss and getattr(state.player, '_torii', False)
+            and 0 < real_dmg <= 5):
+        real_dmg = 1
+    # Tungsten Rod: every HP loss reduced by 1 (attacks AND hp-loss effects)
+    if real_dmg > 0 and getattr(state.player, '_tungsten_rod', False):
+        real_dmg = max(0, real_dmg - 1)
     if real_dmg > 0:
-        results = state.bus.emit(Event.DEATH_WOULD_OCCUR, state, amount=real_dmg)
-        if any(results):  # relic prevented death
-            state.player.hp = max(1, state.player.hp)
-            return real_dmg
+        # Fossilized Helix: prevent the first HP loss each combat
+        if getattr(state.player, '_helix_ready', False):
+            state.player._helix_ready = False
+            return 0
+        # Revival relics (Lizard Tail) only care about LETHAL damage — emitting
+        # on every hit consumed the revive on chip damage (and could even heal).
+        if real_dmg >= state.player.hp:
+            results = state.bus.emit(Event.DEATH_WOULD_OCCUR, state, amount=real_dmg)
+            if any(results):  # relic prevented death (handler restored HP)
+                state.player.hp = max(1, state.player.hp)
+                return real_dmg
         state.player.hp -= real_dmg
         state.bus.emit(Event.DAMAGE_TAKEN, state, amount=real_dmg)
+        # Blood for Blood: costs 1 less per HP loss this combat (the
+        # _times_hit flag was previously never incremented — dead discount)
+        if state.combat is not None:
+            for pile in (state.combat.hand, state.combat.draw_pile,
+                         state.combat.discard_pile):
+                for c in pile:
+                    if c.name == "Blood for Blood":
+                        c._times_hit = getattr(c, '_times_hit', 0) + 1
         if PowerId.RUPTURE in state.player.powers and is_hp_loss:
             state.player.powers[PowerId.STRENGTH] = (
                 state.player.powers.get(PowerId.STRENGTH, 0) + state.player.powers[PowerId.RUPTURE]
             )
     return real_dmg
+
+
+def _x_value(state: GameState) -> int:
+    """X spent by an X-cost card: all current energy, +2 with Chemical X
+    (the energy itself is still fully consumed by the card)."""
+    x = state.player.energy
+    if getattr(state.player, '_chemical_x', False):
+        x += 2
+    return x
+
+
+def _heal_player(state: GameState, amount: int) -> int:
+    """Heal the player. Combat healing is 50% more effective with Magic Flower.
+    Returns actual HP gained."""
+    if amount <= 0:
+        return 0
+    if state.combat is not None and getattr(state.player, '_magic_flower', False):
+        amount = int(amount * 1.5)
+    before = state.player.hp
+    state.player.hp = min(state.player.max_hp, state.player.hp + amount)
+    return state.player.hp - before
 
 
 def _gain_block(state: GameState, amount: int) -> None:
@@ -173,6 +230,12 @@ def _apply_power(state: GameState, target, power_id, amount: int) -> None:
         PowerId.NO_DRAW, PowerId.HEX, PowerId.SHACKLED,
     }
     if power_id in debuffs:
+        # Ginger / Turnip: full immunity — do NOT consume an Artifact charge
+        if target is state.player:
+            if power_id == PowerId.WEAK and getattr(target, '_immune_weak', False):
+                return
+            if power_id == PowerId.FRAIL and getattr(target, '_immune_frail', False):
+                return
         artifact = target.powers.get(PowerId.ARTIFACT, 0)
         if artifact > 0:
             target.powers[PowerId.ARTIFACT] = artifact - 1
@@ -188,6 +251,17 @@ def _apply_power(state: GameState, target, power_id, amount: int) -> None:
 
 
 _HAND_LIMIT = 10
+
+
+def _remove_identical(pile: list, card: Card) -> bool:
+    """Remove CARD (by identity) from a pile. list.remove() uses dataclass
+    __eq__ and can remove an identical twin (another Strike) instead of the
+    actual object — duplicating or vanishing cards. Returns True if removed."""
+    for i, c in enumerate(pile):
+        if c is card:
+            del pile[i]
+            return True
+    return False
 
 
 def _draw_cards(state: GameState, n: int) -> None:
@@ -213,8 +287,7 @@ def _draw_cards(state: GameState, n: int) -> None:
 
 def _exhaust_card(state: GameState, card: Card) -> None:
     from .events import Event
-    if card in state.combat.hand:
-        state.combat.hand.remove(card)
+    _remove_identical(state.combat.hand, card)
     state.combat.exhaust_pile.append(card)
     state.bus.emit(Event.CARD_EXHAUST, state, card=card)
 
@@ -231,9 +304,8 @@ def _discard_from_hand(state: GameState, card: Card) -> None:
     """Manually discard a card from hand (Silent mechanic). Triggers
     on-discard effects (Reflex, Tactician) and the CARD_DISCARD event."""
     from .events import Event
-    if card not in state.combat.hand:
+    if not _remove_identical(state.combat.hand, card):
         return
-    state.combat.hand.remove(card)
     state.combat.discard_pile.append(card)
     state.combat.discarded_this_turn += 1
     if hasattr(card, 'on_manual_discard'):
@@ -308,6 +380,23 @@ class VoidCard(Card):
         state.player.energy = max(0, state.player.energy - 1)
 
 
+class Apparition(Card):
+    """Special card granted by the Council of Ghosts event."""
+    def __init__(self, upgraded: bool = False):
+        super().__init__("Apparition", "Apparition", CardType.SKILL,
+                         CardRarity.SPECIAL, 1, upgraded,
+                         ethereal=not upgraded, exhaust=True)
+
+    def play(self, state, target=None):
+        from .enums import PowerId
+        state.player.powers[PowerId.INTANGIBLE] = \
+            state.player.powers.get(PowerId.INTANGIBLE, 0) + 1
+
+    def upgrade(self):
+        self.upgraded = True
+        self.ethereal = False
+
+
 # ── Curses ─────────────────────────────────────────────────────────────────
 
 class CurseBase(Card):
@@ -351,10 +440,6 @@ class Pain(CurseBase):
     def __init__(self):
         super().__init__("Pain", "Pain", CardType.CURSE, CardRarity.CURSE, -1, unplayable=True)
 
-    def on_card_played(self, state, card):
-        _damage_player(state, 1, is_hp_loss=True)
-
-
 class Parasite(CurseBase):
     def __init__(self):
         super().__init__("Parasite", "Parasite", CardType.CURSE, CardRarity.CURSE, -1, unplayable=True)
@@ -365,7 +450,7 @@ class Pride(CurseBase):
         super().__init__("Pride", "Pride", CardType.CURSE, CardRarity.CURSE, 1, innate=True, exhaust=True)
 
     def play(self, state, target=None):
-        state.combat.hand.append(Pride())
+        _add_card_to_hand(state, Pride())
         _exhaust_card(state, self)
 
 
@@ -773,8 +858,7 @@ class BloodForBlood(Card):
         return max(0, super().effective_cost() - getattr(self, '_times_hit', 0))
 
     def play(self, state, target=None):
-        cost = self.effective_cost()
-        state.player.energy -= cost
+        # Energy is paid by play_card() — deducting here double-charged it.
         dmg = 22 if self.upgraded else 18
         _deal_damage(state, target, dmg)
         _exhaust_card(state, self)
@@ -890,7 +974,7 @@ class DualWield(Card):
         if attacks:
             copies = 2 if self.upgraded else 1
             for _ in range(copies):
-                state.combat.hand.append(attacks[0].copy())
+                _add_card_to_hand(state, attacks[0].copy())
 
     def upgrade(self):
         self.upgraded = True
@@ -993,7 +1077,7 @@ class InfernalBlade(Card):
 
     def play(self, state, target=None):
         # Add a random attack to hand (simplified: add a Strike)
-        state.combat.hand.append(Strike())
+        _add_card_to_hand(state, Strike())
         _exhaust_card(state, self)
 
     def upgrade(self):
@@ -1049,8 +1133,8 @@ class PowerThrough(Card):
 
     def play(self, state, target=None):
         _gain_block(state, 20 if self.upgraded else 15)
-        state.combat.hand.append(Wound())
-        state.combat.hand.append(Wound())
+        _add_card_to_hand(state, Wound())
+        _add_card_to_hand(state, Wound())
 
     def upgrade(self):
         self.upgraded = True
@@ -1256,7 +1340,7 @@ class Whirlwind(Card):
         super().__init__("Whirlwind", "Whirlwind", CardType.ATTACK, CardRarity.UNCOMMON, -2, upgraded)
 
     def play(self, state, target=None):
-        x = state.player.energy
+        x = _x_value(state)
         state.player.energy = 0
         dmg = 8 if self.upgraded else 5
         for _ in range(x):
@@ -1368,7 +1452,7 @@ class Exhume(Card):
     def play(self, state, target=None):
         if state.combat.exhaust_pile:
             card = state.combat.exhaust_pile.pop()
-            state.combat.hand.append(card)
+            _add_card_to_hand(state, card)
         _exhaust_card(state, self)
 
     def upgrade(self):
@@ -1493,7 +1577,7 @@ class Reaper(Card):
                 # heal for damage dealt (unblocked)
                 actual = min(dmg, e.hp + min(dmg, e.block) - max(0, e.block - dmg))
                 heal = max(0, dmg - max(0, e.block))
-                state.player.hp = min(state.player.max_hp, state.player.hp + heal)
+                _heal_player(state, heal)
         _exhaust_card(state, self)
 
     def upgrade(self):

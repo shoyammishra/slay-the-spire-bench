@@ -39,8 +39,8 @@ class BurningBlood(Relic):
 
     def register(self, state: GameState) -> None:
         def on_combat_end(gs: GameState, **kw):
-            heal = 6
-            gs.player.hp = min(gs.player.max_hp, gs.player.hp + heal)
+            from .cards import _heal_player
+            _heal_player(gs, 6)
         state.bus.subscribe(Event.COMBAT_END, on_combat_end)
 
 
@@ -89,8 +89,12 @@ class AncientTeaSet(Relic):
             self._triggered = True
         def on_combat_start(gs: GameState, **kw):
             if self._triggered:
-                gs.player.energy += 2
                 self._triggered = False
+                # Direct energy here would be WIPED by _begin_player_turn's
+                # energy reset; ENERGIZED is consumed at TURN_START after it.
+                from .enums import PowerId
+                gs.player.powers[PowerId.ENERGIZED] = \
+                    gs.player.powers.get(PowerId.ENERGIZED, 0) + 2
         state.bus.subscribe(Event.REST_SITE_ENTER, on_rest)
         state.bus.subscribe(Event.COMBAT_START, on_combat_start)
 
@@ -106,7 +110,11 @@ class ArtOfWar(Relic):
             self._no_attacks = False
         def on_turn_end(gs: GameState, **kw):
             if self._no_attacks:
-                gs.player.energy += 1
+                # Energy added at TURN_END is wiped by the next turn's energy
+                # reset — queue ENERGIZED (consumed at TURN_START after it).
+                from .enums import PowerId
+                gs.player.powers[PowerId.ENERGIZED] = \
+                    gs.player.powers.get(PowerId.ENERGIZED, 0) + 1
             self._no_attacks = True
         state.bus.subscribe(Event.ATTACK_PLAY, on_attack_play)
         state.bus.subscribe(Event.TURN_END, on_turn_end)
@@ -117,12 +125,10 @@ class BagOfPreparation(Relic):
     name = "Bag of Preparation"
 
     def register(self, state: GameState) -> None:
-        self._first = True
+        # Real StS: draws 2 extra at the start of EVERY combat (no once-only flag).
         def on_combat_start(gs: GameState, **kw):
-            if self._first:
-                self._first = False
-                from .cards import _draw_cards
-                _draw_cards(gs, 2)
+            from .cards import _draw_cards
+            _draw_cards(gs, 2)
         state.bus.subscribe(Event.COMBAT_START, on_combat_start)
 
 
@@ -140,10 +146,9 @@ class BronzeScales(Relic):
 class NunchakuRelic(Relic):
     id = "Nunchaku"
     name = "Nunchaku"
+    _count = 0  # persists across combats (real StS) — must not reset in register()
 
     def register(self, state: GameState) -> None:
-        self._count = 0
-
         def on_attack(gs: GameState, card=None, **kw):
             from .enums import CardType
             if card and card.type == CardType.ATTACK:
@@ -152,9 +157,6 @@ class NunchakuRelic(Relic):
                     self._count = 0
                     gs.player.energy += 1
         state.bus.subscribe(Event.CARD_PLAY, on_attack)
-
-    def on_combat_start(self, state):
-        self._count = 0
 
 
 class OddlySmoothStone(Relic):
@@ -171,10 +173,9 @@ class OddlySmoothStone(Relic):
 class PenNib(Relic):
     id = "Pen Nib"
     name = "Pen Nib"
+    _count = 0  # persists across combats (real StS) — must not reset in register()
 
     def register(self, state: GameState) -> None:
-        self._count = 0
-
         def on_attack(gs: GameState, card=None, **kw):
             from .enums import CardType
             if card and card.type == CardType.ATTACK:
@@ -217,7 +218,8 @@ class MeatOnTheBone(Relic):
     def register(self, state: GameState) -> None:
         def on_combat_end(gs: GameState, **kw):
             if gs.player.hp <= gs.player.max_hp // 2:
-                gs.player.hp = min(gs.player.max_hp, gs.player.hp + 12)
+                from .cards import _heal_player
+                _heal_player(gs, 12)
         state.bus.subscribe(Event.COMBAT_END, on_combat_end)
 
 
@@ -228,6 +230,11 @@ class Shuriken(Relic):
     def register(self, state: GameState) -> None:
         self._count = 0
         from .enums import PowerId
+
+        def on_turn_start(gs: GameState, **kw):
+            # Real StS: "3 Attacks in a SINGLE turn" — counter resets per turn.
+            self._count = 0
+        state.bus.subscribe(Event.TURN_START, on_turn_start)
 
         def on_attack(gs: GameState, card=None, **kw):
             from .enums import CardType
@@ -242,10 +249,9 @@ class Shuriken(Relic):
 class Sundial(Relic):
     id = "Sundial"
     name = "Sundial"
+    _count = 0  # persists across combats (real StS) — must not reset in register()
 
     def register(self, state: GameState) -> None:
-        self._count = 0
-
         def on_shuffle(gs: GameState, **kw):
             self._count += 1
             if self._count >= 3:
@@ -308,9 +314,15 @@ class MarkOfPain(Relic):
 class RunicDome(Relic):
     id = "Runic Dome"
     name = "Runic Dome"
-    # Hides enemy intents — no mechanical effect in simulator, just metadata
+
+    def on_pickup(self, state: GameState) -> None:
+        state.player.energy_per_turn += 1
+
     def register(self, state: GameState) -> None:
-        pass
+        # Downside: enemy intents hidden — prompt_builder omits them when set.
+        # (The greedy bot never reads prompts, so the cost falls on the LLM,
+        # matching the real trade-off.)
+        state.player._runic_dome = True
 
 
 class SneckoEye(Relic):
@@ -334,7 +346,8 @@ class BlackBlood(Relic):
 
     def register(self, state: GameState) -> None:
         def on_combat_end(gs: GameState, **kw):
-            gs.player.hp = min(gs.player.max_hp, gs.player.hp + 12)
+            from .cards import _heal_player
+            _heal_player(gs, 12)
         state.bus.subscribe(Event.COMBAT_END, on_combat_end)
 
 
@@ -359,10 +372,17 @@ def make_relic(relic_id: str) -> Relic:
 
 
 def random_relic(state: GameState, rarity: str = "common") -> Relic:
-    """Return a random relic of the given rarity, using loot_rng."""
+    """Return a random relic of the given rarity, using loot_rng.
+    Off-class relics are filtered out and already-owned relics deduped."""
     try:
-        from .relics_full import _RARITY_POOLS
+        from .relics_full import _RARITY_POOLS, relic_allowed
         pool = _RARITY_POOLS.get(rarity, _RARITY_POOLS["common"])
+        character = getattr(state, "character", "ironclad")
+        owned = {r.id for r in state.player.relics}
+        filtered = [cls for cls in pool
+                    if relic_allowed(cls.id, character) and cls.id not in owned]
+        if filtered:
+            pool = filtered
     except ImportError:
         pool = list(RELIC_REGISTRY.values())
     if not pool:

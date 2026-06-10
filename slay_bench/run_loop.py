@@ -103,7 +103,8 @@ def roll_encounter(state: GameState, node_type: NodeType) -> List[str]:
     return table[idx]
 
 
-def spawn_enemies(state: GameState, enemy_ids: List[str]) -> List[Enemy]:
+def spawn_enemies(state: GameState, enemy_ids: List[str],
+                  elite: bool = False, boss: bool = False) -> List[Enemy]:
     from .enemies import ENEMY_REGISTRY
     from .enemies_act2 import register_act2_act3
     register_act2_act3(ENEMY_REGISTRY)
@@ -111,7 +112,11 @@ def spawn_enemies(state: GameState, enemy_ids: List[str]) -> List[Enemy]:
     for eid in enemy_ids:
         cls = ENEMY_REGISTRY.get(eid)
         if cls:
-            enemies.append(cls(state.rng.hp_rng))
+            e = cls(state.rng.hp_rng)
+            # Room-type tags consumed by Preserved Insect / Slaver's Collar
+            e._elite = elite
+            e._boss = boss
+            enemies.append(e)
     return enemies
 
 
@@ -144,6 +149,10 @@ class RunState:
         self.history.append(node)
         self.state.floor = node.floor
         self.state.player.floor = node.floor
+        # Maw Bank: +12 gold per floor climbed (until any shop purchase)
+        if getattr(self.state.player, '_maw_bank', False) \
+                and not getattr(self.state.player, '_no_gold', False):
+            self.state.player.gold += 12
 
 
 def resolve_node(run: RunState, node: MapNode,
@@ -161,10 +170,11 @@ def resolve_node(run: RunState, node: MapNode,
         result.update(_resolve_combat(run, node, card_choice_fn))
 
     elif node.node_type == NodeType.REST:
-        result.update(_resolve_rest(run))
+        result.update(_resolve_rest(run, card_choice_fn))
 
     elif node.node_type == NodeType.MERCHANT:
-        result["outcome"] = "shop"
+        from .nodes import greedy_shop_visit
+        result.update(greedy_shop_visit(state))
 
     elif node.node_type == NodeType.TREASURE:
         from .nodes import resolve_treasure
@@ -189,7 +199,9 @@ def _resolve_combat(run: RunState, node: MapNode,
     }[node.node_type]
 
     enemy_ids = roll_encounter(state, node.node_type)
-    enemies = spawn_enemies(state, enemy_ids)
+    enemies = spawn_enemies(state, enemy_ids,
+                            elite=node.node_type == NodeType.ELITE,
+                            boss=node.node_type == NodeType.BOSS)
     start_combat(state, enemies)
 
     # Default AI: greedy card play
@@ -229,6 +241,15 @@ def _resolve_combat(run: RunState, node: MapNode,
         if node.node_type == NodeType.BOSS:
             state.bus.emit(Event.BOSS_DEFEATED, state)
 
+        # Elite relic drop (Black Star: an additional one)
+        if node.node_type == NodeType.ELITE:
+            from .nodes import _obtain_relic
+            from .relics import random_relic
+            from .rewards import elite_relic_rarity
+            n_relics = 2 if getattr(state.player, '_black_star', False) else 1
+            for _ in range(n_relics):
+                _obtain_relic(state, random_relic(state, elite_relic_rarity(state)))
+
         # Card reward
         n_offers = 3
         if getattr(state.player, '_prayer_wheel', False):
@@ -256,18 +277,39 @@ def _resolve_combat(run: RunState, node: MapNode,
     return result
 
 
-def _resolve_rest(run: RunState) -> dict:
+def _resolve_rest(run: RunState, card_choice_fn: Optional[Callable] = None) -> dict:
     from .nodes import resolve_rest, RestSiteAction
+    from .enums import CardType
     state = run.state
-    if getattr(state.player, '_no_rest_heal', False):
-        action = RestSiteAction.SMITH
-        candidates = [c for c in state.player.deck if not c.upgraded]
+    p = state.player
+    no_heal = getattr(p, '_no_rest_heal', False)
+    no_smith = getattr(p, '_no_smith', False)
+
+    # Peace Pipe: removing a curse beats resting/smithing
+    if getattr(p, '_peace_pipe', False) and \
+            any(c.type == CardType.CURSE for c in p.deck):
+        resolve_rest(state, RestSiteAction.TOKE)
+        return {"outcome": "toke"}
+
+    # Coffee Dripper makes REST useless → SMITH, unless Fusion Hammer forbids it
+    if no_heal and not no_smith:
+        candidates = [c for c in p.deck if not c.upgraded]
         card = candidates[0] if candidates else None
-        resolve_rest(state, action, card)
+        resolve_rest(state, RestSiteAction.SMITH, card)
         return {"outcome": "smith", "upgraded": card}
-    else:
-        resolve_rest(state, RestSiteAction.REST)
-        return {"outcome": "rest"}
+
+    resolve_rest(state, RestSiteAction.REST)
+    result = {"outcome": "rest"}
+    # Dream Catcher: a card reward when you rest
+    offer = getattr(state, '_dream_catcher_offer', None)
+    if offer and card_choice_fn:
+        chosen = card_choice_fn(offer)
+        if chosen:
+            p.deck.append(chosen)
+            state.bus.emit(Event.CARD_ADDED, state, card=chosen)
+            result["card_chosen"] = chosen
+    state._dream_catcher_offer = None
+    return result
 
 
 def _resolve_event(run: RunState) -> dict:
@@ -293,13 +335,14 @@ def run_act(state: GameState, act: int,
     # Traverse all floors
     all_nodes = [n for floor in game_map.floors for n in floor]
 
-    # Pick first node (leftmost)
+    # Pick first node (leftmost). NOTE: no move_to here — the loop below pops
+    # this same node and calls move_to; the pre-loop call double-counted the
+    # first floor (and would have paid Maw Bank twice).
     current_nodes = game_map.floors[0] if game_map.floors else []
     current_node = current_nodes[0] if current_nodes else None
-    run.move_to(current_node)
 
     visited: set = set()
-    queue = [current_node]
+    queue = [current_node] if current_node is not None else []
 
     while queue:
         node = queue.pop(0)

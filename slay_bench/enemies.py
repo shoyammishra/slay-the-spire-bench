@@ -49,23 +49,26 @@ class Enemy:
 
 # ── helpers ───────────────────────────────────────────────────────────────────
 
-def effective_move_damage(enemy: Enemy, move: Move) -> int:
+def effective_move_damage(enemy: Enemy, move: Move, player=None) -> int:
     """Per-hit damage of a move after the enemy's Strength and Weak.
     Single source of truth shared by combat execution AND the prompt builder,
     so the intent shown to the LLM matches the damage that actually lands
     (real StS displays the adjusted number; Vulnerable on the player is
-    applied separately at damage time)."""
+    applied separately at damage time). Pass the player so Paper Krane
+    (Weak reduces enemy damage 40% instead of 25%) is honored."""
     strength = enemy.powers.get(PowerId.STRENGTH, 0)
     per_hit = max(0, move.damage + strength)
     if PowerId.WEAK in enemy.powers:
-        per_hit = math.floor(per_hit * 0.75)
+        mult = 0.6 if (player is not None
+                       and getattr(player, '_paper_krane', False)) else 0.75
+        per_hit = math.floor(per_hit * mult)
     return per_hit
 
 
 def _enemy_attack(state: GameState, enemy: Enemy, move: Move) -> None:
     from .cards import _damage_player
     from .events import Event
-    per_hit = effective_move_damage(enemy, move)
+    per_hit = effective_move_damage(enemy, move, state.player)
     # Vulnerable on player handled in _damage_player
     for _ in range(move.hits):
         _damage_player(state, per_hit)

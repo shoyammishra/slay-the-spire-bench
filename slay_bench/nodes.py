@@ -26,14 +26,22 @@ def resolve_rest(state: GameState, action: str, card_to_upgrade: Optional[Card] 
     state.bus.emit(Event.REST_SITE_ENTER, state)
 
     if action == RestSiteAction.REST:
-        heal = int(state.player.max_hp * 0.30)
-        # Regal Pillow: +15 heal when resting
-        if any(r.id == "Regal Pillow" for r in state.player.relics):
-            heal += 15
+        # Coffee Dripper: resting no longer heals (enforced here so EVERY
+        # caller honors it, not just the harness paths)
+        if getattr(state.player, '_no_rest_heal', False):
+            heal = 0
+        else:
+            heal = int(state.player.max_hp * 0.30)
+            # Regal Pillow: +15 heal when resting
+            if any(r.id == "Regal Pillow" for r in state.player.relics):
+                heal += 15
         state.player.hp = min(state.player.max_hp, state.player.hp + heal)
 
     elif action == RestSiteAction.SMITH:
-        if card_to_upgrade and card_to_upgrade in state.player.deck:
+        # Fusion Hammer: smithing is disabled
+        if getattr(state.player, '_no_smith', False):
+            pass
+        elif card_to_upgrade and card_to_upgrade in state.player.deck:
             card_to_upgrade.upgrade()
             state.bus.emit(Event.CARD_UPGRADED, state, card=card_to_upgrade)
 
@@ -48,8 +56,20 @@ def resolve_rest(state: GameState, action: str, card_to_upgrade: Optional[Card] 
         _obtain_relic(state, relic)
 
     elif action == RestSiteAction.TOKE:
-        # Peace Pipe relic required — remove a card
-        pass
+        # Peace Pipe relic required — remove the worst card
+        # (curse → basic Strike → basic Defend; nothing if none of those)
+        if getattr(state.player, '_peace_pipe', False):
+            from .enums import CardType
+            deck = state.player.deck
+            target = next((c for c in deck if c.type == CardType.CURSE), None)
+            if target is None:
+                target = next((c for c in deck if c.name == "Strike"), None) \
+                    or next((c for c in deck if c.name == "Defend"), None)
+            if target is not None:
+                deck.remove(target)
+                state.player._cards_removed = \
+                    getattr(state.player, '_cards_removed', 0) + 1
+                state.bus.emit(Event.CARD_REMOVED, state, card=target)
 
 
 # ── Shop ──────────────────────────────────────────────────────────────────────
@@ -142,6 +162,7 @@ def buy_card(state: GameState, shop: ShopInventory, card: Card) -> bool:
     if state.player.gold < price:
         return False
     state.player.gold -= price
+    state.player._maw_bank = False  # Maw Bank deactivates on any purchase
     shop.cards.remove(card)
     state.player.deck.append(card)
     from .events import Event
@@ -154,6 +175,7 @@ def buy_relic(state: GameState, shop: ShopInventory, relic: Relic) -> bool:
     if state.player.gold < price:
         return False
     state.player.gold -= price
+    state.player._maw_bank = False  # Maw Bank deactivates on any purchase
     shop.relics.remove(relic)
     _obtain_relic(state, relic)
     return True
@@ -166,6 +188,7 @@ def buy_potion(state: GameState, shop: ShopInventory, potion: Potion) -> bool:
     if len(state.player.potions) >= 3:
         return False
     state.player.gold -= price
+    state.player._maw_bank = False  # Maw Bank deactivates on any purchase
     shop.potions.remove(potion)
     state.player.potions.append(potion)
     return True
@@ -173,17 +196,44 @@ def buy_potion(state: GameState, shop: ShopInventory, potion: Potion) -> bool:
 
 def remove_card(state: GameState, shop: ShopInventory, card: Card) -> bool:
     """Pay to remove a card from deck."""
-    cost = shop.removal_cost + shop.removal_used * 25
+    # Smiling Mask: card removal always costs 50
+    if getattr(state.player, '_smiling_mask', False):
+        cost = 50
+    else:
+        cost = shop.removal_cost + shop.removal_used * 25
     if state.player.gold < cost:
         return False
     if card not in state.player.deck:
         return False
     state.player.gold -= cost
+    state.player._maw_bank = False  # Maw Bank deactivates on any purchase
     shop.removal_used += 1
     state.player.deck.remove(card)
+    state.player._cards_removed = getattr(state.player, '_cards_removed', 0) + 1
     from .events import Event
     state.bus.emit(Event.CARD_REMOVED, state, card=card)
     return True
+
+
+def greedy_shop_visit(state: GameState) -> dict:
+    """Deterministic shop policy shared by both run loops (the previous
+    MERCHANT no-op made shop floors free passes and gold useless):
+    Meal Ticket heal, then pay to remove the worst card (curse → basic
+    Strike → basic Defend) if gold allows. Conservatively buys nothing else."""
+    from .enums import CardType
+    result = {"outcome": "shop", "removed": None}
+    # Meal Ticket: heal 15 HP whenever you enter a shop
+    if getattr(state.player, '_meal_ticket', False):
+        state.player.hp = min(state.player.max_hp, state.player.hp + 15)
+    shop = generate_shop(state)  # consumes RNG like a real shop visit
+    deck = state.player.deck
+    target = next((c for c in deck if c.type == CardType.CURSE), None)
+    if target is None:
+        target = next((c for c in deck if c.name == "Strike"), None) \
+            or next((c for c in deck if c.name == "Defend"), None)
+    if target is not None and remove_card(state, shop, target):
+        result["removed"] = target.name
+    return result
 
 
 # ── Treasure ──────────────────────────────────────────────────────────────────

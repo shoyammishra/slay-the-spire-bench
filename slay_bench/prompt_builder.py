@@ -21,10 +21,13 @@ def _card_summary(card) -> dict:
     }
 
 
-def _enemy_summary(e) -> dict:
+def _enemy_summary(e, player=None) -> dict:
     from .enemies import effective_move_damage
     intent = None
-    if e.current_move:
+    # Runic Dome: intents are hidden from the player (the relic's downside —
+    # the greedy bot never reads prompts, so the cost falls on the LLM)
+    hide_intent = player is not None and getattr(player, '_runic_dome', False)
+    if e.current_move and not hide_intent:
         intent = {
             "name": e.current_move.name,
             "intent": e.current_move.intent.name,
@@ -32,7 +35,7 @@ def _enemy_summary(e) -> dict:
         if e.current_move.damage:
             # Show Strength/Weak-adjusted damage (what will actually land),
             # like the real game's intent display — not the move's base value.
-            intent["damage"] = effective_move_damage(e, e.current_move)
+            intent["damage"] = effective_move_damage(e, e.current_move, player)
             intent["hits"] = e.current_move.hits
         if e.current_move.block:
             intent["block"] = e.current_move.block
@@ -75,7 +78,7 @@ def combat_state_structured(state: GameState) -> str:
     p = state.player
     data = {
         "player": _player_summary(p),
-        "enemies": [_enemy_summary(e) for e in c.enemies if e.hp > 0],
+        "enemies": [_enemy_summary(e, p) for e in c.enemies if e.hp > 0],
         "hand": [_card_summary_with_playable(card, state) for card in c.hand],
         "draw_pile_size": len(c.draw_pile),
         "discard_pile_size": len(c.discard_pile),
@@ -83,6 +86,13 @@ def combat_state_structured(state: GameState) -> str:
         "turn": c.turn,
         "energy": p.energy,
     }
+    # Frozen Eye: full draw-pile order (next card first); Crystal Ball: top 3.
+    # Info-only relics — the greedy bot ignores prompts, so this is symmetric.
+    if getattr(p, '_frozen_eye', False):
+        data["draw_pile_order"] = [card.name for card in reversed(c.draw_pile)]
+    elif getattr(p, '_crystal_ball', False):
+        data["draw_pile_top3"] = [card.name
+                                  for card in list(reversed(c.draw_pile))[:3]]
     return json.dumps(data, indent=2)
 
 
@@ -135,11 +145,12 @@ def combat_state_raw(state: GameState) -> str:
         if e.hp <= 0:
             continue
         intent_str = ""
-        if e.current_move:
+        # Runic Dome: intents hidden (the relic's downside)
+        if e.current_move and not getattr(p, '_runic_dome', False):
             from .enemies import effective_move_damage
             m = e.current_move
             if m.damage:
-                eff = effective_move_damage(e, m)
+                eff = effective_move_damage(e, m, p)
                 intent_str = f" → intends {m.name} ({eff}×{m.hits} dmg)"
             elif m.block:
                 intent_str = f" → intends {m.name} (block {m.block})"
@@ -160,6 +171,13 @@ def combat_state_raw(state: GameState) -> str:
         lines.append(f"  [{i}] {card.name}  cost={cost}  type={card.type.name}  {playable}")
 
     lines.append(f"Draw pile: {len(c.draw_pile)} cards")
+    # Frozen Eye: full draw-pile order (next card first); Crystal Ball: top 3
+    if getattr(p, '_frozen_eye', False):
+        order = ", ".join(card.name for card in reversed(c.draw_pile))
+        lines.append(f"Draw pile order (Frozen Eye, next first): {order}")
+    elif getattr(p, '_crystal_ball', False):
+        top3 = ", ".join(card.name for card in list(reversed(c.draw_pile))[:3])
+        lines.append(f"Top 3 of draw pile (Crystal Ball): {top3}")
     lines.append(f"Discard: {len(c.discard_pile)} cards")
     if c.exhaust_pile:
         lines.append(f"Exhausted: {', '.join(cd.name for cd in c.exhaust_pile)}")

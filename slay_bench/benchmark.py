@@ -744,7 +744,9 @@ _SYNERGY_FIXTURES = [
       "Strike_R", "Strike_R", "Defend_R"],
      ["Strike_R", "Defend_R", "Sever Soul"], 2),         # Sever Soul = Exhaust
     ("Aggro",
-     ["Perfected Strike", "Rampage", "Blood for Blood", "Reckless Charge", "Pommel Strike",
+     # Cleave (not Perfected Strike): with Perfected Strike in deck, "remove
+     # Strike" as removal ground truth is debatable — Strikes feed it.
+     ["Cleave", "Rampage", "Blood for Blood", "Reckless Charge", "Pommel Strike",
       "Anger", "Strike_R", "Strike_R", "Defend_R", "Bash"],
      ["Twin Strike", "Defend_R", "Iron Wave"], 0),       # Twin Strike = Aggro strike-payoff
     ("Strength",
@@ -760,7 +762,8 @@ _SYNERGY_FIXTURES = [
       "Strike_R", "Strike_R", "Strike_R", "Defend_R"],
      ["Defend_R", "Strike_R", "Fiend Fire"], 2),         # Fiend Fire = Exhaust
     ("Aggro",
-     ["Perfected Strike", "Rampage", "Blood for Blood", "Pommel Strike", "Clothesline",
+     # Wild Strike replaces Perfected Strike (see fixture 4's note)
+     ["Wild Strike", "Rampage", "Blood for Blood", "Pommel Strike", "Clothesline",
       "Anger", "Strike_R", "Strike_R", "Defend_R", "Bash"],
      ["Reckless Charge", "Defend_R", "Iron Wave"], 0),   # Reckless Charge = Aggro payoff
     # ── Fixtures 9-20: paper-grade expansion to 5 decks per archetype. ──────────
@@ -779,7 +782,8 @@ _SYNERGY_FIXTURES = [
       "Strike_R", "Strike_R", "Defend_R", "Defend_R"],
      ["Dark Embrace", "Twin Strike", "Defend_R"], 0),    # Dark Embrace = Exhaust payoff
     ("Aggro",
-     ["Rampage", "Reckless Charge", "Perfected Strike", "Twin Strike", "Pommel Strike",
+     # Cleave replaces Perfected Strike (see fixture 4's note)
+     ["Rampage", "Reckless Charge", "Cleave", "Twin Strike", "Pommel Strike",
       "Anger", "Strike_R", "Strike_R", "Defend_R", "Bash"],
      ["Blood for Blood", "Defend_R", "Shrug It Off"], 0),  # Blood for Blood = Aggro payoff
     ("Strength",
@@ -811,7 +815,8 @@ _SYNERGY_FIXTURES = [
       "Strike_R", "Strike_R", "Strike_R", "Defend_R"],
      ["Fiend Fire", "Iron Wave", "Defend_R"], 0),        # Fiend Fire = Exhaust payoff (was mislabeled 2=Defend)
     ("Aggro",
-     ["Perfected Strike", "Blood for Blood", "Rampage", "Pommel Strike", "Sword Boomerang",
+     # Clash replaces Perfected Strike (see fixture 4's note)
+     ["Clash", "Blood for Blood", "Rampage", "Pommel Strike", "Sword Boomerang",
       "Anger", "Strike_R", "Strike_R", "Strike_R", "Defend_R"],
      ["Twin Strike", "Second Wind", "Defend_R"], 0),     # Twin Strike = Aggro strike-payoff
 ]
@@ -1188,7 +1193,9 @@ class RunEvaluator:
                     NodeType.BOSS: "boss",
                 }[ntype]
                 enemy_ids = roll_encounter(state, ntype)
-                enemies = spawn_enemies(state, enemy_ids)
+                enemies = spawn_enemies(state, enemy_ids,
+                                        elite=ntype == NodeType.ELITE,
+                                        boss=ntype == NodeType.BOSS)
                 start_combat(state, enemies)
                 won, turns = self._llm_combat(state, counters)
                 if won:
@@ -1197,9 +1204,26 @@ class RunEvaluator:
                     state.bus.emit(Event.GOLD_GAINED, state, amount=gold)
                     if ntype == NodeType.BOSS:
                         state.bus.emit(Event.BOSS_DEFEATED, state)
-                    offers = generate_card_reward(state)
-                    chosen = self._llm_card_choice(state, offers)
-                    counters["llm_calls"] += 1
+                    # Elite relic drop (Black Star: an additional one)
+                    if ntype == NodeType.ELITE:
+                        from .nodes import _obtain_relic
+                        from .relics import random_relic
+                        from .rewards import elite_relic_rarity
+                        n_relics = 2 if getattr(state.player, '_black_star', False) else 1
+                        for _ in range(n_relics):
+                            _obtain_relic(state, random_relic(
+                                state, elite_relic_rarity(state)))
+                    # Same offer count as run_loop (Prayer Wheel / Busted Crown)
+                    n_offers = 3
+                    if getattr(state.player, '_prayer_wheel', False):
+                        n_offers += 1
+                    if getattr(state.player, '_busted_crown', False):
+                        n_offers = max(1, n_offers - 2)
+                    offers = generate_card_reward(state, n_offers)
+                    chosen = None
+                    if offers:  # no offers → no LLM call to count
+                        counters["llm_calls"] += 1
+                        chosen = self._llm_card_choice(state, offers)
                     if chosen:
                         state.player.deck.append(chosen)
                         state.bus.emit(Event.CARD_ADDED, state, card=chosen)
@@ -1210,18 +1234,39 @@ class RunEvaluator:
                 return False
 
             elif ntype == NodeType.REST:
+                from .enums import CardType
+                p = state.player
+                no_heal = getattr(p, '_no_rest_heal', False)
+                no_smith = getattr(p, '_no_smith', False)
                 action = RestSiteAction.REST
                 card = None
-                if getattr(state.player, '_no_rest_heal', False):
+                # Peace Pipe: removing a curse beats resting/smithing
+                if getattr(p, '_peace_pipe', False) and \
+                        any(c.type == CardType.CURSE for c in p.deck):
+                    action = RestSiteAction.TOKE
+                elif no_heal and not no_smith:
                     action = RestSiteAction.SMITH
-                elif self.llm_routing:
+                elif self.llm_routing and not no_smith:
                     counters["llm_calls"] += 1
                     if self._llm_rest_choice(state) == "smith":
                         action = RestSiteAction.SMITH
                 if action == RestSiteAction.SMITH:
-                    candidates = [c for c in state.player.deck if not c.upgraded]
+                    candidates = [c for c in p.deck if not c.upgraded]
                     card = candidates[0] if candidates else None
                 resolve_rest(state, action, card)
+                # Dream Catcher: a card reward when you rest
+                offer = getattr(state, '_dream_catcher_offer', None)
+                if action == RestSiteAction.REST and offer:
+                    counters["llm_calls"] += 1
+                    chosen = self._llm_card_choice(state, offer)
+                    if chosen:
+                        p.deck.append(chosen)
+                        state.bus.emit(Event.CARD_ADDED, state, card=chosen)
+                state._dream_catcher_offer = None
+
+            elif ntype == NodeType.MERCHANT:
+                from .nodes import greedy_shop_visit
+                greedy_shop_visit(state)
 
             elif ntype == NodeType.TREASURE:
                 resolve_treasure(state)
@@ -1236,8 +1281,9 @@ class RunEvaluator:
         if not current_nodes:
             return False
 
+        # NOTE: no move_to here — the loop pops this node and calls move_to;
+        # the pre-loop call double-counted the first floor (Maw Bank ×2).
         current_node = current_nodes[0]
-        run.move_to(current_node)
         visited = set()
         queue = [current_node]
 

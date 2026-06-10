@@ -51,6 +51,13 @@ def start_combat(state: GameState, enemies: List[Enemy]) -> None:
     for relic in state.player.relics:
         relic.register(state)
 
+    # Neow's Lament: enemies in the first N combats have 1 HP
+    neow = getattr(state, '_neow_1hp_combats', 0)
+    if neow > 0:
+        state._neow_1hp_combats = neow - 1
+        for e in enemies:
+            e.hp = 1
+
     # Emit combat start
     state.bus.emit(Event.COMBAT_START, state)
 
@@ -127,6 +134,17 @@ def _begin_player_turn(state: GameState) -> None:
         del player.powers[PowerId.NO_DRAW]
         player.powers.pop(PowerId.NEXT_TURN_DRAW, None)
 
+    # Gambling Chip: once per combat, mulligan the opening hand's basic
+    # Strikes/Defends and draw replacements (deterministic stand-in for the
+    # player's free choice; manual-discard triggers apply, like the real game).
+    if combat.turn == 1 and getattr(player, '_gambling_chip', False):
+        from .cards import _discard_from_hand
+        basics = [c for c in list(combat.hand) if c.name in ("Strike", "Defend")]
+        for c in basics:
+            _discard_from_hand(state, c)
+        if basics:
+            _draw_cards(state, len(basics))
+
     # Confused: randomize card costs
     if PowerId.CONFUSED in player.powers:
         for c in combat.hand:
@@ -154,8 +172,12 @@ def play_card(state: GameState, card: Card, target: Optional[Enemy] = None) -> N
         player.energy -= cost
         player.energy = max(0, player.energy)
 
-    # Remove from hand before play (some cards add to hand)
-    combat.hand.remove(card)
+    # Remove from hand before play (some cards add to hand). Identity-based:
+    # list.remove() compares dataclass fields and could remove an identical
+    # twin, leaving the played object in hand (a copy then vanished at the
+    # discard step below).
+    from .cards import _remove_identical
+    _remove_identical(combat.hand, card)
 
     # Emit play event
     state.bus.emit(Event.CARD_PLAY, state, card=card)
@@ -187,25 +209,41 @@ def play_card(state: GameState, card: Card, target: Optional[Enemy] = None) -> N
         if player.powers[PowerId.BURST] <= 0:
             del player.powers[PowerId.BURST]
 
-    # Execute card effect
-    card.play(state, target)
-
-    # Double Tap / Burst replay
-    for _ in range(double_tap_count + burst_replay):
+    # Execute card effect. _playing_card lets damage helpers know WHICH card
+    # is dealing damage (Strike Dummy); save/restore handles nested plays (Havoc).
+    prev_playing = getattr(combat, '_playing_card', None)
+    combat._playing_card = card
+    try:
         card.play(state, target)
 
-    # Exhaust logic
+        # Double Tap / Burst replay
+        for _ in range(double_tap_count + burst_replay):
+            card.play(state, target)
+    finally:
+        combat._playing_card = prev_playing
+
+    # Exhaust logic. IDENTITY checks, not `in` — Card is a dataclass whose
+    # __eq__ compares fields, so `card not in hand` was False whenever an
+    # identical copy (another Strike) was still in hand and the played card
+    # silently VANISHED from the game; self-exhausting cards (Slimed etc.)
+    # were also appended to the exhaust pile a second time with a double
+    # CARD_EXHAUST emit (Feel No Pain / Dark Embrace double-triggered).
+    in_hand = any(c is card for c in combat.hand)
+    in_exhaust = any(c is card for c in combat.exhaust_pile)
+    in_discard = any(c is card for c in combat.discard_pile)
     should_exhaust = card.exhaust
     if player.corruption and card.type == CardType.SKILL:
         should_exhaust = True
     if should_exhaust:
-        from .cards import _exhaust_card
-        if card not in combat.hand:  # may have been removed by effect
+        if not in_hand and not in_exhaust:
             combat.exhaust_pile.append(card)
             state.bus.emit(Event.CARD_EXHAUST, state, card=card)
-    elif card not in combat.hand:  # wasn't re-added during play
+    elif not in_hand and not in_exhaust and not in_discard:
+        # NOTE: no CARD_DISCARD here — playing a card is not a discard.
+        # Emitting it made Tingsha/Tough Bandages/Hovering Kite fire on every
+        # card play. CARD_DISCARD is reserved for manual discards
+        # (_discard_from_hand), matching the real game's discard triggers.
         combat.discard_pile.append(card)
-        state.bus.emit(Event.CARD_DISCARD, state, card=card)
 
     # Check enemy deaths
     _check_enemy_deaths(state)

@@ -100,10 +100,27 @@ BOSS_RELIC_POOL: List[str] = []  # populated by relics_full._update_relic_regist
 
 
 def generate_boss_relic_choices(state: GameState, count: int = 3) -> List[str]:
-    """Return 3 boss relic IDs to choose from."""
-    pool = list(BOSS_RELIC_POOL)
+    """Return 3 boss relic IDs to choose from (character-gated, deduped)."""
+    try:
+        from .relics_full import relic_allowed
+    except ImportError:
+        relic_allowed = lambda rid, ch: True
+    character = getattr(state, "character", "ironclad")
+    owned = {r.id for r in state.player.relics}
+    pool = [r for r in BOSS_RELIC_POOL
+            if relic_allowed(r, character) and r not in owned]
     state.rng.loot_rng.shuffle(pool)
     return pool[:count]
+
+
+def elite_relic_rarity(state: GameState) -> str:
+    """Rarity of an elite's relic drop (real-StS odds: 50/33/17)."""
+    roll = state.rng.loot_rng.next_int(100)
+    if roll < 50:
+        return "common"
+    if roll < 83:
+        return "uncommon"
+    return "rare"
 
 
 def gold_reward(state: GameState, enemy_type: str = "normal") -> int:
@@ -126,4 +143,7 @@ def potion_drop(state: GameState, enemy_type: str = "normal") -> bool:
     # Sozu: no potions (roll first so the RNG stream stays seed-stable)
     if getattr(state.player, "_no_potions", False):
         return False
+    # White Beast Statue: potions always drop (after the roll, same reason)
+    if getattr(state.player, "_potion_always", False):
+        return True
     return dropped

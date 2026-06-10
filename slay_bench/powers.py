@@ -154,12 +154,14 @@ def register_power_hooks(state: GameState) -> None:
                 e.hp -= e.powers[PowerId.CHOKED]
 
         # Pain curse: while in HAND, lose 1 HP on any other card play (StS rule;
-        # copies in the draw/discard piles do nothing)
-        for c in gs.combat.hand:
-            if c.__class__.__name__ == 'Pain':
-                from .cards import _damage_player
+        # copies in the draw/discard piles do nothing). EACH copy triggers —
+        # separate 1-HP losses, so Tungsten Rod can negate each individually.
+        pain_copies = sum(1 for c in gs.combat.hand
+                          if c.__class__.__name__ == 'Pain')
+        if pain_copies:
+            from .cards import _damage_player
+            for _ in range(pain_copies):
                 _damage_player(gs, 1, is_hp_loss=True)
-                break
 
         # Hex: add Dazed on non-attack play
         if PowerId.HEX in player.powers and card and card.type != CardType.ATTACK:

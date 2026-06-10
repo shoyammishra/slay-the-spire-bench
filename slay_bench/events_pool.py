@@ -410,6 +410,7 @@ def _remove_random_card(state: GameState) -> str:
         return "No cards to remove."
     idx = state.rng.event_rng.next_int(len(state.player.deck))
     card = state.player.deck.pop(idx)
+    state.player._cards_removed = getattr(state.player, '_cards_removed', 0) + 1
     return f"Removed {card}."
 
 def _remove_starter(state: GameState) -> str:
@@ -418,13 +419,15 @@ def _remove_starter(state: GameState) -> str:
 def _transform_card(state: GameState) -> str:
     if not state.player.deck:
         return "No cards to transform."
-    from .cards import make_card
-    from .rewards import _IRONCLAD_POOL
+    from .cards import make_card_for
+    from .rewards import card_pool_for
+    character = getattr(state, "character", "ironclad")
+    char_pool = card_pool_for(state)  # Silent must not get Ironclad cards
     idx = state.rng.event_rng.next_int(len(state.player.deck))
     old = state.player.deck[idx]
-    pool_by_rarity = _IRONCLAD_POOL.get(old.rarity, list(_IRONCLAD_POOL.values())[0])
+    pool_by_rarity = char_pool.get(old.rarity, list(char_pool.values())[0])
     new_name = pool_by_rarity[state.rng.event_rng.next_int(len(pool_by_rarity))]
-    state.player.deck[idx] = make_card(new_name)
+    state.player.deck[idx] = make_card_for(character, new_name)
     return f"Transformed {old} into {state.player.deck[idx]}."
 
 def _duplicate_card(state: GameState) -> str:
@@ -558,10 +561,11 @@ def _mind_bloom_rich(state: GameState) -> str:
     return "You are rich! But cursed!"
 
 def _council_ghosts(state: GameState) -> str:
-    from .cards import make_card
-    # Apparition is a special card (not in base Ironclad pool, add as placeholder)
+    from .cards import Apparition
     loss = state.player.hp // 2
     state.player.hp = max(1, state.player.hp - loss)
+    for _ in range(5):
+        state.player.deck.append(Apparition())
     return f"Lost {loss} HP, gained 5 Apparitions."
 
 def _cursed_tome(state: GameState) -> str:
