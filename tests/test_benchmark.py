@@ -9,7 +9,7 @@ from slay_bench.benchmark import (
     MockLLM, TurnEvaluator, CombatEvaluator, SynergyEvaluator,
     RunEvaluator, BenchmarkHarness,
     _exhaustive_best_sequence, _simulate_play_sequence,
-    _classify_archetype, _draft_coherence,
+    _classify_archetype, _classify_archetype_confident, _draft_coherence,
     TurnScore, CombatScore, SynergyScore, RunScore, BenchmarkResult,
 )
 from slay_bench.prompt_builder import (
@@ -194,6 +194,45 @@ def test_combat_evaluator_play_attacks():
           f"parse_errors={score.parse_errors}")
 
 
+def test_combat_evaluator_null_indices():
+    """Model returning null/string card_index or target_index must not crash."""
+    responses = ['{"action": "play", "card_index": null, "target_index": null, "reasoning": "bad"}',
+                 '{"action": "play", "card_index": "0", "target_index": "0", "reasoning": "str"}',
+                 '{"action": "end_turn", "reasoning": "done"}'] * 20
+    mock = MockLLM(responses)
+    evaluator = CombatEvaluator(mock, max_turns=20)
+    state = new_ironclad_game(31)
+    enemy = Cultist(state.rng.hp_rng)
+    score = evaluator.evaluate(state, [enemy])  # must not raise TypeError
+    assert isinstance(score, CombatScore)
+    print(f"[PASS] CombatEvaluator null/str indices handled: won={score.won}, "
+          f"turns={score.turns}")
+
+
+def test_classify_archetype_confident():
+    """Confident only when one archetype uniquely owns the most signature cards."""
+    from types import SimpleNamespace
+    card = lambda n: SimpleNamespace(name=n)
+
+    # One signature (Body Slam = Block payoff), rest generic → confident Block
+    deck = [card(n) for n in ("Strike", "Defend", "Bash", "Body Slam", "Hemokinesis")]
+    label, conf = _classify_archetype_confident(deck, [])
+    assert conf and label == "Block", (label, conf)
+
+    # No signature card at all → ambiguous (this is the seed-244 bug: Armaments /
+    # Headbutt are NOT Exhaust payoffs, so they must not fabricate an Exhaust label)
+    deck = [card(n) for n in ("Strike", "Bash", "Armaments", "Headbutt", "Uppercut")]
+    label, conf = _classify_archetype_confident(deck, [])
+    assert not conf, (label, conf)
+
+    # Tie: one payoff for each of two archetypes → ambiguous
+    deck = [card(n) for n in ("Corruption", "Juggernaut")]  # Exhaust + Block
+    label, conf = _classify_archetype_confident(deck, [])
+    assert not conf, (label, conf)
+
+    print("[PASS] _classify_archetype_confident: signature/ambiguity logic correct")
+
+
 # ── SynergyEvaluator tests ────────────────────────────────────────────────────
 
 def test_synergy_evaluator():
@@ -221,6 +260,22 @@ def test_synergy_evaluator_raw():
     assert isinstance(score, SynergyScore)
     assert score.parse_ok
     print(f"[PASS] SynergyEvaluator raw: archetype={score.raw_response.get('archetype')}")
+
+
+def test_synergy_eval_fixtures():
+    """run_synergy_eval uses hand-crafted decks: confident labels, correct ground
+    truth, and a model that answers right scores right."""
+    # Fixture 0 is the Strength deck; best pick idx 1, removal = Strike.
+    mock = MockLLM(['{"archetype": "Strength", "best_card_index": 1, "worst_card_name": "Strike"}'])
+    harness = BenchmarkHarness(mock, model_name="mock", prompt_format="structured")
+    scores = harness.run_synergy_eval([42])  # one sample -> fixture 0
+    s = scores[0]
+    assert s.expert_archetype == "Strength", s.expert_archetype
+    assert s.archetype_confident is True          # crafted decks are never ambiguous
+    assert s.archetype_correct is True            # model said Strength
+    assert s.card_pick_correct is True            # picked index 1
+    assert s.removal_correct is True              # said Strike
+    print(f"[PASS] synergy fixtures: label={s.expert_archetype}, all-correct path works")
 
 
 # ── Archetype classification tests ───────────────────────────────────────────
@@ -252,7 +307,7 @@ def test_run_evaluator():
     mock = MockLLM([combat_resp, card_resp] * 500)
     evaluator = RunEvaluator(mock, max_combat_turns=5)
     state = new_ironclad_game(60)
-    score = evaluator.evaluate(state, act=1)
+    score = evaluator.evaluate(state, n_acts=1)
     assert isinstance(score, RunScore)
     assert score.floors_reached >= 0
     assert 0.0 <= score.hp_fraction <= 1.0
@@ -309,6 +364,79 @@ def test_harness_determinism():
           f"combat hp={r1.combat_scores[0].hp_remaining}")
 
 
+# ── Robustness regression tests (malformed-but-parseable LLM output) ─────────
+
+def test_turn_evaluator_nonint_indices():
+    """String/null/negative indices in "plays" must not crash the evaluator.
+    Numeric strings count as valid plays; null/negatives = illegal sequence."""
+    from slay_bench import new_game, start_combat
+    # String indices: coerced, sequence plays fine
+    mock = MockLLM(['{"plays": ["0", "1"], "reasoning": "r"}'])
+    ev = TurnEvaluator(mock, "structured")
+    state = new_game(80, "ironclad")
+    start_combat(state, [Cultist(state.rng.hp_rng)])
+    score = ev.evaluate(state)
+    assert score.legal, "numeric-string indices should be playable"
+    # Null + negative indices: illegal, not a crash
+    mock2 = MockLLM(['{"plays": [null, -1], "reasoning": "r"}'])
+    ev2 = TurnEvaluator(mock2, "structured")
+    state2 = new_game(80, "ironclad")
+    start_combat(state2, [Cultist(state2.rng.hp_rng)])
+    score2 = ev2.evaluate(state2)
+    assert not score2.legal and score2.llm_damage == 0
+    print("[PASS] Turn evaluator survives string/null/negative indices")
+
+
+def test_synergy_evaluator_null_fields():
+    """null archetype / worst_card_name and string best_card_index must not
+    crash, and a numeric-string pick is scored as the number it means."""
+    from slay_bench import new_game
+    from slay_bench.cards import make_card_for
+    mock = MockLLM(['{"archetype": null, "best_card_index": "1", "worst_card_name": null}'])
+    ev = SynergyEvaluator(mock, "structured")
+    state = new_game(81, "ironclad")
+    offers = [make_card_for("ironclad", n) for n in ("Anger", "Bludgeon", "Iron Wave")]
+    score = ev.evaluate(state, offers, expert_pick_idx=1, expert_remove_name="Strike")
+    assert score.parse_ok
+    assert score.card_pick_correct is True, "string '1' should match expert pick 1"
+    assert score.removal_correct is False
+    print("[PASS] Synergy evaluator survives null/string answer fields")
+
+
+def test_character_propagates_to_evaluators():
+    """BenchmarkHarness must hand its character to ALL evaluators (Silent runs
+    were getting Ironclad system prompts in turn/combat)."""
+    mock = MockLLM(['{"plays": [], "reasoning": "r"}',
+                    '{"action": "end_turn", "reasoning": "r"}'] * 50)
+    h = BenchmarkHarness(mock, "m", "structured", character="silent")
+    h.run_turn_eval([90])
+    h.run_combat_eval([91])
+    assert all("Silent" in sys for sys, _user in mock._calls), \
+        "every system prompt must mention the Silent"
+    print("[PASS] Character propagates to turn/combat evaluators")
+
+
+def test_aggregation_keys_match_summary():
+    """Multi-seed aggregation must use the real summary key names — a mismatch
+    silently yields None means for every metric."""
+    import sys as _sys, os as _os
+    _sys.path.insert(0, _os.path.dirname(_os.path.dirname(_os.path.abspath(__file__))))
+    from run_benchmark import _aggregate_summaries
+    mock = MockLLM(['{"plays": [0], "reasoning": "r"}',
+                    '{"action": "end_turn", "reasoning": "r"}',
+                    '{"archetype": "Aggro", "best_card_index": 0, "worst_card_name": "Strike"}',
+                    '{"pick": 0, "reasoning": "r"}'] * 200)
+    h = BenchmarkHarness(mock, "m", "structured")
+    s1 = h.run_all(seed=42, n_turn=1, n_combat=1, n_synergy=1, n_run=0).summary()
+    s2 = h.run_all(seed=43, n_turn=1, n_combat=1, n_synergy=1, n_run=0).summary()
+    agg = _aggregate_summaries([s1, s2], "m", "structured", "ironclad", [42, 43])
+    assert agg["turn"]["avg_damage_ratio_mean"] is not None
+    assert agg["turn"]["parse_ok_rate_mean"] is not None
+    assert agg["combat"]["avg_hp_ratio_mean"] is not None
+    assert agg["synergy"]["parse_ok_rate_mean"] is not None
+    print("[PASS] Aggregation keys match summary keys (no silent None means)")
+
+
 if __name__ == "__main__":
     tests = [
         test_structured_prompt,
@@ -331,6 +459,10 @@ if __name__ == "__main__":
         test_run_evaluator,
         test_harness_summary,
         test_harness_determinism,
+        test_turn_evaluator_nonint_indices,
+        test_synergy_evaluator_null_fields,
+        test_character_propagates_to_evaluators,
+        test_aggregation_keys_match_summary,
     ]
     passed = failed = 0
     for test in tests:

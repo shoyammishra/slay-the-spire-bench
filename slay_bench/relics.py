@@ -14,8 +14,17 @@ class Relic:
     id: str
     name: str
 
+    def on_pickup(self, state: GameState) -> None:
+        """One-time effects applied when the relic is obtained (max HP, energy
+        per turn, deck changes, ...). Must NOT go in register(): register() is
+        re-run at the start of every combat, so any non-idempotent mutation
+        there would stack across a run."""
+        pass
+
     def register(self, state: GameState) -> None:
-        """Subscribe to relevant events on the state's bus."""
+        """Subscribe to relevant events on the state's bus. Called at the start
+        of every combat (the bus is cleared first), so this must only contain
+        subscriptions and idempotent flag sets."""
         pass
 
     def __repr__(self) -> str:
@@ -33,6 +42,18 @@ class BurningBlood(Relic):
             heal = 6
             gs.player.hp = min(gs.player.max_hp, gs.player.hp + heal)
         state.bus.subscribe(Event.COMBAT_END, on_combat_end)
+
+
+class RingOfTheSnake(Relic):
+    """Silent starter relic: draw 2 additional cards at the start of combat."""
+    id = "Ring of the Snake"
+    name = "Ring of the Snake"
+
+    def register(self, state: GameState) -> None:
+        def on_combat_start(gs: GameState, **kw):
+            from .cards import _draw_cards
+            _draw_cards(gs, 2)
+        state.bus.subscribe(Event.COMBAT_START, on_combat_start)
 
 
 # ── Common relics ─────────────────────────────────────────────────────────────
@@ -160,8 +181,10 @@ class PenNib(Relic):
                 self._count += 1
                 if self._count >= 10:
                     self._count = 0
-                    from .enums import PowerId
-                    gs.player.powers[PowerId.VIGOR] = gs.player.powers.get(PowerId.VIGOR, 0) + 999  # double next attack
+                    # One-shot flag consumed by _deal_damage: this (10th) attack
+                    # deals double damage. CARD_PLAY fires before card.play(),
+                    # so the flag is up before the damage is rolled.
+                    gs.player._pen_nib_ready = True
         state.bus.subscribe(Event.CARD_PLAY, on_attack)
 
 
@@ -228,7 +251,7 @@ class Sundial(Relic):
             if self._count >= 3:
                 self._count = 0
                 gs.player.energy += 2
-        state.bus.subscribe(Event.CARD_DRAW, on_shuffle)  # approximate
+        state.bus.subscribe(Event.SHUFFLE, on_shuffle)
 
 
 # ── Rare relics ───────────────────────────────────────────────────────────────
@@ -239,12 +262,17 @@ class DeadBranch(Relic):
 
     def register(self, state: GameState) -> None:
         def on_exhaust(gs: GameState, card=None, **kw):
-            # Add a random card to hand
-            import random
-            from .cards import IRONCLAD_CARD_CLASSES, make_card
-            name = gs.rng.misc_rng.next_int(len(IRONCLAD_CARD_CLASSES))
-            card_name = list(IRONCLAD_CARD_CLASSES.keys())[name]
-            gs.combat.hand.append(make_card(card_name))
+            # Add a random character card to hand
+            from .cards import IRONCLAD_CARD_CLASSES, make_card_for
+            if getattr(gs, "character", "ironclad") == "silent":
+                from .cards_silent import SILENT_CARD_CLASSES as classes
+            else:
+                classes = IRONCLAD_CARD_CLASSES
+            idx = gs.rng.misc_rng.next_int(len(classes))
+            card_name = list(classes.keys())[idx]
+            from .cards import _add_card_to_hand
+            _add_card_to_hand(gs, make_card_for(
+                getattr(gs, "character", "ironclad"), card_name))
         state.bus.subscribe(Event.CARD_EXHAUST, on_exhaust)
 
 
@@ -266,10 +294,10 @@ class MarkOfPain(Relic):
     id = "Mark of Pain"
     name = "Mark of Pain"
 
-    def register(self, state: GameState) -> None:
-        from .enums import PowerId
+    def on_pickup(self, state: GameState) -> None:
         state.player.energy_per_turn += 1
 
+    def register(self, state: GameState) -> None:
         def on_combat_start(gs: GameState, **kw):
             from .cards import Wound
             gs.combat.draw_pile.append(Wound())
@@ -314,7 +342,7 @@ class BlackBlood(Relic):
 
 RELIC_REGISTRY = {
     r.id: r for r in [
-        BurningBlood, Akabeko, Anchor, AncientTeaSet, ArtOfWar,
+        BurningBlood, RingOfTheSnake, Akabeko, Anchor, AncientTeaSet, ArtOfWar,
         BagOfPreparation, BronzeScales, NunchakuRelic, OddlySmoothStone,
         PenNib, Vajra, IceCream, MeatOnTheBone, Shuriken, Sundial,
         DeadBranch, LizardTail, MarkOfPain, RunicDome, SneckoEye,

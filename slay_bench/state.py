@@ -21,6 +21,12 @@ class CombatState:
     turn: int = 0
     cards_played_this_turn: int = 0
     cards_played_this_combat: int = 0
+    attacks_played_this_turn: int = 0   # Finisher
+    discarded_this_turn: int = 0        # Sneaky Strike / Eviscerate
+    # Debuff timing (StS "justApplied" rule): player debuffs applied by enemies
+    # during the enemy phase must not tick down at the end of that same round.
+    enemy_phase: bool = False
+    just_applied: set = field(default_factory=set)
 
 
 @dataclass
@@ -55,4 +61,5 @@ class GameState:
     # non-combat state
     floor: int = 0
     act: int = 1
+    character: str = "ironclad"
     act_boss_relic_choices: list = field(default_factory=list)

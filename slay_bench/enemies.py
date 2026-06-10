@@ -322,10 +322,11 @@ class AcidSlimeL(Enemy):
     def on_hp_threshold(self, state):
         if not self._split and self.hp <= self.max_hp // 2:
             self._split = True
-            m1 = AcidSlimeM(state.rng.hp_rng)
-            m2 = AcidSlimeM(state.rng.hp_rng)
-            state.combat.enemies.append(m1)
-            state.combat.enemies.append(m2)
+            for _ in range(2):
+                m = AcidSlimeM(state.rng.hp_rng)
+                m.hp = m.max_hp = self.hp  # children inherit parent's current HP
+                state.combat.enemies.append(m)
+            self.hp = 0  # parent is replaced by its split children
 
 
 class SpikeSlimeS(Enemy):
@@ -407,10 +408,11 @@ class SpikeSlimeL(Enemy):
     def on_hp_threshold(self, state):
         if not self._split and self.hp <= self.max_hp // 2:
             self._split = True
-            m1 = SpikeSlimeM(state.rng.hp_rng)
-            m2 = SpikeSlimeM(state.rng.hp_rng)
-            state.combat.enemies.append(m1)
-            state.combat.enemies.append(m2)
+            for _ in range(2):
+                m = SpikeSlimeM(state.rng.hp_rng)
+                m.hp = m.max_hp = self.hp  # children inherit parent's current HP
+                state.combat.enemies.append(m)
+            self.hp = 0  # parent is replaced by its split children
 
 
 class FungalBeast(Enemy):

@@ -68,12 +68,14 @@ class ShopInventory:
 
 def generate_shop(state: GameState) -> ShopInventory:
     """Generate a shop inventory with 5 cards, 2 potions, 1-2 relics."""
-    from .rewards import generate_card_reward, _IRONCLAD_POOL
+    from .rewards import generate_card_reward, card_pool_for
     from .enums import CardRarity
     from .relics import random_relic
     from .potions import random_potion, POTION_POOL
-    from .cards import make_card
+    from .cards import make_card_for
 
+    character = getattr(state, "character", "ironclad")
+    char_pool = card_pool_for(state)
     shop = ShopInventory()
 
     # 5 cards: 2 common, 2 uncommon, 1 rare (base weights)
@@ -84,7 +86,7 @@ def generate_shop(state: GameState) -> ShopInventory:
     ]
     seen = set()
     for rarity, count in _rarity_counts:
-        pool = _IRONCLAD_POOL[rarity]
+        pool = char_pool[rarity]
         added = 0
         attempts = 0
         while added < count and attempts < 30:
@@ -93,7 +95,7 @@ def generate_shop(state: GameState) -> ShopInventory:
             name = pool[idx]
             if name not in seen:
                 seen.add(name)
-                card = make_card(name)
+                card = make_card_for(character, name)
                 shop.cards.append(card)
                 shop.card_prices[id(card)] = _card_price(rarity, state.floor)
                 added += 1
@@ -193,7 +195,7 @@ def resolve_treasure(state: GameState, take_gold: bool = True) -> None:
     large = state.rng.misc_rng.next_int(3) == 0
     rarity = "rare" if large else "common"
     relic = random_relic(state, rarity)
-    _obtain_relic(state, relic)
+    _obtain_relic(state, relic, source="chest")
     if take_gold:
         gold = (55 + state.rng.loot_rng.next_int(26)) if large else (25 + state.rng.loot_rng.next_int(26))
         state.player.gold += gold
@@ -203,8 +205,13 @@ def resolve_treasure(state: GameState, take_gold: bool = True) -> None:
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
 
-def _obtain_relic(state: GameState, relic: Relic) -> None:
+def _obtain_relic(state: GameState, relic: Relic, source: Optional[str] = None) -> None:
     state.player.relics.append(relic)
+    # One-time pickup effects (max HP, energy/turn, deck changes) happen exactly
+    # once here; register() is re-run at the start of every combat and must only
+    # contain subscriptions/idempotent flags.
+    relic.on_pickup(state)
     relic.register(state)
     from .events import Event
-    state.bus.emit(Event.RELIC_OBTAINED, state, relic=relic)
+    # source tags where the relic came from ("chest", None) — Cursed Key keys on it
+    state.bus.emit(Event.RELIC_OBTAINED, state, relic=relic, source=source)

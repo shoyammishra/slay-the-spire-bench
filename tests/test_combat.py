@@ -144,6 +144,68 @@ def test_slime_splits():
     print(f"[PASS] Slime split: {initial_enemies} -> {len(state.combat.enemies)} enemies")
 
 
+def test_intangible_covers_enemy_turn():
+    """Player Intangible gained during the player turn must still be active
+    when the enemies attack that same round (Wraith Form / Incense Burner),
+    and only tick down at the end of the round."""
+    from slay_bench.enums import PowerId
+    state = new_ironclad_game(7)
+    enemy = Cultist(state.rng.hp_rng)
+    start_combat(state, [enemy])
+    # Skip turn 1 (Cultist uses Incantation, no attack)
+    end_player_turn(state)
+    # Turn 2: gain Intangible 1 mid-turn (as Wraith Form would), then end turn.
+    state.player.powers[PowerId.INTANGIBLE] = 1
+    hp_before = state.player.hp
+    state.player.block = 0
+    end_player_turn(state)
+    lost = hp_before - state.player.hp
+    assert lost == 1, f"Intangible should cap the attack at 1 damage, lost {lost}"
+    assert PowerId.INTANGIBLE not in state.player.powers, \
+        "Intangible 1 should be gone after the round ends"
+    print(f"[PASS] Intangible covers enemy turn: lost {lost} HP, ticked after round")
+
+
+def test_enemy_applied_debuff_survives_first_tick():
+    """A debuff an enemy applies during its turn must not tick that same round
+    (StS justApplied rule) — it has to be active on the player's next turn."""
+    from slay_bench.enums import PowerId
+    from slay_bench.cards import _apply_power
+    state = new_ironclad_game(7)
+    enemy = Cultist(state.rng.hp_rng)
+    start_combat(state, [enemy])
+    # Simulate an enemy applying Weak 1 during the enemy phase
+    state.combat.enemy_phase = True
+    _apply_power(state, state.player, PowerId.WEAK, 1)
+    state.combat.enemy_phase = False
+    from slay_bench.combat import _tick_player_debuffs
+    _tick_player_debuffs(state)  # end-of-round tick of the application round
+    assert state.player.powers.get(PowerId.WEAK) == 1, \
+        "just-applied Weak must survive the first end-of-round tick"
+    _tick_player_debuffs(state)  # next round's tick removes it
+    assert PowerId.WEAK not in state.player.powers
+    print("[PASS] Enemy-applied debuff skips its first tick (justApplied)")
+
+
+def test_double_tap_consumes_one_stack_per_attack():
+    """Double Tap with 2 stacks doubles the next TWO attacks (one stack each),
+    not one attack three times."""
+    from slay_bench.enums import PowerId
+    state = new_ironclad_game(3)
+    enemy = Cultist(state.rng.hp_rng)
+    start_combat(state, [enemy])
+    state.player.powers[PowerId.DOUBLE_TAP] = 2
+    state.player.energy = 10
+    strike = next(c for c in state.combat.hand if c.name == "Strike")
+    hp_before = enemy.hp
+    play_card(state, strike, enemy)
+    assert hp_before - enemy.hp == 12, \
+        f"Strike with Double Tap should hit twice (12), dealt {hp_before - enemy.hp}"
+    assert state.player.powers.get(PowerId.DOUBLE_TAP) == 1, \
+        "one Double Tap stack should remain for the next attack"
+    print("[PASS] Double Tap consumes one stack per attack")
+
+
 if __name__ == "__main__":
     tests = [
         test_cultist_fight_determinism,
@@ -153,6 +215,9 @@ if __name__ == "__main__":
         test_block_absorbs_damage,
         test_enemy_hp_range,
         test_slime_splits,
+        test_intangible_covers_enemy_turn,
+        test_enemy_applied_debuff_survives_first_tick,
+        test_double_tap_consumes_one_stack_per_attack,
     ]
     passed = 0
     failed = 0

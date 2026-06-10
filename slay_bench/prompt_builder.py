@@ -201,7 +201,8 @@ def card_reward_raw(offers: List, deck: List, relics: List) -> str:
 
 # ── System prompt templates ───────────────────────────────────────────────────
 
-SYSTEM_TURN = """You are an expert Slay the Spire player controlling the Ironclad.
+_SYSTEM_TEMPLATES = {
+    "turn": """You are an expert Slay the Spire player controlling the {character}.
 Your task: given the current combat state, output the optimal sequence of card plays for this turn.
 
 Rules:
@@ -211,24 +212,37 @@ Rules:
 - End your turn when no more beneficial plays remain.
 
 Output format (JSON array of card indices in play order, then "end_turn"):
-{"plays": [0, 2, 1], "reasoning": "brief explanation"}
-"""
-
-SYSTEM_COMBAT = """You are an expert Slay the Spire player controlling the Ironclad.
+{{"plays": [0, 2, 1], "reasoning": "brief explanation"}}
+""",
+    "combat": """You are an expert Slay the Spire player controlling the {character}.
 Each turn you will receive the combat state and must decide which card to play next (or end your turn).
 
 Output format (JSON):
-{"action": "play", "card_index": 0, "target_index": 0, "reasoning": "..."}
+{{"action": "play", "card_index": 0, "target_index": 0, "reasoning": "..."}}
 OR
-{"action": "end_turn", "reasoning": "..."}
-"""
-
-SYSTEM_SYNERGY = """You are an expert Slay the Spire deckbuilder evaluating an Ironclad run.
+{{"action": "end_turn", "reasoning": "..."}}
+""",
+    "synergy": """You are an expert Slay the Spire deckbuilder evaluating a {character} run.
 Analyze the deck and relics, then answer the questions asked.
 Output format: JSON object with keys matching the questions.
-"""
-
-SYSTEM_RUN = """You are an expert Slay the Spire player making run-level decisions for the Ironclad.
+""",
+    "run": """You are an expert Slay the Spire player making run-level decisions for the {character}.
 You will be asked to make decisions at each node: which card to pick, which path to take, what to do at rest sites.
 Always output valid JSON matching the requested format.
-"""
+""",
+}
+
+_CHARACTER_TITLES = {"ironclad": "Ironclad", "silent": "Silent"}
+
+
+def system_prompt(kind: str, character: str = "ironclad") -> str:
+    """Character-aware system prompt ('turn' | 'combat' | 'synergy' | 'run')."""
+    name = _CHARACTER_TITLES.get(character, character.title())
+    return _SYSTEM_TEMPLATES[kind].format(character=name)
+
+
+# Ironclad-formatted constants kept for backwards compatibility.
+SYSTEM_TURN = system_prompt("turn")
+SYSTEM_COMBAT = system_prompt("combat")
+SYSTEM_SYNERGY = system_prompt("synergy")
+SYSTEM_RUN = system_prompt("run")

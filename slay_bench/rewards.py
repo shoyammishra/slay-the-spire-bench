@@ -43,6 +43,14 @@ _IRONCLAD_POOL = {
 }
 
 
+def card_pool_for(state: GameState) -> dict:
+    """Rarity → card-name pool for the state's character."""
+    if getattr(state, "character", "ironclad") == "silent":
+        from .cards_silent import SILENT_POOL
+        return SILENT_POOL
+    return _IRONCLAD_POOL
+
+
 def _roll_rarity(state: GameState) -> CardRarity:
     act = min(state.act, 3) - 1
     common_w = _RARITY_WEIGHTS[CardRarity.COMMON][act]
@@ -61,7 +69,9 @@ def _roll_rarity(state: GameState) -> CardRarity:
 
 def generate_card_reward(state: GameState, count: int = 3) -> List[Card]:
     """Generate a card reward offer (3 cards, no duplicates)."""
-    from .cards import make_card
+    from .cards import make_card_for
+    character = getattr(state, "character", "ironclad")
+    char_pool = card_pool_for(state)
     offers: List[Card] = []
     seen_names = set()
 
@@ -69,7 +79,7 @@ def generate_card_reward(state: GameState, count: int = 3) -> List[Card]:
     while len(offers) < count and attempts < 50:
         attempts += 1
         rarity = _roll_rarity(state)
-        pool = _IRONCLAD_POOL[rarity]
+        pool = char_pool[rarity]
         idx = state.rng.card_rng.next_int(len(pool))
         name = pool[idx]
         if name in seen_names:
@@ -81,7 +91,7 @@ def generate_card_reward(state: GameState, count: int = 3) -> List[Card]:
         if rarity == CardRarity.RARE and state.rng.card_rng.next_int(100) < 25:
             upgraded = True
 
-        offers.append(make_card(name, upgraded))
+        offers.append(make_card_for(character, name, upgraded))
 
     return offers
 
@@ -101,6 +111,9 @@ def gold_reward(state: GameState, enemy_type: str = "normal") -> int:
     base = {"normal": (10, 20), "elite": (25, 35), "boss": (95, 105)}
     lo, hi = base.get(enemy_type, (10, 20))
     gold = lo + state.rng.loot_rng.next_int(hi - lo + 1)
+    # Ectoplasm: no gold (roll first so the RNG stream stays seed-stable)
+    if getattr(state.player, "_no_gold", False):
+        return 0
     # Golden Idol: +25%
     return gold
 
@@ -109,5 +122,8 @@ def potion_drop(state: GameState, enemy_type: str = "normal") -> bool:
     """Should a potion drop? Returns True/False."""
     # Base 40% for normal, 50% for elite
     chance = 40 if enemy_type == "normal" else 50
-    # Sozu relic: no potions
-    return state.rng.potion_rng.next_int(100) < chance
+    dropped = state.rng.potion_rng.next_int(100) < chance
+    # Sozu: no potions (roll first so the RNG stream stays seed-stable)
+    if getattr(state.player, "_no_potions", False):
+        return False
+    return dropped

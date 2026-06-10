@@ -65,6 +65,23 @@ class PowerId(str, Enum):
     EVOLVE = "Evolve"
     RUPTURE = "Rupture"
 
+    # Silent player powers
+    NOXIOUS_FUMES = "Noxious Fumes"
+    ENVENOM = "Envenom"
+    THOUSAND_CUTS = "A Thousand Cuts"
+    AFTER_IMAGE = "After Image"
+    ACCURACY = "Accuracy"
+    INFINITE_BLADES = "Infinite Blades"
+    TOOLS_OF_THE_TRADE = "Tools of the Trade"
+    WRAITH_FORM = "Wraith Form"
+    BURST = "Burst"
+    BLUR = "Blur"
+    PHANTASMAL = "Phantasmal Killer"   # double damage takes effect NEXT turn
+    DOUBLE_DAMAGE = "Double Damage"    # active this turn
+    NEXT_TURN_BLOCK = "Next Turn Block"
+    NEXT_TURN_DRAW = "Next Turn Draw"
+    WELL_LAID_PLANS = "Well-Laid Plans"
+
     # Debuffs (player or enemy)
     WEAK = "Weak"
     VULNERABLE = "Vulnerable"
@@ -78,6 +95,8 @@ class PowerId(str, Enum):
     SHACKLED = "Shackled"
 
     # Enemy powers
+    CHOKED = "Choked"                  # enemy loses HP per card played
+    CORPSE_EXPLOSION = "Corpse Explosion"  # on death, damage other enemies
     THORNS = "Thorns"
     RITUAL = "Ritual"
     CURL_UP = "Curl Up"

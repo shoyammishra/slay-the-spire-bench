@@ -315,8 +315,10 @@ def run_act(state: GameState, act: int,
             summary["survived"] = False
             return summary
 
-        # Pick next node (greedy: first available)
-        next_nodes = run.available_next_nodes()
+        # Pick next node (greedy: first available); exclude the boss, which is
+        # fought once in the dedicated block below
+        next_nodes = [n for n in run.available_next_nodes()
+                      if n is not game_map.boss_node]
         if next_nodes:
             queue.append(next_nodes[0])
 

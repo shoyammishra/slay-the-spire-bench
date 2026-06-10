@@ -43,6 +43,31 @@ def register_power_hooks(state: GameState) -> None:
         if PowerId.ENERGIZED in player.powers:
             player.energy += player.powers.pop(PowerId.ENERGIZED)
 
+        # Noxious Fumes: poison all enemies
+        if PowerId.NOXIOUS_FUMES in player.powers:
+            from .cards import _apply_power
+            for e in gs.combat.enemies:
+                if e.hp > 0:
+                    _apply_power(gs, e, PowerId.POISON,
+                                 player.powers[PowerId.NOXIOUS_FUMES])
+
+        # Infinite Blades: add a Shiv to hand
+        if PowerId.INFINITE_BLADES in player.powers:
+            from .cards import _add_card_to_hand
+            from .cards_silent import Shiv
+            for _ in range(player.powers[PowerId.INFINITE_BLADES]):
+                _add_card_to_hand(gs, Shiv())
+
+        # Tools of the Trade: draw 1, discard 1
+        if PowerId.TOOLS_OF_THE_TRADE in player.powers:
+            from .cards import _draw_cards, _discard_from_hand, _auto_discard_choice
+            n = player.powers[PowerId.TOOLS_OF_THE_TRADE]
+            _draw_cards(gs, n)
+            for _ in range(n):
+                pick = _auto_discard_choice(gs)
+                if pick:
+                    _discard_from_hand(gs, pick)
+
     bus.subscribe(Event.TURN_START, on_turn_start)
 
     # ── Turn End hooks ────────────────────────────────────────────────────────
@@ -82,16 +107,21 @@ def register_power_hooks(state: GameState) -> None:
         #           simplified here: just note the shackle amount)
         # (Full Shackled implementation would require turn-start restoration)
 
-        # Burn cards in hand deal damage
+        # Wraith Form: lose 1 Dexterity each turn it is active
+        if PowerId.WRAITH_FORM in player.powers:
+            player.powers[PowerId.DEXTERITY] = player.powers.get(PowerId.DEXTERITY, 0) - 1
+            if player.powers[PowerId.DEXTERITY] == 0:
+                del player.powers[PowerId.DEXTERITY]
+
+        # Well-Laid Plans: retain up to N cards (least valuable kept simple: first N)
+        if PowerId.WELL_LAID_PLANS in player.powers:
+            for card in gs.combat.hand[:player.powers[PowerId.WELL_LAID_PLANS]]:
+                card._temp_retain = True
+
+        # Burn / curse cards in hand deal their end-of-turn effects
         for card in list(gs.combat.hand):
             if hasattr(card, 'end_of_turn_effect'):
                 card.end_of_turn_effect(gs)
-
-        # Pain curse
-        for card in (gs.combat.draw_pile + gs.combat.hand + gs.combat.discard_pile):
-            if card.__class__.__name__ in ('Decay', 'Doubt', 'Regret', 'Shame') and hasattr(card, 'end_of_turn_effect'):
-                if card in gs.combat.hand or card in gs.combat.draw_pile or card in gs.combat.discard_pile:
-                    pass  # Already handled via hand iteration above for hand cards
 
     bus.subscribe(Event.TURN_END, on_turn_end)
 
@@ -106,8 +136,26 @@ def register_power_hooks(state: GameState) -> None:
             from .cards import _gain_block
             _gain_block(gs, player.powers[PowerId.RAGE])
 
-        # Pain curse: lose 1 hp on any card play
-        for c in (gs.combat.draw_pile + gs.combat.hand + gs.combat.discard_pile):
+        # A Thousand Cuts: damage all enemies on any card play
+        if PowerId.THOUSAND_CUTS in player.powers:
+            from .cards import _apply_damage_to_enemy
+            for e in gs.combat.enemies:
+                if e.hp > 0:
+                    _apply_damage_to_enemy(gs, e, player.powers[PowerId.THOUSAND_CUTS])
+
+        # After Image: gain block on any card play
+        if PowerId.AFTER_IMAGE in player.powers:
+            from .cards import _gain_block
+            _gain_block(gs, player.powers[PowerId.AFTER_IMAGE])
+
+        # Choke: choked enemies lose HP per card played
+        for e in gs.combat.enemies:
+            if e.hp > 0 and PowerId.CHOKED in e.powers:
+                e.hp -= e.powers[PowerId.CHOKED]
+
+        # Pain curse: while in HAND, lose 1 HP on any other card play (StS rule;
+        # copies in the draw/discard piles do nothing)
+        for c in gs.combat.hand:
             if c.__class__.__name__ == 'Pain':
                 from .cards import _damage_player
                 _damage_player(gs, 1, is_hp_loss=True)
@@ -191,6 +239,13 @@ def register_power_hooks(state: GameState) -> None:
     def on_enemy_death(gs: GameState, target: Enemy = None, **kw):
         if target and hasattr(target, 'on_death'):
             target.on_death(gs)
+
+        # Corpse Explosion: on death, deal the enemy's max HP to all others
+        if target and PowerId.CORPSE_EXPLOSION in target.powers:
+            from .cards import _apply_damage_to_enemy
+            for e in gs.combat.enemies:
+                if e is not target and e.hp > 0:
+                    _apply_damage_to_enemy(gs, e, target.max_hp)
 
     bus.subscribe(Event.ENEMY_DEATH, on_enemy_death)
 
