@@ -138,6 +138,11 @@ def main():
     out_dir = Path(args.out_dir)
     out_dir.mkdir(exist_ok=True)
     safe_model = args.model.replace("/", "-").replace(":", "-")
+    # Character tag keeps Silent results from overwriting Ironclad files (and
+    # from cross-merging dimensions between characters). Ironclad stays untagged
+    # for backwards compatibility with existing result files.
+    if args.character != "ironclad":
+        safe_model = f"{safe_model}_{args.character}"
 
     if len(seeds) == 1:
         # Single-seed path (backwards-compatible)
