@@ -45,12 +45,21 @@
 
 1. ~~**Merge `synergy-rework` → main.**~~ DONE 2026-06-10 (merge commit `6398bb1`,
    47/47 tests verified on main). Work continues on main.
-2. **(Optional) refresh synergy at n=20 on the free tier.** Synergy is 1 light call per
-   sample — free Groq sustains it (~10–20 min per model×format). Worth doing because the
-   n=8 numbers predate the pick-coercion fix (a model answering `"1"` as a string is now
-   scored correct) and n=20 halves the step size to 5pp. Run:
-   `--only synergy --n-synergy 20` ×4 combos, then `--character silent` ×4.
-   Turn-level (1 call/sample) is also free-tier-feasible if needed for a demo.
+2. ~~**Refresh synergy at n=20 on the free tier.**~~ DONE 2026-06-10 — **all 8 combos** have
+   clean n=20 (Ironclad + Silent, both models, both formats), re-run on the **de-biased
+   instrument** (commit `5db7063`). Headline result airtight: Exhaust 5% / Discard 5% pooled
+   vs 85–95% for surface-readable archetypes; card-pick survived de-biasing (0.65–0.75 ≠
+   chance). Full numbers in docs/experiment_log.md.
+3. **Paper-grade synergy = error bars (the remaining gap, free-tier-feasible).** The n=20
+   numbers are point estimates at seed=42 (one deterministic fixture pass — no variance to
+   std over). Close it ONE of two ways, both supported by the harness:
+   - **k-sampling at temp>0:** `--only synergy --n-synergy 20 --temperature 0.7` ×8 combos,
+     repeated k≥5 times → mean±std per metric (sampling variance on a fixed exam).
+   - **seed sweep:** `--only synergy --n-synergy 20 --seeds 42 142 242 342 442` ×8 combos →
+     per-seed JSON + auto-aggregated mean±std (the `_aggregate_summaries` path, key-bug-fixed).
+   Either yields the mean±std synergy tables the paper needs. **This is the planned next-session
+   task** (along with re-confirming all 8 clean n=20). Turn-level (1 call/sample) is also
+   free-tier-feasible if a demo is wanted; turn/combat/run paper-grade still need paid Groq.
 
 ## Paper-grade run matrix (M3)
 
