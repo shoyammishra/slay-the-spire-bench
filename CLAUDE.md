@@ -11,7 +11,7 @@ GitHub: https://github.com/shoyammishra/slay-the-spire-bench (public)
 
 ## Active Context
 
-- **Status:** In progress — synergy REDESIGNED to hand-crafted decks + RE-RUN at n=8 (done). Run-level re-run BLOCKED by free-tier Groq TPM (see below). qwen3 DROPPED. **A* acceptance changes IMPLEMENTED (2026-06-10):** Silent character + multi-act + temperature + multi-seed CLI — all code-side. Awaiting paid Groq for actual runs.
+- **Status:** In progress. `synergy-rework` MERGED to main (`6398bb1`) + branch deleted. **Synergy RE-RUN at n=20 for BOTH characters (2026-06-10):** 7 of 8 combos got clean n=20 (1 combo — llama Ironclad structured — rate-limited, kept old n=8). Silent is first-ever synergy data. Run-level still BLOCKED by free-tier Groq TPM. qwen3 DROPPED. 21-bug sweep done (47 tests). Awaiting paid Groq for turn/combat/run.
 - **Current task:** Run-level n=3 re-run is blocked on free Groq's 6000 TPM cap (run-level is too token-heavy — hundreds of stateful calls; one prompt alone requests ~3367 tok and trips 429 on nearly every call). Need PAID Groq Dev tier to scale run-level + everything else to n≥20. Synergy n=8 already re-run with hand-crafted fixtures.
 - **⛔ ALL existing run-level numbers INVALID (2026-06-07):** the run-level data in `results/*.json` (llama 20%/40%, 13.4 floors; scout floors=5) is from OLD pre-fix code (predates map dead-end + EventBus stacking + `_safe_int` fixes). IGNORE it — run-level has NO valid data yet. A clean pass is pending + blocked on free TPM. (report.md/findings.md/report.html now all EXCLUDE run-level — do not re-introduce the old 13.4/20–40% figures.)
 - **⚠️ Run-level blocked on free tier (2026-06-07):** `--only run --n-run 3` on llama-3.1-8b hit the 6000 TPM wall — structured completed 0 runs (kept prior valid run results via partial-save), raw hung in an infinite retry loop and was Ctrl-C'd. Free Groq sustains ~2 calls/min; a single run needs dozens-to-hundreds → infeasible. Partial-save logic worked: existing run-level + fresh synergy results both intact. **Unblock = paid Groq Dev tier** (the 429 error itself recommends it). This is the same lever needed for paper-grade n≥20.
@@ -23,6 +23,7 @@ GitHub: https://github.com/shoyammishra/slay-the-spire-bench (public)
 - **Next:** After the 2026-06-10 bug sweep, turn/combat pilot numbers are stale too (debuff-timing fix changed combat dynamics) — only synergy n=8 survives. So ALL dims need fresh paid-Groq runs; the roadmap run order is now cheapest→most expensive (smoke → turn/combat → synergy → run-level) to validate the pipeline before the big run-level spend. ~~Merge `synergy-rework`→main~~ DONE 2026-06-10 (`6398bb1`). Still doable NOW on free tier: optionally refresh synergy at n=20 (1 light call/sample). See `docs/roadmap.md`.
 - **Provider note:** llama models on Groq. Reasoning models (qwen3 etc.) require a paid tier — do not benchmark on free tiers.
 - **⚠️ GOTCHA — running process uses startup code:** a launched Python run loads `benchmark.py` once at startup; editing it does NOT affect an in-flight run. Re-launch or use `--only` to pick up code changes.
+- **⚠️ GOTCHA — use the venv Python for real runs:** the system Python (`WindowsApps\python.exe`) has NO `groq`/`dotenv`/`matplotlib`. Real benchmark runs MUST use `.venv\Scripts\python.exe`. (Tests + mock runs work on either.) A run launched with bare `python` dies instantly with `ModuleNotFoundError: groq` → `RuntimeError: pip install groq`.
 - **Remaining run plan (reordered 2026-06-10, cheapest→most expensive):** (0) ~~merge `synergy-rework` → main~~ DONE (`6398bb1`; work continues on main); (1) paid smoke test (tiny full pass); (2) turn+combat n≥20 ×5 seeds ×4 combos (re-baseline — pre-sweep numbers stale); (3) synergy n=20 ×2 characters (+temp 0.7 k-sampling); (4) run-level n≥20 ×5 seeds (biggest spend, last of core); (5) 3rd-family model repeats 2–4; (6) optional: `--acts 3`, `--llm-routing`, Silent run-level. Full checklist in `docs/roadmap.md`.
 - **Speed:** Paid Groq (~400–1000 tok/s, no TPM cap) is the real speedup lever for n≥20 — see docs/notes.md.
 - **➡️ Next steps = the paper-grade run matrix in `docs/roadmap.md`** (models, per-dim n≥20, ≥5 seeds, both formats, mean±std, run order). When a paid Groq Dev tier is available: smoke test first, then turn/combat (cheap re-baseline), then synergy ×2 characters, then run-level (most expensive — run once the pipeline is proven), then a 3rd-family model.
@@ -172,35 +173,37 @@ Output files per run (overwrites if same model+format+seed):
 - **Synergy archetype mislabeling (3rd synergy fix, 2026-06-07)**: post-2nd-rework `--only synergy` gave archetype_acc=0 on ALL 4 llama combos (incl. raw, normally 100%) with parse_ok=1.0 — the heuristic was mislabeling decks, not the models failing. seed 244 → "Exhaust" with zero Exhaust cards (Armaments/Headbutt are miscategorized in the broad `_ARCHETYPES` list); seed 242 a 4/5/4/3 near-tie decided by a generic common (Corruption 3× payoff overruled). Fixed: added `_classify_archetype_confident()` — LABEL now decided by **signature cards only** (`_ARCHETYPE_PAYOFFS` + relics); deck is confidently labeled only if one archetype uniquely owns the most signatures, else **ambiguous** → `archetype_correct=None` → excluded from acc. `_classify_archetype` unchanged (still drives draft coherence / best-pick). Synergy JSON now persists per-sample `expert_archetype`/`model_archetype`/`confident` + `archetype_n_scored`/`archetype_n_ambiguous`. **Post-2nd-rework archetype numbers INVALID — re-run `--only synergy`, and bump n_synergy (~1/3 of seeds land a clean signature at small pools).** See docs/findings.md.
 - **null/string LLM indices crashed combat (2026-06-07)**: a model returning `"target_index": null` crashed run-level with `TypeError: None < int`. Added `_safe_int()`; applied to both `RunEvaluator._llm_combat` and `CombatEvaluator` (same latent bug). Regression test added.
 - **qwen3-32b reasoning model (wired, then DROPPED)**: outputs `<think>...</think>` blocks. `complete_json` strips them; `max_tokens` raised to 3000 (Groq) / 8000 (OpenRouter). `OpenRouterLLM.complete` retries 429s + network drops with backoff and fails fast on 402. **Dropped from the study:** Groq free-tier TPM (6000) truncates it mid-think (parse-failure cascade, 0%), and OpenRouter free tier is too slow (~30–80 tok/s) and hit 402 Payment Required. A reasoning model needs a PAID tier to benchmark viably. Result files deleted.
+- **synergy-instrument bias (2026-06-10, `5db7063`)**: auditing the n=20 results found the synergy *instrument* was biased, independent of model behavior. (1) **Positional confound** — hand-written fixtures put the expert best-pick at offer index 0 in 35/40 cases (Silent 20/20); an always-"0" model scored 75% (IC) / 100% (Silent) card-pick. Fixed: `run_synergy_eval` deterministically rotates each offer list so the correct index cycles 0→1→2 (uniform, invisible to the stateless model; always-0 now ≈0.33). (2) **Mislabeled fixture** `ironclad#18` (Exhaust): offers `[Fiend Fire, Iron Wave, Defend]` had pick=2 (Defend) — Fiend-Fire pickers scored wrong; fixed to 0. (3) **Ambiguous offer** `ironclad#16`: Anger is on the Strength list next to Limit Break → replaced with Shrug It Off. (4) **Archetype substring match** scored multi-name answers / option-list echoes as correct → now requires exactly one named archetype = expert's. (5) Per-sample JSON now persists `expert_pick_idx`/`model_pick`/`model_removal` (the bias had been unmeasurable from saved results). 3 regression tests incl. executable fixture design-rules for all 40 fixtures. **All 8 combos re-run de-biased** — archetype/removal numbers held; card-pick survived (0.65–0.75, not chance), confirming name-vs-play dissociation is real.
 
-## Current Results (seed=42; turn n=5, combat n=3, synergy n=8). Run-level EXCLUDED (no valid data).
-Polished shareable report: `docs/report.html`. Full detail: `docs/findings.md`, `docs/experiment_log.md`.
+## Current Results — Synergy n=20, both characters (seed=42, 2026-06-10).
+⚠️ Turn/combat pilot numbers below are PRE-BUG-SWEEP and now STALE (the debuff-timing fix
+changed combat dynamics) — kept only as history; re-run needed. **Synergy is the current valid
+dimension.** Run-level still has NO valid data. Full detail: `docs/experiment_log.md`, `docs/findings.md`.
 
-### llama-3.1-8b-instant
-| Metric | Structured | Raw |
-|---|---|---|
-| Turn damage ratio | 36.7% | 69.6% |
-| Turn legal rate | 60% | 100% |
-| Combat win rate | 100% | 100% |
-| Combat HP ratio | 112.3% | 113.8% |
-| Synergy archetype (n=8) | 50.0% | 37.5% |
-| Synergy best card (n=8) | 100% | 62.5% |
-| Synergy removal (n=8) | 25.0% | 12.5% |
+### Synergy n=20 (CURRENT, de-biased instrument) — archetype / card-pick / removal
+| Character | Model | structured | raw |
+|---|---|---|---|
+| Ironclad | llama-3.1-8b | 0.55 / 0.65 / 0.15 | 0.40 / 0.65 / 0.05 |
+| Ironclad | scout-17b | 0.70 / 0.75 / 0.25 | 0.45 / 0.70 / 0.15 |
+| Silent | llama-3.1-8b | 0.75 / 0.35 / 0.15 | 0.60 / 0.65 / 0.15 |
+| Silent | scout-17b | 0.75 / 0.70 / **0.60** | **0.80 / 0.75** / 0.20 |
 
-### meta-llama/llama-4-scout-17b
-| Metric | Structured | Raw |
-|---|---|---|
-| Turn damage ratio | 49.8% | 37.5% |
-| Turn legal rate | 100% | 100% |
-| Combat win rate | 100% | 100% |
-| Combat HP ratio | 111.4% | 103.5% |
-| Synergy archetype (n=8) | 75.0% | 50.0% |
-| Synergy best card (n=8) | 75.0% | 100% |
-| Synergy removal (n=8) | 25.0% | 12.5% |
+**Per-archetype archetype-ID (all 8 combos pooled):** Aggro 95%, Poison 95%, Shiv 90%, Block
+85%, Strength 40%, **Exhaust 5%, Discard 5%**.
 
-**Per-archetype ID (8 attempts each = 2 decks × 2 models × 2 formats):** Block 7/8, Aggro 8/8, Strength 2/8, **Exhaust 0/8 (always "Aggro")**.
+**Key synergy findings (n=20, de-biased):** (1) **Mechanic-defined archetypes are a
+cross-character blind spot — airtight:** Exhaust (IC) 5% AND Discard (Si) 5% pooled, vs 85–95%
+for surface-readable archetypes; both are the payoff-loop archetype, not a keyword. (2)
+**Name-vs-play dissociation is REAL not an artifact** — card-pick held at 0.65–0.75 after
+de-biasing (always-0 would now score ~0.33). (3) Silent archetype-ID ≥ Ironclad (0.60–0.80 vs
+0.40–0.70). (4) scout-17b Silent structured removal 0.60 standout; removal near-floor
+(0.05–0.25) elsewhere. (5) parse_ok=1.0 everywhere. See docs/findings.md.
 
-Key findings (from hand-crafted n=8 fixtures): (1) **Exhaust archetype never recognised** — every model/format calls it "Aggro" despite signature cards. (2) **Name-vs-play dissociation** — card-pick high (62.5–100%) even on decks the model can't label. (3) **Removal near-zero** (12.5–25%) — models cut situational cards, not basic Strike. (4) **No single format wins** — raw helps llama card-pick, structured helps scout archetype ID. See docs/findings.md.
+### Turn/combat — STALE pilot (pre-sweep, seed=42, turn n=5 / combat n=3), history only
+| Model | Turn dmg (S/R) | Turn legal (S/R) | Combat win (S/R) | Combat HP (S/R) |
+|---|---|---|---|---|
+| llama-3.1-8b | 36.7% / 69.6% | 60% / 100% | 100% / 100% | 112.3% / 113.8% |
+| scout-17b | 49.8% / 37.5% | 100% / 100% | 100% / 100% | 111.4% / 103.5% |
 
 ## Available Groq Models (as of 2026-06-07)
 - `llama-3.1-8b-instant` — small, fast (tested)

@@ -1,5 +1,64 @@
 # Experiment Log
 
+## 2026-06-10 — Synergy n=20, both characters, DE-BIASED instrument (CURRENT valid synergy data)
+
+**Config:** `--only synergy --n-synergy 20`, seed=42, free Groq, post-bug-sweep code.
+8 runs = 2 models × 2 formats × {Ironclad, Silent}. Silent is **first-ever synergy data**.
+Ran via `.venv\Scripts\python.exe` (system Python lacks `groq` — gotcha logged below).
+
+⚠️ **These numbers REPLACE an earlier biased run from the same day.** The first n=20 pass
+ran on a synergy instrument with a positional confound (expert pick was at offer index 0 in
+35/40 fixtures) + one mislabeled fixture; those card-pick numbers were not interpretable.
+Fixed in commit `5db7063` (offer rotation cycles the correct index 0→1→2; fixture #18 pick
+corrected; strict single-name archetype match) and re-run. Rotation verified: expert-pick
+position is now uniform {0:7,1:7,2:6} and the model spreads its answers {0:5,1:9,2:6} rather
+than parroting 0. See "Bugs Fixed" #synergy-instrument in CLAUDE.md.
+
+| Character | Model | Format | n | Archetype | Card Pick | Removal | Parse |
+|---|---|---|---|---|---|---|---|
+| Ironclad | llama-3.1-8b | structured | 20 | 0.55 | 0.65 | 0.15 | 1.0 |
+| Ironclad | llama-3.1-8b | raw | 20 | 0.40 | 0.65 | 0.05 | 1.0 |
+| Ironclad | scout-17b | structured | 20 | 0.70 | 0.75 | 0.25 | 1.0 |
+| Ironclad | scout-17b | raw | 20 | 0.45 | 0.70 | 0.15 | 1.0 |
+| Silent | llama-3.1-8b | structured | 20 | 0.75 | 0.35 | 0.15 | 1.0 |
+| Silent | llama-3.1-8b | raw | 20 | 0.60 | 0.65 | 0.15 | 1.0 |
+| Silent | scout-17b | structured | 20 | 0.75 | 0.70 | **0.60** | 1.0 |
+| Silent | scout-17b | raw | 20 | **0.80** | **0.75** | 0.20 | 1.0 |
+
+**Per-archetype archetype-ID, all 8 combos pooled (20 attempts each, 40 for Block):**
+
+| Archetype | Correct | Character |
+|---|---|---|
+| Aggro | 19/20 = 95% | Ironclad |
+| Poison | 19/20 = 95% | Silent |
+| Shiv | 18/20 = 90% | Silent |
+| Block | 34/40 = 85% | both |
+| Strength | 8/20 = 40% | Ironclad |
+| **Exhaust** | **1/20 = 5%** | Ironclad |
+| **Discard** | **1/20 = 5%** | Silent |
+
+**Key results (n=20, both characters, de-biased):**
+- **Mechanic-defined archetypes are the universal blind spot — now airtight.** Pooled over
+  all 8 combos, **Exhaust 5% and Discard 5%** sit far below every surface-readable archetype
+  (Aggro/Poison/Shiv/Block 85–95%). Both characters' miss is exactly the archetype defined by
+  a *payoff mechanic* (exhaust / discard), not a card-name keyword. Strength (40%) is the
+  intermediate case — frequently "Aggro" because Strength decks are Strike-heavy.
+- **Card-pick survived de-biasing** (0.65–0.75 for both models on most combos, vs ~0.33
+  chance) — so the **name-vs-play dissociation is real, not a positional artifact**: models
+  judge local card quality well even on decks they cannot label. (The lone exception, Silent
+  llama structured at 0.35, is a genuine weak spot, not the old bias.)
+- **Silent archetype-ID ≥ Ironclad** (0.60–0.80 vs 0.40–0.70). Plausibly Silent labels
+  (Poison/Shiv/Block/Discard) read more literally off the cards than Ironclad's abstractions.
+- **scout-17b Silent structured removal 0.60** is still the standout — the removal blind spot
+  is much weaker on Silent for the bigger model. Removal stays near-floor (0.05–0.25)
+  everywhere else.
+- parse_ok = 1.0 everywhere.
+
+**Caveat:** all 8 are seed=42 only (one fixture pass; deterministic). For paper-grade error
+bars still need `--temperature 0.7` k-sampling or a seed sweep — the harness supports both.
+
+---
+
 ## 2026-06-10 — No new runs; harness extended for A* acceptance (code-only)
 
 **Status:** No experiments — run-level remains blocked on free Groq TPM (paid tier pending).

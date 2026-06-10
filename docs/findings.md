@@ -1,5 +1,40 @@
 # Findings
 
+## ⭐ Mechanic-defined archetypes are a cross-character blind spot (n=20 de-biased, 2026-06-10)
+
+The strongest synergy signal, confirmed across BOTH characters at n=20 on a **de-biased
+instrument** (see synergy-instrument fix below): models fail to identify the one archetype
+defined by a *payoff mechanic* rather than a surface card-name pattern. Pooled per-archetype
+archetype-ID accuracy over all 8 model×format×character combos:
+
+| Archetype | Acc | | Archetype | Acc |
+|---|---|---|---|---|
+| Aggro (IC)  | 95% | | Strength (IC) | 40% |
+| Poison (Si) | 95% | | **Exhaust (IC)** | **5%** |
+| Shiv (Si)   | 90% | | **Discard (Si)** | **5%** |
+| Block (both)| 85% | | | |
+
+- **Ironclad Exhaust → 1/20 (5%)** (labeled "Aggro", sometimes "Strength") even with
+  Corruption / Feel No Pain / Dark Embrace / Fiend Fire signatures present.
+- **Silent Discard → 1/20 (5%)** (always "Block" or "Shiv"). Same shape, one character over.
+- Surface-readable archetypes (Aggro/Poison/Shiv/Block) all 85–95%. Strength (40%) is the
+  intermediate case — frequently "Aggro" because Strength decks are Strike-heavy.
+
+**Why it matters for the paper:** a clean, mechanistic, reproducible failure mode that the
+multi-horizon decomposition isolates — the model picks good cards locally (dissociation below)
+but cannot name the *strategy* when the strategy is a payoff loop rather than a keyword. Two
+characters give it cross-domain support within one engine, and the two blind-spot archetypes
+are the structurally analogous ones (exhaust-payoff ↔ discard-payoff).
+
+**Name-vs-play dissociation is REAL, not an artifact.** Card-pick held at 0.65–0.75 after the
+instrument was de-biased (a model that always answered offer-index-0 would now score ~0.33).
+So models judge local card quality well even on decks they cannot label. (Lone weak spot:
+Silent llama structured 0.35 — genuine, not the old positional bias.)
+
+**Secondary (n=20):** Silent archetype-ID ≥ Ironclad (0.60–0.80 vs 0.40–0.70), plausibly
+because Silent labels read literally off the cards. scout-17b Silent structured removal 0.60
+is the standout; removal near-floor (0.05–0.25) everywhere else. Full table: docs/experiment_log.md.
+
 ## ⛔ Existing run-level numbers are INVALID — do not report (2026-06-07)
 
 The run-level results currently sitting in the `results/*.json` files (llama-3.1-8b
