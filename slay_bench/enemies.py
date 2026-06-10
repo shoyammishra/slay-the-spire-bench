@@ -49,13 +49,23 @@ class Enemy:
 
 # ── helpers ───────────────────────────────────────────────────────────────────
 
-def _enemy_attack(state: GameState, enemy: Enemy, move: Move) -> None:
-    from .cards import _damage_player
-    from .events import Event
+def effective_move_damage(enemy: Enemy, move: Move) -> int:
+    """Per-hit damage of a move after the enemy's Strength and Weak.
+    Single source of truth shared by combat execution AND the prompt builder,
+    so the intent shown to the LLM matches the damage that actually lands
+    (real StS displays the adjusted number; Vulnerable on the player is
+    applied separately at damage time)."""
     strength = enemy.powers.get(PowerId.STRENGTH, 0)
     per_hit = max(0, move.damage + strength)
     if PowerId.WEAK in enemy.powers:
         per_hit = math.floor(per_hit * 0.75)
+    return per_hit
+
+
+def _enemy_attack(state: GameState, enemy: Enemy, move: Move) -> None:
+    from .cards import _damage_player
+    from .events import Event
+    per_hit = effective_move_damage(enemy, move)
     # Vulnerable on player handled in _damage_player
     for _ in range(move.hits):
         _damage_player(state, per_hit)
@@ -167,7 +177,9 @@ class RedLouse(Enemy):
             if roll < 25:
                 self.current_move = Move("Grow", IntentType.BUFF)
             else:
-                self.current_move = Move("Bite", IntentType.ATTACK, damage=5 + self.powers.get(PowerId.STRENGTH, 0), hits=1)
+                # Base damage only — _enemy_attack adds Strength at execution
+                # (baking it in here double-counted Grow stacks: 5+str dealt +str again)
+                self.current_move = Move("Bite", IntentType.ATTACK, damage=5, hits=1)
         return self.current_move
 
     def execute_move(self, state):

@@ -206,6 +206,29 @@ def test_double_tap_consumes_one_stack_per_attack():
     print("[PASS] Double Tap consumes one stack per attack")
 
 
+def test_red_louse_strength_not_double_counted():
+    """RedLouse baked Strength into its Bite move at select time, then
+    _enemy_attack added Strength again — after one Grow it dealt 11 not 8."""
+    from slay_bench.enums import PowerId
+    from slay_bench.enemies import RedLouse, _enemy_attack
+    state = new_ironclad_game(5)
+    louse = RedLouse(state.rng.hp_rng)
+    start_combat(state, [louse])
+    louse.powers[PowerId.STRENGTH] = 3
+    louse._first = False
+    # Roll moves until Bite comes up (75% per roll, deterministic stream)
+    for _ in range(50):
+        if louse.select_move(state).name == "Bite":
+            break
+    assert louse.current_move.name == "Bite"
+    state.player.block = 0
+    hp_before = state.player.hp
+    _enemy_attack(state, louse, louse.current_move)
+    dealt = hp_before - state.player.hp
+    assert dealt == 8, f"Bite with 3 Strength should deal 5+3=8, dealt {dealt}"
+    print("[PASS] RedLouse Strength applied once (5+3=8)")
+
+
 if __name__ == "__main__":
     tests = [
         test_cultist_fight_determinism,
@@ -218,6 +241,7 @@ if __name__ == "__main__":
         test_intangible_covers_enemy_turn,
         test_enemy_applied_debuff_survives_first_tick,
         test_double_tap_consumes_one_stack_per_attack,
+        test_red_louse_strength_not_double_counted,
     ]
     passed = 0
     failed = 0

@@ -22,6 +22,7 @@ def _card_summary(card) -> dict:
 
 
 def _enemy_summary(e) -> dict:
+    from .enemies import effective_move_damage
     intent = None
     if e.current_move:
         intent = {
@@ -29,7 +30,9 @@ def _enemy_summary(e) -> dict:
             "intent": e.current_move.intent.name,
         }
         if e.current_move.damage:
-            intent["damage"] = e.current_move.damage
+            # Show Strength/Weak-adjusted damage (what will actually land),
+            # like the real game's intent display — not the move's base value.
+            intent["damage"] = effective_move_damage(e, e.current_move)
             intent["hits"] = e.current_move.hits
         if e.current_move.block:
             intent["block"] = e.current_move.block
@@ -133,9 +136,11 @@ def combat_state_raw(state: GameState) -> str:
             continue
         intent_str = ""
         if e.current_move:
+            from .enemies import effective_move_damage
             m = e.current_move
             if m.damage:
-                intent_str = f" → intends {m.name} ({m.damage}×{m.hits} dmg)"
+                eff = effective_move_damage(e, m)
+                intent_str = f" → intends {m.name} ({eff}×{m.hits} dmg)"
             elif m.block:
                 intent_str = f" → intends {m.name} (block {m.block})"
             else:
@@ -203,13 +208,14 @@ def card_reward_raw(offers: List, deck: List, relics: List) -> str:
 
 _SYSTEM_TEMPLATES = {
     "turn": """You are an expert Slay the Spire player controlling the {character}.
-Your task: given the current combat state, output the optimal sequence of card plays for this turn.
+Your task: given the current combat state, output the sequence of card plays that MAXIMIZES TOTAL DAMAGE dealt to enemies THIS TURN.
 
 Rules:
+- Your answer is scored ONLY on enemy HP removed this turn. Block, defense, and setup for future turns are NOT scored — do not spend energy on them.
 - You can only play cards you have enough energy for (energy resets each turn).
 - Playing a card with "exhaust" removes it from the game (not discard).
 - Cards with type ATTACK deal damage; SKILL provides utility; POWER applies a permanent effect.
-- End your turn when no more beneficial plays remain.
+- If a sequence contains an unplayable card, the whole answer scores zero — list only legal plays.
 
 Output format (JSON array of card indices in play order, then "end_turn"):
 {{"plays": [0, 2, 1], "reasoning": "brief explanation"}}

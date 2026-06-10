@@ -12,7 +12,6 @@ LLM interface is abstract: plug in Groq, OpenRouter, or a mock for unit tests.
 from __future__ import annotations
 
 import copy
-import itertools
 import json
 import time
 from abc import ABC, abstractmethod
@@ -337,26 +336,54 @@ def _simulate_play_sequence(state_snapshot, sequence: List[int]) -> Tuple[int, b
 
 def _exhaustive_best_sequence(state_snapshot) -> Tuple[int, List[int]]:
     """
-    Enumerate all permutations of playable cards (up to 6 cards to keep it tractable).
-    Returns (best_damage, best_sequence).
+    Exhaustive search for the damage-maximizing play sequence.
+    Returns (best_damage, best_sequence) with indices into the initial hand.
+
+    DFS over play prefixes (illegal prefixes prune their whole subtree) instead
+    of blind permutation enumeration. This removes the old first-6-playable cap,
+    which silently understated the optimum whenever more than 6 cards were
+    playable — Silent's 7-card opening hand (Ring of the Snake) hit it on most
+    seeds, so damage_ratio denominators were wrong. Identical cards (same
+    name/upgrade/cost) are expanded only once per node, so duplicate-heavy
+    starter hands stay cheap. Energy limits keep legal sequences short; a
+    deterministic node budget bounds pathological all-zero-cost hands.
     """
-    c = state_snapshot.combat
-    playable_indices = [i for i, card in enumerate(c.hand) if card.can_play(state_snapshot)]
+    from .combat import play_card, is_combat_over
+    import copy
 
-    # Cap at 6 to avoid factorial explosion (720 permutations max)
-    cap = playable_indices[:6]
+    base = copy.deepcopy(state_snapshot)
+    initial_hp = sum(e.hp for e in base.combat.enemies if e.hp > 0)
+    hand0 = list(base.combat.hand)
 
-    best_dmg = 0
-    best_seq: List[int] = []
+    best = {"dmg": 0, "seq": []}
+    budget = [20000]
 
-    for length in range(len(cap) + 1):
-        for perm in itertools.permutations(cap, length):
-            dmg, legal = _simulate_play_sequence(state_snapshot, list(perm))
-            if legal and dmg > best_dmg:
-                best_dmg = dmg
-                best_seq = list(perm)
+    def dfs(s, hand_map, seq):
+        dmg = initial_hp - sum(e.hp for e in s.combat.enemies if e.hp > 0)
+        if dmg > best["dmg"]:
+            best["dmg"], best["seq"] = dmg, list(seq)
+        if is_combat_over(s) or budget[0] <= 0:
+            return
+        tried = set()
+        for i, card in enumerate(hand_map):
+            if i in seq or card is None:
+                continue
+            key = (card.name, card.upgraded, card.effective_cost())
+            if key in tried:
+                continue
+            if card not in s.combat.hand or not card.can_play(s):
+                continue
+            tried.add(key)
+            budget[0] -= 1
+            # Copy state and hand_map together so the index→card identity
+            # mapping survives into the child state.
+            s2, hm2 = copy.deepcopy((s, hand_map))
+            target = next((e for e in s2.combat.enemies if e.hp > 0), None)
+            play_card(s2, hm2[i], target)
+            dfs(s2, hm2, seq + [i])
 
-    return best_dmg, best_seq
+    dfs(base, hand0, [])
+    return best["dmg"], best["seq"]
 
 
 class TurnEvaluator:
@@ -512,13 +539,18 @@ class CombatEvaluator:
 
         outcome = is_combat_over(state)
         won = outcome == "win"
+        # Score HP at the moment combat ends, BEFORE end_combat fires COMBAT_END
+        # hooks (Burning Blood heals +6 there). The greedy baseline never emits
+        # COMBAT_END, so reading post-heal HP inflated hp_ratio for every
+        # Ironclad win: an LLM playing identically to the bot scored ~1.10.
+        hp_at_end = state.player.hp
         if won:
             end_combat(state)
 
         return CombatScore(
             won=won,
             turns=turns,
-            hp_remaining=state.player.hp,
+            hp_remaining=hp_at_end,
             optimal_hp_remaining=optimal_hp,
             cards_played=cards_played,
             parse_errors=parse_errors,
@@ -1432,11 +1464,13 @@ class BenchmarkHarness:
         """Evaluate synergy recognition on hand-crafted, unambiguous archetype decks.
 
         RNG-drafted Act-1 decks rarely have a clear archetype, so we use fixed
-        fixtures (`_SYNERGY_FIXTURES`) for clean, deterministic ground truth. `seeds`
-        is used only to pick which fixture each sample runs (so n_synergy controls
-        the count, cycling through the fixture list — n > len(fixtures) with
-        temperature > 0 gives repeated-sample variance); the deck/offers/labels
-        come from the fixture, not from RNG."""
+        fixtures (`_SYNERGY_FIXTURES`) for clean, deterministic ground truth.
+        Fixture choice AND offer rotation are derived from each sample's SEED
+        (not the loop index): consecutive seeds still cover every fixture once
+        per len(fixtures) samples with uniform pick positions, but different
+        base seeds produce genuinely different fixture↔rotation pairings, so
+        multi-seed runs (`--seeds`) measure real instrument variance instead of
+        sending byte-identical prompts and reporting a fake std of 0."""
         from slay_bench import new_game
         from slay_bench.cards import make_card_for
 
@@ -1446,13 +1480,14 @@ class BenchmarkHarness:
                                      character=self.character)
         scores = []
         for i, seed in enumerate(seeds):
-            archetype, deck_names, offer_names, pick_idx = fixtures[i % len(fixtures)]
+            archetype, deck_names, offer_names, pick_idx = fixtures[seed % len(fixtures)]
             # De-bias offer position: the hand-written fixtures put the expert pick
             # at index 0 in 35/40 cases, so a model that always answered 0 scored
             # 75-100% on card-pick. Rotate each offer list so the correct index
             # cycles 0,1,2 across samples — uniform by construction, deterministic,
-            # and invisible to the (stateless) model.
-            target_pos = i % len(offer_names)
+            # and invisible to the (stateless) model. Keyed on the seed so that
+            # different --seeds runs see different rotations (real variance).
+            target_pos = seed % len(offer_names)
             rot = (pick_idx - target_pos) % len(offer_names)
             offer_names = list(offer_names[rot:]) + list(offer_names[:rot])
             pick_idx = target_pos

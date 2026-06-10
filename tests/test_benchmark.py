@@ -451,6 +451,12 @@ def test_synergy_fixture_ground_truth_rules():
         for i, (arch, deck, offers, pick) in enumerate(fixtures):
             deck_names = [make_card_for(char, n).name for n in deck]
             assert "Strike" in deck_names, f"{char}#{i} ({arch}): no Strike removal target"
+            # The scoring-time expert label comes from the classifier, not the
+            # fixture tag — every deck must classify CONFIDENTLY as its label.
+            deck_cards = [make_card_for(char, n) for n in deck]
+            label, confident = _classify_archetype_confident(deck_cards, [], char)
+            assert confident and label == arch, \
+                f"{char}#{i}: declared {arch} but classifier says {label} (confident={confident})"
             offer_names = [make_card_for(char, n).name for n in offers]
             assert offer_names[pick] in arch_t[arch], \
                 f"{char}#{i} ({arch}): expert pick {offer_names[pick]} is off-archetype"
@@ -499,6 +505,114 @@ def test_synergy_archetype_multi_mention_scored_false():
     print("[PASS] Multi-archetype answers rejected; single correct name accepted")
 
 
+def test_combat_hp_scored_before_combat_end_heal():
+    """hp_remaining must be read BEFORE end_combat fires COMBAT_END hooks
+    (Burning Blood heals +6 there; the greedy baseline never emits COMBAT_END).
+    Pre-fix, an LLM playing identically to the bot scored hp_ratio ~1.10."""
+    from slay_bench import new_game, start_combat as _sc
+    # Dry run on a twin state (same seed → same shuffle) to find an attack index.
+    dry = new_game(7, "ironclad")
+    dry_enemy = Cultist(dry.rng.hp_rng)
+    _sc(dry, [dry_enemy])
+    from slay_bench.enums import CardType
+    atk_idx = next(i for i, c in enumerate(dry.combat.hand)
+                   if c.type == CardType.ATTACK)
+
+    state = new_game(7, "ironclad")
+    state.player.hp = 50  # below max so the +6 heal is observable
+    enemy = Cultist(state.rng.hp_rng)
+    enemy.hp = enemy.max_hp = 1  # any attack kills on turn 1
+    mock = MockLLM([json.dumps({"action": "play", "card_index": atk_idx,
+                                "target_index": 0})])
+    ev = CombatEvaluator(mock, "structured")
+    score = ev.evaluate(state, [enemy])
+    assert score.won
+    assert score.hp_remaining == 50, \
+        f"hp scored post-heal: {score.hp_remaining} (Burning Blood leaked into the score)"
+    assert score.optimal_hp_remaining == 50  # greedy also kills turn 1 untouched
+    assert abs(score.hp_ratio - 1.0) < 1e-9
+    assert state.player.hp == 56  # the heal still applies to the state itself
+    print(f"[PASS] hp_remaining={score.hp_remaining} pre-heal, ratio={score.hp_ratio:.3f}")
+
+
+def test_turn_oracle_handles_more_than_six_playable():
+    """The oracle must search ALL playable cards. The old first-6 cap understated
+    the optimum on Silent's 7-card opening hand (Ring of the Snake) — e.g. seed
+    43 reported 6 when the true optimum was 12."""
+    import itertools
+    from slay_bench import new_game, start_combat as _sc
+    for seed in (43, 44):
+        state = new_game(seed, "silent")
+        enemy = Cultist(state.rng.hp_rng)
+        _sc(state, [enemy])
+        playable = [i for i, c in enumerate(state.combat.hand)
+                    if c.can_play(state)]
+        assert len(playable) == 7, f"setup drift: expected 7 playable, got {len(playable)}"
+        opt_dmg, opt_seq = _exhaustive_best_sequence(state)
+        # Brute-force reference over ALL playable indices (energy 3 + one
+        # 0-cost card bounds legal sequences well under length 5).
+        brute = 0
+        for length in range(6):
+            for perm in itertools.permutations(playable, length):
+                dmg, legal = _simulate_play_sequence(state, list(perm))
+                if legal and dmg > brute:
+                    brute = dmg
+        assert opt_dmg == brute, f"seed {seed}: oracle={opt_dmg} brute-force={brute}"
+        # The oracle's own sequence must reproduce its claimed damage legally.
+        dmg, legal = _simulate_play_sequence(state, opt_seq)
+        assert legal and dmg == opt_dmg
+    print(f"[PASS] Turn oracle matches full brute force on 7-playable Silent hands")
+
+
+def test_synergy_prompts_vary_across_base_seeds():
+    """`--seeds` must produce real instrument variance for synergy. Pre-fix,
+    fixture choice and offer rotation came from the loop index only, so every
+    seed sent byte-identical prompts and multi-seed std was 0 by construction."""
+    def prompts_for(base_seed):
+        mock = MockLLM(['{"archetype":"Aggro","best_card_index":0,'
+                        '"worst_card_name":"Strike"}'])
+        h = BenchmarkHarness(mock, "m", "structured")
+        import io, contextlib
+        with contextlib.redirect_stdout(io.StringIO()):
+            h.run_synergy_eval(list(range(base_seed + 200, base_seed + 220)))
+        return [u for (_s, u) in mock._calls]
+
+    p42, p142 = prompts_for(42), prompts_for(142)
+    assert p42 == prompts_for(42), "same base seed must reproduce identical prompts"
+    assert p42 != p142, "different base seeds must produce different synergy prompts"
+    print("[PASS] Synergy prompts are seed-dependent (reproducible per seed, vary across seeds)")
+
+
+def test_intent_shows_effective_damage():
+    """Prompts must show Strength-adjusted intent damage (what actually lands),
+    like the real game — Cultist's Ritual previously displayed 6 forever while
+    real hits grew 9/12/15."""
+    from slay_bench.enums import PowerId
+    state = new_ironclad_game(20)
+    enemy = Cultist(state.rng.hp_rng)
+    start_combat(state, [enemy])
+    enemy.powers[PowerId.STRENGTH] = 6
+    enemy.current_move = enemy.MOVES[1]  # Dark Strike, base 6
+    data = json.loads(combat_state_structured(state))
+    assert data["enemies"][0]["intent"]["damage"] == 12, data["enemies"][0]["intent"]
+    assert "(12×1 dmg)" in combat_state_raw(state)
+    # Weak reduces the displayed number too (floor(12 * 0.75) = 9).
+    enemy.powers[PowerId.WEAK] = 1
+    data = json.loads(combat_state_structured(state))
+    assert data["enemies"][0]["intent"]["damage"] == 9
+    print("[PASS] Intent display is Strength/Weak-adjusted in both formats")
+
+
+def test_turn_prompt_states_damage_objective():
+    """The turn system prompt must state the scored objective (max damage this
+    turn) — models were previously penalized for unscored defensive play."""
+    from slay_bench.prompt_builder import system_prompt
+    p = system_prompt("turn").lower()
+    assert "maximizes total damage" in p
+    assert "not scored" in p
+    print("[PASS] Turn system prompt states the damage-only objective")
+
+
 if __name__ == "__main__":
     tests = [
         test_structured_prompt,
@@ -528,6 +642,11 @@ if __name__ == "__main__":
         test_synergy_fixture_ground_truth_rules,
         test_synergy_pick_position_debias,
         test_synergy_archetype_multi_mention_scored_false,
+        test_combat_hp_scored_before_combat_end_heal,
+        test_turn_oracle_handles_more_than_six_playable,
+        test_synergy_prompts_vary_across_base_seeds,
+        test_intent_shows_effective_damage,
+        test_turn_prompt_states_damage_objective,
     ]
     passed = failed = 0
     for test in tests:

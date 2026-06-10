@@ -1,5 +1,26 @@
 # Findings
 
+## ⚠️ The pilot "LLM beats the greedy bot on HP" result was an instrument artifact (2026-06-10, 2nd audit)
+
+The stale combat-level hp_ratio values >1.0 (103.5–113.8% across both models/formats) were
+NOT model skill: `CombatEvaluator` read the LLM's HP *after* `end_combat()` fired Burning
+Blood's +6 COMBAT_END heal, while the greedy baseline never emits COMBAT_END. Verified: an
+LLM playing *identically* to the bot scored hp_ratio = 1.095. Fixed (HP now captured
+pre-heal); never cite the >100% numbers. The bias was also Ironclad-only (Silent's starter
+relic fires at COMBAT_START), so it would have confounded cross-character combat comparisons.
+
+Two sibling instrument findings from the same audit (both fixed, both with regression tests):
+(1) the turn-level oracle capped its search at the first 6 playable cards — wrong for
+Silent's 7-card opening hand (understated the optimum on 6/10 seeds, up to 2×); (2)
+multi-seed synergy runs sent byte-identical prompts for every seed (fixture+rotation came
+from the loop index), so `--seeds` error bars would have reported std≈0 by construction.
+Full audit + the still-pending engine-fidelity fix batch: `docs/bug_audit_2026-06-10.md`.
+
+Reassuring negatives from the same audit: the de-biased synergy n=20 results SURVIVE (all 40
+fixtures classify confidently as labeled; no string-matching near-misses in removal scoring —
+wrong answers are genuinely wrong cards, mostly "Defend"); Ironclad turn-level oracle values
+are unaffected by the cap bug (5-card opening hand → byte-identical before/after the rewrite).
+
 ## ⭐ Mechanic-defined archetypes are a cross-character blind spot (n=20 de-biased, 2026-06-10)
 
 The strongest synergy signal, confirmed across BOTH characters at n=20 on a **de-biased

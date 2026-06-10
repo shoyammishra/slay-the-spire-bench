@@ -1,5 +1,25 @@
 # Decision Log
 
+## 2026-06-10 (2nd audit) — Combat HP scored pre-COMBAT_END
+**Decision:** `CombatEvaluator` captures `hp_remaining` BEFORE `end_combat()`; the greedy baseline keeps its no-COMBAT_END convention. Both sides now exclude post-combat relic heals.
+**Why:** Burning Blood's COMBAT_END heal applied only to the LLM's score → identical play scored hp_ratio 1.095. Symmetric pre-heal reading restores 1.0 = parity.
+
+## 2026-06-10 (2nd audit) — Turn oracle = prefix-pruned DFS, no positional cap
+**Decision:** `_exhaustive_best_sequence` does DFS over ALL playable cards with illegal-prefix pruning, per-node dedup of identical cards, and a deterministic 20k-node budget (replaces permutations over the first 6 playable).
+**Why:** The cap understated the optimum for any >6-playable hand (Silent's 7-card opener: 6/10 seeds wrong, up to 2×). DFS is complete AND faster (legal sequences are energy-bounded). Ironclad values verified byte-identical pre/post.
+
+## 2026-06-10 (2nd audit) — Synergy instrument keyed on seed
+**Decision:** Fixture selection (`seed % 20`) and offer rotation (`seed % 3`) derive from the sample's seed, not the loop index.
+**Why:** Index-keyed selection made every `--seeds` run byte-identical → fake std=0 error bars. Seed-keying keeps per-run balance (consecutive seeds cover all fixtures once, uniform pick positions) while making seeds real treatments. Cost: per-sample pairing differs from the saved seed-42 n=20 files (aggregates comparable, rows not).
+
+## 2026-06-10 (2nd audit) — Turn prompt states the scored objective
+**Decision:** The turn system prompt explicitly says: maximize total damage THIS TURN; block/defense/setup are NOT scored; an illegal card zeroes the answer.
+**Why:** The scorer is damage-only vs a damage-only oracle, but "optimal play" invited (correct!) defensive play that scored as failure — construct validity requires the model to know the objective. Turn scores are not comparable across this change (they were already stale pre-sweep).
+
+## 2026-06-10 (2nd audit) — Intent display shows effective damage
+**Decision:** `effective_move_damage()` (enemies.py) is the single source for Strength/Weak-adjusted per-hit damage, used by `_enemy_attack` and BOTH prompt formats. Enemies must store BASE damage in Moves (RedLouse violated this and double-counted).
+**Why:** Real StS shows adjusted intent; showing base damage misinformed the LLM (Cultist "6 dmg" while Ritual hits grew 9/12/15) while the greedy baseline doesn't read prompts — an asymmetric handicap.
+
 ## 2026-06-07 — Illegal play scoring
 **Decision:** If any card in a turn sequence is illegal, `damage_ratio = 0` (zero, not partial credit).
 **Why:** Partial credit would reward models that guess randomly and happen to play some valid cards. Zero enforces that legal play is a prerequisite, not an add-on.
