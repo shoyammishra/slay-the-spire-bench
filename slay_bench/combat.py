@@ -38,11 +38,10 @@ def start_combat(state: GameState, enemies: List[Enemy]) -> None:
         state.combat.draw_pile.remove(c)
         state.combat.hand.append(c)
 
-    # Corruption: skills cost 0
-    if state.player.corruption:
-        for c in state.combat.draw_pile + state.combat.hand:
-            if c.type == CardType.SKILL:
-                c.cost_override = 0
+    # (Corruption is per-combat — end_combat clears it, so it can never be
+    # active here. Its cost-0 + exhaust effects live in can_play/play_card.)
+    # Combust HP-loss counter (1 HP per Combust played) is per-combat too.
+    state.player._combust_plays = 0
 
     # Register power event hooks (fresh for each combat)
     register_power_hooks(state)
@@ -50,6 +49,12 @@ def start_combat(state: GameState, enemies: List[Enemy]) -> None:
     # Register relic hooks
     for relic in state.player.relics:
         relic.register(state)
+
+    # Register potion hooks (Fairy in a Bottle's auto-revive) — potions were
+    # never registered before, so Fairy could not fire.
+    for potion in state.player.potions:
+        if hasattr(potion, 'register'):
+            potion.register(state)
 
     # Neow's Lament: enemies in the first N combats have 1 HP
     neow = getattr(state, '_neow_1hp_combats', 0)
@@ -77,6 +82,7 @@ def _begin_player_turn(state: GameState) -> None:
     combat.cards_played_this_turn = 0
     combat.attacks_played_this_turn = 0
     combat.discarded_this_turn = 0
+    combat.time_warp_lock = False
 
     # Reset block (unless Barricade / Blur / Calipers)
     if not player.barricade:
@@ -117,9 +123,11 @@ def _begin_player_turn(state: GameState) -> None:
     else:
         player.energy = player.energy_per_turn
 
-    # Enemy block resets each turn
-    for e in combat.enemies:
-        e.block = 0
+    # NOTE: enemy block is NOT reset here. Block resets at the start of its
+    # OWNER's turn (StS rule) — resetting enemy block at the player's turn
+    # start wiped every enemy blocking move (Bellow, Defensive Stance, enemy
+    # Metallicize, ...) before the player could ever attack into it. Enemy
+    # block now resets at the start of the enemy phase in end_player_turn.
 
     # Emit turn start (powers hook here: Demon Form, Metallicize, Brutality, etc.)
     state.bus.emit(Event.TURN_START, state)
@@ -157,7 +165,10 @@ def play_card(state: GameState, card: Card, target: Optional[Enemy] = None) -> N
     combat = state.combat
     player = state.player
 
-    if card not in combat.hand:
+    # IDENTITY membership: dataclass __eq__ let a card "in hand" via an
+    # identical twin be played again (duplicate-index exploit — the twin was
+    # never removed and the replay was scored as a legal play).
+    if not any(c is card for c in combat.hand):
         raise ValueError(f"Card {card} not in hand")
     if not card.can_play(state):
         raise ValueError(f"Cannot play {card}: insufficient energy or restriction")
@@ -169,6 +180,8 @@ def play_card(state: GameState, card: Card, target: Optional[Enemy] = None) -> N
         cost = card.effective_cost()
         if player.corruption and card.type == CardType.SKILL:
             cost = 0
+        # Blue Candle curses report cost -1 — never ADD energy via -= -1
+        cost = max(0, cost)
         player.energy -= cost
         player.energy = max(0, player.energy)
 
@@ -177,7 +190,8 @@ def play_card(state: GameState, card: Card, target: Optional[Enemy] = None) -> N
     # twin, leaving the played object in hand (a copy then vanished at the
     # discard step below).
     from .cards import _remove_identical
-    _remove_identical(combat.hand, card)
+    if not _remove_identical(combat.hand, card):
+        raise ValueError(f"Card {card} not in hand (identity)")
 
     # Emit play event
     state.bus.emit(Event.CARD_PLAY, state, card=card)
@@ -186,12 +200,19 @@ def play_card(state: GameState, card: Card, target: Optional[Enemy] = None) -> N
     elif card.type == CardType.SKILL:
         state.bus.emit(Event.SKILL_PLAY, state, card=card)
 
-    # Track play counts
+    # Track play counts. NOTE: attacks_played_this_turn is incremented AFTER
+    # the card resolves (below) so Finisher does not count itself.
     combat.cards_played_this_turn += 1
     combat.cards_played_this_combat += 1
     player.cards_played_this_combat += 1
-    if card.type == CardType.ATTACK:
-        combat.attacks_played_this_turn += 1
+
+    # Time Eater's Time Warp: every 12th card play ends the player's turn
+    # (approximated as a play-lock until next turn) and buffs the boss.
+    for e in combat.enemies:
+        warp = e.powers.get(PowerId.TIME_WARP, 0) if e.hp > 0 else 0
+        if warp and combat.cards_played_this_combat % warp == 0:
+            combat.time_warp_lock = True
+            e.powers[PowerId.STRENGTH] = e.powers.get(PowerId.STRENGTH, 0) + 2
 
     # Double Tap: each stack doubles one attack (1 stack consumed per attack)
     double_tap_count = 0
@@ -222,6 +243,11 @@ def play_card(state: GameState, card: Card, target: Optional[Enemy] = None) -> N
     finally:
         combat._playing_card = prev_playing
 
+    # Count the attack AFTER it resolves: Finisher ("per Attack played this
+    # turn") must not count itself (real StS: first Finisher of a turn = 0).
+    if card.type == CardType.ATTACK:
+        combat.attacks_played_this_turn += 1
+
     # Exhaust logic. IDENTITY checks, not `in` — Card is a dataclass whose
     # __eq__ compares fields, so `card not in hand` was False whenever an
     # identical copy (another Strike) was still in hand and the played card
@@ -251,30 +277,37 @@ def play_card(state: GameState, card: Card, target: Optional[Enemy] = None) -> N
 
 def end_player_turn(state: GameState) -> None:
     """End player turn, discard hand, execute enemy moves, begin next player turn."""
-    from .cards import _draw_cards
+    from .cards import _draw_cards, _remove_identical
     combat = state.combat
     player = state.player
 
     # Emit turn end (Combust, Flex, Constricted, Burn cards, etc.)
     state.bus.emit(Event.TURN_END, state)
 
-    # Discard hand (ethereal cards exhaust instead; Runic Pyramid keeps the hand)
+    # Choke ("Choked" enemies lose HP per card played) lasts only the turn
+    # Choke was played — it never expired before.
+    for e in combat.enemies:
+        e.powers.pop(PowerId.CHOKED, None)
+
+    # Discard hand (ethereal cards exhaust instead; Runic Pyramid keeps the
+    # hand). Identity removal: equality remove() could pull a retained twin.
     runic_pyramid = getattr(player, '_runic_pyramid', False)
     for card in list(combat.hand):
         if card.ethereal:
-            from .cards import _exhaust_card
-            combat.hand.remove(card)
+            _remove_identical(combat.hand, card)
             combat.exhaust_pile.append(card)
             state.bus.emit(Event.CARD_EXHAUST, state, card=card)
         elif runic_pyramid or getattr(card, 'retain', False) \
                 or getattr(card, '_temp_retain', False):
             pass  # stay in hand
         else:
-            combat.hand.remove(card)
+            _remove_identical(combat.hand, card)
             combat.discard_pile.append(card)
 
-    # Bullet Time: restore costs zeroed for this turn only
-    for card in combat.hand + combat.discard_pile + combat.draw_pile:
+    # Bullet Time: restore costs zeroed for this turn only (incl. cards that
+    # were exhausted this turn — Exhume would otherwise return them at cost 0)
+    for card in (combat.hand + combat.discard_pile + combat.draw_pile
+                 + combat.exhaust_pile):
         if getattr(card, '_bullet_time', False):
             card._bullet_time = False
             card.cost_override = None
@@ -283,8 +316,13 @@ def end_player_turn(state: GameState) -> None:
     # active here — they tick at the end of the ROUND, below. Debuffs the
     # enemies apply during this phase are flagged just_applied so they don't
     # tick the same round (StS rule).
+    # Block resets at the start of its OWNER's turn: enemy block from last
+    # round (Bellow, Defensive Stance, Curl Up, ...) survived the player's
+    # turn and is wiped now, as the enemy phase begins.
     combat.enemy_phase = True
     try:
+        for enemy in combat.enemies:
+            enemy.block = 0
         for enemy in combat.enemies:
             if enemy.hp > 0:
                 _execute_enemy_turn(state, enemy)
@@ -353,6 +391,11 @@ def _tick_enemy_powers(state: GameState, enemy: Enemy) -> None:
     # Ritual: gain Strength
     if PowerId.RITUAL in enemy.powers:
         enemy.powers[PowerId.STRENGTH] = enemy.powers.get(PowerId.STRENGTH, 0) + enemy.powers[PowerId.RITUAL]
+
+    # Metallicize (Lagavulin asleep): gain block at end of its turn — there
+    # was no enemy-side handler, so the power never did anything.
+    if PowerId.METALLICIZE in enemy.powers:
+        enemy.add_block(enemy.powers[PowerId.METALLICIZE])
 
     # Regenerate
     if PowerId.REGENERATE in enemy.powers:

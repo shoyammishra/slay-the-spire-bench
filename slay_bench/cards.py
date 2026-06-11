@@ -34,17 +34,30 @@ class Card:
         return self.cost
 
     def can_play(self, state: GameState) -> bool:
-        if self.unplayable:
-            return False
         from .enums import PowerId
+        # Blue Candle: curses become playable (0 energy; lose 1 HP + exhaust
+        # handled by the relic's CARD_PLAY hook)
+        blue_candle_curse = (self.type == CardType.CURSE
+                             and getattr(state.player, '_blue_candle', False))
+        if self.unplayable and not blue_candle_curse:
+            return False
         if PowerId.ENTANGLED in state.player.powers and self.type == CardType.ATTACK:
+            return False
+        # Time Eater's Time Warp: once triggered, no more plays this turn
+        if (state.combat is not None
+                and getattr(state.combat, 'time_warp_lock', False)):
             return False
         # Velvet Choker: at most 6 cards per turn
         if (getattr(state.player, '_velvet_choker', False)
                 and state.combat is not None
                 and state.combat.cards_played_this_turn >= 6):
             return False
+        if blue_candle_curse:
+            return True  # costs 0 under Blue Candle
         cost = self.effective_cost()
+        # Corruption: skills cost 0 (play_card charges 0 — legality must match)
+        if state.player.corruption and self.type == CardType.SKILL and cost > 0:
+            cost = 0
         if cost == -1:
             return False
         if cost == -2:
@@ -118,9 +131,11 @@ def _apply_damage_to_enemy(state: GameState, target: Enemy, amount: int,
     if PowerId.INTANGIBLE in target.powers:
         amount = 1
     # Thorns retaliates against ATTACK damage only (not Combust/Juggernaut/etc.)
+    # Thorns damage to the player is non-attack: blockable, Intangible-capped,
+    # but never amplified by the player's Vulnerable.
     thorns = target.powers.get(PowerId.THORNS, 0)
     if from_attack and thorns > 0:
-        _damage_player(state, thorns)
+        _damage_player(state, thorns, from_attack=False)
     blocked = min(target.block, amount)
     target.block -= blocked
     real_dmg = amount - blocked
@@ -139,22 +154,32 @@ def _apply_damage_to_enemy(state: GameState, target: Enemy, amount: int,
     return amount  # return total (blocked+unblocked) for display purposes
 
 
-def _damage_player(state: GameState, amount: int, is_hp_loss: bool = False) -> int:
-    """Damage the player; returns actual HP lost."""
+def _damage_player(state: GameState, amount: int, is_hp_loss: bool = False,
+                   from_attack: bool = True) -> int:
+    """Damage the player; returns actual HP lost.
+
+    is_hp_loss=True: HP-loss effects (Offering, Combust, poison ticks, curses)
+    bypass block, Intangible and Vulnerable entirely (StS rule — block used to
+    absorb these, neutering Offering/poison-on-player/etc).
+    from_attack=False: non-attack damage (Thorns retaliation, Burn/Decay) is
+    blockable and Intangible-capped, but NOT amplified by Vulnerable (which
+    only affects Attack damage) and not eligible for Torii."""
     from .enums import PowerId
     from .events import Event
-    if not is_hp_loss:
+    if is_hp_loss:
+        real_dmg = amount  # bypasses block / Intangible / Vulnerable
+    else:
         if PowerId.INTANGIBLE in state.player.powers:
             amount = 1
-        if PowerId.VULNERABLE in state.player.powers:
+        if from_attack and PowerId.VULNERABLE in state.player.powers:
             amount = math.floor(amount * 1.5)
-    blocked = min(state.player.block, amount)
-    state.player.block -= blocked
-    real_dmg = amount - blocked
-    # Torii: unblocked attack damage of 5 or less is reduced to 1
-    if (not is_hp_loss and getattr(state.player, '_torii', False)
-            and 0 < real_dmg <= 5):
-        real_dmg = 1
+        blocked = min(state.player.block, amount)
+        state.player.block -= blocked
+        real_dmg = amount - blocked
+        # Torii: unblocked attack damage of 5 or less is reduced to 1
+        if (from_attack and getattr(state.player, '_torii', False)
+                and 0 < real_dmg <= 5):
+            real_dmg = 1
     # Tungsten Rod: every HP loss reduced by 1 (attacks AND hp-loss effects)
     if real_dmg > 0 and getattr(state.player, '_tungsten_rod', False):
         real_dmg = max(0, real_dmg - 1)
@@ -242,6 +267,11 @@ def _apply_power(state: GameState, target, power_id, amount: int) -> None:
             if target.powers[PowerId.ARTIFACT] == 0:
                 del target.powers[PowerId.ARTIFACT]
             return
+    # Snecko Skull: +1 whenever the PLAYER applies Poison to an enemy
+    # (it used to increment the player's OWN poison — actively harmful)
+    if (power_id == PowerId.POISON and target is not state.player
+            and getattr(state.player, '_snecko_skull', False)):
+        amount += 1
     target.powers[power_id] = target.powers.get(power_id, 0) + amount
     # StS justApplied rule: debuffs enemies put on the player during the enemy
     # phase must survive the end-of-round tick of that same round.
@@ -340,7 +370,8 @@ class Burn(Card):
     def upgrade(self): pass
 
     def end_of_turn_effect(self, state):
-        _damage_player(state, 2 if not self.upgraded else 4, is_hp_loss=True)
+        # Burn deals DAMAGE (blockable, no Vulnerable), not HP loss
+        _damage_player(state, 2 if not self.upgraded else 4, from_attack=False)
 
 
 class Dazed(Card):
@@ -375,9 +406,8 @@ class VoidCard(Card):
 
     def play(self, state, target=None): pass
     def upgrade(self): pass
-
-    def on_draw(self, state):
-        state.player.energy = max(0, state.player.energy - 1)
+    # NOTE: the on-draw energy loss is handled by the CARD_DRAW hook in
+    # powers.py (keyed on the class name) — do not add an on_drawn here too.
 
 
 class Apparition(Card):
@@ -414,7 +444,8 @@ class Decay(CurseBase):
         super().__init__("Decay", "Decay", CardType.CURSE, CardRarity.CURSE, -1, unplayable=True)
 
     def end_of_turn_effect(self, state):
-        _damage_player(state, 2, is_hp_loss=True)
+        # Decay deals DAMAGE (blockable, no Vulnerable), not HP loss
+        _damage_player(state, 2, from_attack=False)
 
 
 class Doubt(CurseBase):
@@ -546,10 +577,15 @@ class Armaments(Card):
         _gain_block(state, 5)
         if self.upgraded:
             for c in state.combat.hand:
-                c.upgrade()
+                if c.type not in (CardType.STATUS, CardType.CURSE):
+                    c.upgrade()
         else:
-            # upgrade one card in hand of player's choice — auto pick first upgradeable
-            upgradeable = [c for c in state.combat.hand if not c.upgraded]
+            # upgrade one card in hand of player's choice — auto pick first
+            # upgradeable (statuses/curses can't be upgraded — picking one
+            # wasted the upgrade on a no-op CurseBase.upgrade)
+            upgradeable = [c for c in state.combat.hand
+                           if not c.upgraded
+                           and c.type not in (CardType.STATUS, CardType.CURSE)]
             if upgradeable:
                 upgradeable[0].upgrade()
 
@@ -638,7 +674,10 @@ class Havoc(Card):
 
     def play(self, state, target=None):
         if state.combat.draw_pile:
-            card = state.combat.draw_pile[-1]
+            # Pop the top card BEFORE playing it — leaving it in the draw pile
+            # while _exhaust_card appended it to the exhaust pile duplicated it
+            # (same object in two piles, deck grew every Havoc play).
+            card = state.combat.draw_pile.pop()
             # play the top card without paying cost, then exhaust
             card.cost_override = 0
             card.play(state, target)
@@ -705,6 +744,10 @@ class PerfectedStrike(Card):
                         state.combat.discard_pile + state.combat.exhaust_pile)
             if "strike" in c.id.lower()
         )
+        # The card being played is in no pile mid-play — count itself (StS
+        # counts ALL your Strike cards, including this Perfected Strike).
+        if "strike" in self.id.lower():
+            strike_count += 1
         _deal_damage(state, target, 6 + strike_count * bonus)
 
     def upgrade(self):
@@ -810,10 +853,12 @@ class Warcry(Card):
     def play(self, state, target=None):
         draw = 2 if self.upgraded else 1
         _draw_cards(state, draw)
-        # put a card from hand on top of draw pile (auto: last drawn)
+        # put a card from hand on top of draw pile (auto: last drawn).
+        # Identity removal: equality-based hand.remove() could remove a twin,
+        # leaving the chosen object in hand AND the draw pile (duplication).
         if state.combat.hand:
             card = state.combat.hand[-1]
-            state.combat.hand.remove(card)
+            _remove_identical(state.combat.hand, card)
             state.combat.draw_pile.append(card)
         _exhaust_card(state, self)
 
@@ -852,7 +897,9 @@ class BattleTrance(Card):
 
 class BloodForBlood(Card):
     def __init__(self, upgraded: bool = False):
-        super().__init__("Blood for Blood", "Blood for Blood", CardType.ATTACK, CardRarity.UNCOMMON, 4, upgraded, exhaust=True)
+        # Real BfB does NOT exhaust; BfB+ costs 3 base.
+        super().__init__("Blood for Blood", "Blood for Blood", CardType.ATTACK,
+                         CardRarity.UNCOMMON, 3 if upgraded else 4, upgraded)
 
     def effective_cost(self):
         return max(0, super().effective_cost() - getattr(self, '_times_hit', 0))
@@ -861,10 +908,10 @@ class BloodForBlood(Card):
         # Energy is paid by play_card() — deducting here double-charged it.
         dmg = 22 if self.upgraded else 18
         _deal_damage(state, target, dmg)
-        _exhaust_card(state, self)
 
     def upgrade(self):
         self.upgraded = True
+        self.cost = 3
 
 
 class Bloodletting(Card):
@@ -916,6 +963,8 @@ class Combust(Card):
         from .enums import PowerId
         amount = 7 if self.upgraded else 5
         state.player.powers[PowerId.COMBUST] = state.player.powers.get(PowerId.COMBUST, 0) + amount
+        # Each Combust played costs 1 HP at turn end (reset at combat start)
+        state.player._combust_plays = getattr(state.player, '_combust_plays', 0) + 1
 
     def upgrade(self):
         self.upgraded = True
@@ -1218,7 +1267,7 @@ class SearingBlow(Card):
 
     def _damage(self):
         n = self._upgrades
-        return (n * n + 7 * n + 12) // 2 + (n % 2) * 1  # formula from game
+        return n * (n + 7) // 2 + 12  # 12 base, 16 at +1, 21 at +2 (game formula)
 
     def play(self, state, target=None):
         _deal_damage(state, target, self._damage())
@@ -1571,13 +1620,15 @@ class Reaper(Card):
 
     def play(self, state, target=None):
         dmg = 5 if self.upgraded else 4
+        total_heal = 0
         for e in state.combat.enemies:
             if e.hp > 0:
-                dealt = _deal_damage(state, e, dmg)
-                # heal for damage dealt (unblocked)
-                actual = min(dmg, e.hp + min(dmg, e.block) - max(0, e.block - dmg))
-                heal = max(0, dmg - max(0, e.block))
-                _heal_player(state, heal)
+                # Heal = actual unblocked HP removed (the old calc used the
+                # POST-hit block and ignored Strength/Weak — it overhealed).
+                hp_before = e.hp
+                _deal_damage(state, e, dmg)
+                total_heal += max(0, hp_before - e.hp)
+        _heal_player(state, total_heal)
         _exhaust_card(state, self)
 
     def upgrade(self):

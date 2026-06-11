@@ -22,6 +22,7 @@ from .cards import (
     _deal_damage, _apply_damage_to_enemy, _damage_player, _gain_block,
     _apply_power, _draw_cards, _exhaust_card,
     _add_card_to_hand, _discard_from_hand, _auto_discard_choice, _x_value,
+    _remove_identical,
 )
 
 
@@ -562,9 +563,12 @@ class EscapePlan(Card):
         super().__init__("Escape Plan", "Escape Plan", CardType.SKILL, CardRarity.UNCOMMON, 0, upgraded)
 
     def play(self, state, target=None):
+        # Identity comparison — `c not in before` used dataclass __eq__, so a
+        # drawn skill with an identical twin already in hand went undetected.
         before = list(state.combat.hand)
         _draw_cards(state, 1)
-        drawn = [c for c in state.combat.hand if c not in before]
+        drawn = [c for c in state.combat.hand
+                 if not any(c is b for b in before)]
         if drawn and drawn[0].type == CardType.SKILL:
             _gain_block(state, 5 if self.upgraded else 3)
 
@@ -766,11 +770,13 @@ class Setup(Card):
                          0 if upgraded else 1, upgraded)
 
     def play(self, state, target=None):
-        # Simplification: first other card in hand goes on top of the draw pile, costs 0
+        # Simplification: first other card in hand goes on top of the draw pile,
+        # costs 0. Identity removal — equality remove() could pull a twin and
+        # leave the chosen object in hand AND the draw pile (duplication).
         others = [c for c in state.combat.hand if c is not self]
         if others:
             card = others[0]
-            state.combat.hand.remove(card)
+            _remove_identical(state.combat.hand, card)
             card.cost_override = 0
             state.combat.draw_pile.append(card)  # draw pops from the end = top
 

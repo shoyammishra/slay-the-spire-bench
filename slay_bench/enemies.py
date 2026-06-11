@@ -290,9 +290,11 @@ class AcidSlimeM(Enemy):
             from .cards import _apply_power
             _apply_power(state, state.player, PowerId.WEAK, 1)
         elif m.name == "Corrosive Spit":
+            # Real Corrosive Spit: damage + 1 Slimed to discard (Weak is
+            # Lick's job — it was wrongly applied here too)
             _enemy_attack(state, self, m)
-            from .cards import _apply_power
-            _apply_power(state, state.player, PowerId.WEAK, 2)
+            from .cards import Slimed
+            state.combat.discard_pile.append(Slimed())
         else:
             _enemy_attack(state, self, m)
 
@@ -328,9 +330,11 @@ class AcidSlimeL(Enemy):
             from .cards import _apply_power
             _apply_power(state, state.player, PowerId.WEAK, 2)
         elif m.name == "Corrosive Spit":
+            # Real Corrosive Spit (L): damage + 2 Slimed to discard
             _enemy_attack(state, self, m)
-            from .cards import _apply_power
-            _apply_power(state, state.player, PowerId.WEAK, 3)
+            from .cards import Slimed
+            state.combat.discard_pile.append(Slimed())
+            state.combat.discard_pile.append(Slimed())
         else:
             _enemy_attack(state, self, m)
 
@@ -493,7 +497,6 @@ class GremlinNob(Enemy):
         m = self.current_move
         self.move_history.append(m.name)
         if m.name == "Bellow":
-            self.powers[PowerId.ANGER_ENEMY] = self.powers.get(PowerId.ANGER_ENEMY, 0)
             # Enrage: gain strength when player plays a skill
             self.powers["enrage"] = 2
         elif m.name == "Skull Bash":
@@ -520,6 +523,8 @@ class Lagavulin(Enemy):
             if self._asleep_turns >= 2 or state.player.hp < state.player.max_hp:
                 self._asleep = False
                 self._awoken = True
+                # Lagavulin loses its Metallicize when it wakes up (StS rule)
+                self.powers.pop(PowerId.METALLICIZE, None)
                 self.current_move = Move("Attack", IntentType.ATTACK, damage=18, hits=1)
             else:
                 self._asleep_turns += 1
@@ -608,8 +613,12 @@ class SlimeBoss(Enemy):
     def on_hp_threshold(self, state):
         if not self._split and self.hp <= self.max_hp // 2:
             self._split = True
+            # Children inherit the boss's current HP (the L-slime splits
+            # already did this; the boss was spawning fresh-HP children)
             m1 = SpikeSlimeL(state.rng.hp_rng)
             m2 = AcidSlimeL(state.rng.hp_rng)
+            m1.hp = m1.max_hp = self.hp
+            m2.hp = m2.max_hp = self.hp
             state.combat.enemies.append(m1)
             state.combat.enemies.append(m2)
             # SlimeBoss dies when split
@@ -634,7 +643,8 @@ class Hexaghost(Enemy):
         move_name = pattern[self._phase % len(pattern)]
         self._phase += 1
         if move_name == "Divider":
-            self.current_move = Move("Divider", IntentType.ATTACK, damage=max(1, state.player.hp // 12), hits=6)
+            # Real Divider: per-hit damage = player HP / 12 + 1
+            self.current_move = Move("Divider", IntentType.ATTACK, damage=state.player.hp // 12 + 1, hits=6)
         elif move_name == "Inferno":
             self._inferno_count += 1
             dmg = 2 * self._inferno_count

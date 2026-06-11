@@ -27,6 +27,9 @@ class CombatState:
     # during the enemy phase must not tick down at the end of that same round.
     enemy_phase: bool = False
     just_applied: set = field(default_factory=set)
+    # Time Eater's Time Warp: set when the card-play threshold is hit;
+    # blocks further plays this turn (≈ "ends your turn"). Reset at turn start.
+    time_warp_lock: bool = False
 
 
 @dataclass

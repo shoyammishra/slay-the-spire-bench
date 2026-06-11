@@ -458,6 +458,313 @@ def test_pen_nib_counter_persists_across_combats():
     print("[PASS] Pen Nib counter persists across combats (10th attack doubles)")
 
 
+# ── 2026-06-11 audit regression tests ─────────────────────────────────────────
+
+def test_hp_loss_bypasses_block():
+    """HP-loss effects (Offering, poison ticks, Combust) must bypass block —
+    block used to absorb them entirely."""
+    from slay_bench.cards import _damage_player
+    state = new_ironclad_game(42)
+    enemy = Cultist(state.rng.hp_rng)
+    start_combat(state, [enemy])
+    state.player.block = 10
+    hp = state.player.hp
+    _damage_player(state, 6, is_hp_loss=True)
+    assert hp - state.player.hp == 6, f"HP loss absorbed by block: lost {hp - state.player.hp}"
+    assert state.player.block == 10, f"block consumed by HP loss: {state.player.block}"
+    print("[PASS] HP-loss effects bypass block")
+
+
+def test_burn_damage_blockable_not_hp_loss():
+    """Burn deals blockable damage (not block-bypassing HP loss)."""
+    from slay_bench.cards import Burn
+    state = new_ironclad_game(42)
+    enemy = Cultist(state.rng.hp_rng)
+    start_combat(state, [enemy])
+    state.combat.hand[:] = [Burn()]
+    state.player.block = 5
+    hp = state.player.hp
+    end_player_turn(state)  # TURN_END fires Burn while block is still up
+    assert state.player.hp == hp, f"Burn pierced block: hp {hp}->{state.player.hp}"
+    print("[PASS] Burn damage is blockable")
+
+
+def test_enemy_block_survives_player_turn():
+    """Enemy block gained during the enemy phase must persist through the
+    player's next turn (it used to be wiped at player-turn start, making
+    every enemy blocking move a no-op)."""
+    from slay_bench.enemies import Enemy, Move
+    from slay_bench.enums import IntentType
+
+    class _Blocker(Enemy):
+        def __init__(self):
+            super().__init__("Blocker", "Blocker", 50, 50)
+        def select_move(self, state):
+            self.current_move = Move("Guard", IntentType.BLOCK)
+            return self.current_move
+        def execute_move(self, state):
+            self.add_block(10)
+
+    state = new_ironclad_game(42)
+    blocker = _Blocker()
+    start_combat(state, [blocker])
+    end_player_turn(state)  # enemy gains 10 block in its phase
+    assert blocker.block == 10, f"enemy block wiped: {blocker.block}"
+    s = Strike()
+    state.combat.hand[:] = [s]
+    state.player.energy = 3
+    hp_before = blocker.hp
+    play_card(state, s, blocker)
+    assert hp_before == blocker.hp, "Strike should be fully blocked"
+    assert blocker.block == 4, f"block should absorb 6: {blocker.block}"
+    print("[PASS] Enemy block persists into the player's turn")
+
+
+def test_lagavulin_metallicize_and_wake():
+    """Sleeping Lagavulin gains 8 block per round (enemy Metallicize had no
+    handler) and loses the power when it wakes."""
+    from slay_bench.enemies import Lagavulin
+    from slay_bench.enums import PowerId
+    state = new_ironclad_game(42)
+    lag = Lagavulin(state.rng.hp_rng)
+    start_combat(state, [lag])
+    end_player_turn(state)
+    assert lag.block == 8, f"sleeping Lagavulin should have 8 block, got {lag.block}"
+    state.player.hp -= 1  # damage wakes it at next move selection
+    end_player_turn(state)
+    assert PowerId.METALLICIZE not in lag.powers, "Metallicize must drop on wake"
+    print("[PASS] Lagavulin Metallicize ticks while asleep, drops on wake")
+
+
+def test_havoc_no_duplication():
+    """Havoc duplicated the top draw-pile card (left in draw AND exhausted)."""
+    from slay_bench.cards import Havoc
+    state = new_ironclad_game(42)
+    enemy = Cultist(state.rng.hp_rng)
+    start_combat(state, [enemy])
+    c = state.combat
+    hv = Havoc()
+    c.hand[:] = [hv]
+    state.player.energy = 3
+    top = c.draw_pile[-1]
+    total = len(c.hand) + len(c.draw_pile) + len(c.discard_pile) + len(c.exhaust_pile)
+    play_card(state, hv, enemy)
+    total2 = len(c.hand) + len(c.draw_pile) + len(c.discard_pile) + len(c.exhaust_pile)
+    assert total2 == total, f"Havoc changed card count {total}->{total2}"
+    assert not any(x is top for x in c.draw_pile), "played card still in draw pile"
+    assert any(x is top for x in c.exhaust_pile), "played card not exhausted"
+    print("[PASS] Havoc plays+exhausts the top card without duplication")
+
+
+def test_warcry_no_twin_duplication():
+    """Warcry's equality-based hand.remove() could remove a twin and leave the
+    chosen card in hand AND the draw pile."""
+    from slay_bench.cards import Warcry
+    state = new_ironclad_game(42)
+    enemy = Cultist(state.rng.hp_rng)
+    start_combat(state, [enemy])
+    c = state.combat
+    wc, s1, s2 = Warcry(), Strike(), Strike()
+    c.hand[:] = [wc, s1, s2]
+    c.draw_pile.clear(); c.discard_pile.clear()
+    state.player.energy = 3
+    play_card(state, wc, enemy)
+    dup = [x for x in c.hand if any(x is d for d in c.draw_pile)]
+    assert not dup, "card object in hand AND draw pile after Warcry"
+    assert any(x is s2 for x in c.draw_pile), "chosen card (hand[-1]) not moved to draw"
+    assert any(x is s1 for x in c.hand), "twin wrongly removed from hand"
+    print("[PASS] Warcry moves the chosen object (no twin duplication)")
+
+
+def test_corruption_makes_skills_free():
+    """Under Corruption, skills must be playable at 0 energy, cost 0, and
+    exhaust — can_play used to demand the printed cost."""
+    state = new_ironclad_game(42)
+    enemy = Cultist(state.rng.hp_rng)
+    start_combat(state, [enemy])
+    state.player.corruption = True
+    state.player.energy = 0
+    d = Defend()
+    state.combat.hand[:] = [d]
+    assert d.can_play(state), "skill must be playable at 0 energy under Corruption"
+    play_card(state, d)
+    assert state.player.energy == 0
+    assert any(x is d for x in state.combat.exhaust_pile), "Corruption skill must exhaust"
+    print("[PASS] Corruption: skills free + exhausted")
+
+
+def test_searing_blow_formula():
+    """Searing Blow: 12 base, 16 at +1, 21 at +2 (was 6/11)."""
+    from slay_bench.cards import SearingBlow
+    sb = SearingBlow()
+    assert sb._damage() == 12, f"base {sb._damage()}"
+    sb.upgrade()
+    assert sb._damage() == 16, f"+1 {sb._damage()}"
+    sb.upgrade()
+    assert sb._damage() == 21, f"+2 {sb._damage()}"
+    print("[PASS] Searing Blow damage formula (12/16/21)")
+
+
+def test_reaper_heals_unblocked_only():
+    """Reaper used post-hit block in its heal calc and overhealed."""
+    from slay_bench.cards import Reaper
+    state = new_ironclad_game(42)
+    enemy = Cultist(state.rng.hp_rng)
+    start_combat(state, [enemy])
+    enemy.block = 3
+    state.player.hp = 10
+    r = Reaper()
+    state.combat.hand[:] = [r]
+    state.player.energy = 2
+    ehp = enemy.hp
+    play_card(state, r, enemy)
+    unblocked = ehp - enemy.hp
+    assert unblocked == 1, f"4 dmg into 3 block should land 1, landed {unblocked}"
+    assert state.player.hp == 11, f"heal must equal unblocked dmg: hp={state.player.hp}"
+    print("[PASS] Reaper heals exactly the unblocked damage")
+
+
+def test_choke_expires_at_turn_end():
+    """Choke's per-card-play HP loss lasts only the turn it was played."""
+    from slay_bench.enums import PowerId
+    state = new_ironclad_game(42)
+    enemy = Cultist(state.rng.hp_rng)
+    start_combat(state, [enemy])
+    enemy.powers[PowerId.CHOKED] = 3
+    end_player_turn(state)
+    assert PowerId.CHOKED not in enemy.powers, "Choked must expire at turn end"
+    print("[PASS] Choke expires at end of the turn")
+
+
+def test_finisher_does_not_count_itself():
+    """Finisher as the first attack of a turn deals 0 (it counted itself)."""
+    from slay_bench.cards_silent import Finisher, StrikeG
+    from slay_bench import new_game
+    state = new_game(42, "silent")
+    enemy = Cultist(state.rng.hp_rng)
+    start_combat(state, [enemy])
+    f = Finisher()
+    state.combat.hand[:] = [f]
+    state.player.energy = 3
+    ehp = enemy.hp
+    play_card(state, f, enemy)
+    assert ehp == enemy.hp, f"first Finisher must deal 0, dealt {ehp - enemy.hp}"
+    # second case: one attack before it -> 1x6 (fresh turn counter)
+    state.combat.attacks_played_this_turn = 0
+    f2, st = Finisher(), StrikeG()
+    state.combat.hand[:] = [st, f2]
+    state.player.energy = 3
+    enemy.block = 0
+    play_card(state, st, enemy)
+    ehp = enemy.hp
+    play_card(state, f2, enemy)
+    assert ehp - enemy.hp == 6, f"Finisher after 1 attack should deal 6, dealt {ehp - enemy.hp}"
+    print("[PASS] Finisher excludes itself from the attack count")
+
+
+def test_blood_for_blood_no_exhaust_and_upgrade_cost():
+    """BfB does not exhaust; BfB+ costs 3."""
+    from slay_bench.cards import BloodForBlood
+    b = BloodForBlood()
+    assert not b.exhaust, "Blood for Blood must not exhaust"
+    assert BloodForBlood(upgraded=True).cost == 3, "BfB+ must cost 3"
+    b.upgrade()
+    assert b.cost == 3, "upgrade() must lower cost to 3"
+    state = new_ironclad_game(42)
+    enemy = Cultist(state.rng.hp_rng)
+    start_combat(state, [enemy])
+    bfb = BloodForBlood()
+    state.combat.hand[:] = [bfb]
+    state.player.energy = 4
+    play_card(state, bfb, enemy)
+    assert not any(x is bfb for x in state.combat.exhaust_pile), "BfB wrongly exhausted"
+    assert any(x is bfb for x in state.combat.discard_pile), "BfB should be discarded"
+    print("[PASS] Blood for Blood: no exhaust, + costs 3")
+
+
+def test_perfected_strike_counts_itself():
+    """Perfected Strike is in no pile mid-play and was excluded from its own
+    strike count (−2/−3 damage every play)."""
+    from slay_bench.cards import PerfectedStrike
+    state = new_ironclad_game(42)
+    enemy = Cultist(state.rng.hp_rng)
+    enemy.hp = enemy.max_hp = 100
+    start_combat(state, [enemy])
+    c = state.combat
+    ps = PerfectedStrike()
+    c.hand[:] = [ps]
+    c.draw_pile[:] = [Strike(), Strike()]
+    c.discard_pile[:] = [Strike()]
+    c.exhaust_pile.clear()
+    state.player.energy = 2
+    enemy.block = 0
+    ehp = enemy.hp
+    play_card(state, ps, enemy)
+    # 3 Strikes in piles + itself = 4 strike-cards -> 6 + 4*2 = 14
+    assert ehp - enemy.hp == 14, f"expected 14, dealt {ehp - enemy.hp}"
+    print("[PASS] Perfected Strike counts itself (6 + 4x2 = 14)")
+
+
+def test_escape_plan_detects_twin_draw():
+    """Escape Plan's drawn-card detection used __eq__ and missed a drawn skill
+    whose twin was already in hand."""
+    from slay_bench.cards_silent import EscapePlan, DefendG
+    from slay_bench import new_game
+    state = new_game(42, "silent")
+    enemy = Cultist(state.rng.hp_rng)
+    start_combat(state, [enemy])
+    ep = EscapePlan()
+    state.combat.hand[:] = [ep, DefendG()]
+    state.combat.draw_pile.append(DefendG())  # top of pile, twin of hand card
+    state.player.energy = 3
+    blk = state.player.block
+    play_card(state, ep, enemy)
+    assert state.player.block - blk == 3, \
+        f"Escape Plan must gain 3 block on drawn skill, gained {state.player.block - blk}"
+    print("[PASS] Escape Plan detects the drawn card by identity")
+
+
+def test_play_card_rejects_replayed_card():
+    """Replaying an already-played card (twin still in hand) must raise —
+    equality membership used to accept it without removing anything."""
+    state = new_ironclad_game(42)
+    enemy = Cultist(state.rng.hp_rng)
+    start_combat(state, [enemy])
+    s1, s2 = Strike(), Strike()
+    state.combat.hand[:] = [s1, s2]
+    state.player.energy = 3
+    play_card(state, s1, enemy)
+    try:
+        play_card(state, s1, enemy)  # s1 already played; s2 (equal twin) in hand
+        raise AssertionError("replaying a played card must raise ValueError")
+    except ValueError:
+        pass
+    assert any(x is s2 for x in state.combat.hand), "twin must remain in hand"
+    print("[PASS] play_card rejects replay of an already-played object")
+
+
+def test_time_warp_locks_plays():
+    """Time Eater's Time Warp: hitting the card threshold ends the player's
+    plays for the turn and buffs the boss (the mechanic was dead code)."""
+    from slay_bench.enums import PowerId
+    state = new_ironclad_game(42)
+    enemy = Cultist(state.rng.hp_rng)
+    start_combat(state, [enemy])
+    enemy.powers[PowerId.TIME_WARP] = 2  # small threshold for the test
+    s1, s2, s3 = Strike(), Strike(), Strike()
+    state.combat.hand[:] = [s1, s2, s3]
+    state.player.energy = 5
+    play_card(state, s1, enemy)
+    assert s2.can_play(state), "lock must not engage before the threshold"
+    play_card(state, s2, enemy)  # 2nd play hits the threshold
+    assert state.combat.time_warp_lock, "Time Warp lock not set"
+    assert not s3.can_play(state), "plays must be locked after Time Warp"
+    assert enemy.powers.get(PowerId.STRENGTH) == 2, "Time Warp must grant 2 Strength"
+    end_player_turn(state)
+    assert not state.combat.time_warp_lock, "lock must clear next turn"
+    print("[PASS] Time Warp locks the turn at the play threshold")
+
+
 if __name__ == "__main__":
     tests = [
         test_cultist_fight_determinism,
@@ -483,6 +790,23 @@ if __name__ == "__main__":
         test_lantern_energy_survives_reset,
         test_gambling_chip_mulligan,
         test_pen_nib_counter_persists_across_combats,
+        # 2026-06-11 audit
+        test_hp_loss_bypasses_block,
+        test_burn_damage_blockable_not_hp_loss,
+        test_enemy_block_survives_player_turn,
+        test_lagavulin_metallicize_and_wake,
+        test_havoc_no_duplication,
+        test_warcry_no_twin_duplication,
+        test_corruption_makes_skills_free,
+        test_searing_blow_formula,
+        test_reaper_heals_unblocked_only,
+        test_choke_expires_at_turn_end,
+        test_finisher_does_not_count_itself,
+        test_blood_for_blood_no_exhaust_and_upgrade_cost,
+        test_perfected_strike_counts_itself,
+        test_escape_plan_detects_twin_draw,
+        test_play_card_rejects_replayed_card,
+        test_time_warp_locks_plays,
     ]
     passed = 0
     failed = 0

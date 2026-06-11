@@ -190,11 +190,9 @@ class SneckoSkull(Relic):
     id = "Snecko Skull"
     name = "Snecko Skull"
     def register(self, state):
-        from .enums import PowerId
-        def on_turn_end(gs, **kw):
-            if PowerId.POISON in gs.player.powers:
-                gs.player.powers[PowerId.POISON] = gs.player.powers[PowerId.POISON] + 1
-        state.bus.subscribe(Event.TURN_END, on_turn_end)
+        # +1 whenever the player applies Poison to an enemy — consumed in
+        # _apply_power. (The old TURN_END hook grew the PLAYER's own poison.)
+        state.player._snecko_skull = True
 
 
 class Strawberry(Relic):
@@ -225,6 +223,9 @@ class BlueCandle(Relic):
     id = "Blue Candle"
     name = "Blue Candle"
     def register(self, state):
+        # Makes curses playable (checked in Card.can_play — without this flag
+        # the CARD_PLAY hook below could never fire and the relic was a no-op)
+        state.player._blue_candle = True
         def on_card_play(gs, card=None, **kw):
             from .enums import CardType
             if card and card.type == CardType.CURSE:
@@ -979,8 +980,10 @@ class PandorasBox(Relic):
         character = getattr(state, "character", "ironclad")
         char_pool = card_pool_for(state)
         deck = state.player.deck
-        strikes = [c for c in deck if "strike" in c.id.lower()]
-        defends = [c for c in deck if "defend" in c.id.lower()]
+        # BASIC Strikes/Defends only — the old substring match on the id also
+        # transformed Twin/Perfected/Pommel/Wild/Sneaky Strike etc.
+        strikes = [c for c in deck if c.id in ("Strike_R", "Strike_G")]
+        defends = [c for c in deck if c.id in ("Defend_R", "Defend_G")]
         for c in strikes + defends:
             deck.remove(c)
         for _ in range(len(strikes)):

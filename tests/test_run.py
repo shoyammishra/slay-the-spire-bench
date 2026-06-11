@@ -329,6 +329,139 @@ def test_elite_relic_drop_tagging():
     print("[PASS] Spawn sites tag elite/boss enemies")
 
 
+# ── 2026-06-11 audit regression tests ─────────────────────────────────────────
+
+def test_neow_gated_to_run_start():
+    """Neow's Lament must not appear in the mid-run event pool (its auto-picked
+    1-HP boon trivialised combats and inflated run-level scores)."""
+    state = new_ironclad_game(42)
+    state.player.floor = 1
+    ids = [e.id for e in available_events(state)]
+    assert "Neow" not in ids, "Neow available mid-run"
+    state.player.floor = 0
+    ids0 = [e.id for e in available_events(state)]
+    assert "Neow" in ids0, "Neow should be available at run start (floor 0)"
+    print("[PASS] Neow's Lament is gated to floor 0")
+
+
+def test_events_do_not_repeat():
+    """random_event must not redraw an event seen earlier in the run until the
+    pool is exhausted."""
+    state = new_ironclad_game(42)
+    state.player.floor = 1
+    seen = [random_event(state).id for _ in range(8)]
+    assert len(seen) == len(set(seen)), f"event repeated: {seen}"
+    print("[PASS] Events do not repeat within a run")
+
+
+def test_mind_bloom_war_no_free_gold():
+    """'I am War' must not grant the 100-gold reward while the boss fight is
+    unimplemented."""
+    from slay_bench.events_pool import EVENT_REGISTRY
+    state = new_ironclad_game(42)
+    state.act = 3
+    gold = state.player.gold
+    resolve_event(state, EVENT_REGISTRY["MindBloom"], 0)
+    assert state.player.gold == gold, f"free gold granted: {gold}->{state.player.gold}"
+    print("[PASS] Mind Bloom 'I am War' grants no unearned gold")
+
+
+def test_snecko_skull_buffs_applied_poison():
+    """Snecko Skull: +1 poison the player APPLIES to enemies — it used to grow
+    the player's OWN poison instead (actively harmful)."""
+    from slay_bench import new_game
+    from slay_bench.combat import start_combat
+    from slay_bench.enemies import Cultist
+    from slay_bench.enums import PowerId
+    from slay_bench.cards import _apply_power
+    state = new_game(7, "silent")
+    enemy = Cultist(state.rng.hp_rng)
+    start_combat(state, [enemy])
+    state.player._snecko_skull = True
+    _apply_power(state, enemy, PowerId.POISON, 5)
+    assert enemy.powers[PowerId.POISON] == 6, \
+        f"enemy poison should be 5+1, got {enemy.powers[PowerId.POISON]}"
+    _apply_power(state, state.player, PowerId.POISON, 2)
+    assert state.player.powers[PowerId.POISON] == 2, \
+        "player-targeted poison must NOT be bumped"
+    print("[PASS] Snecko Skull buffs poison applied to enemies only")
+
+
+def test_blue_candle_makes_curses_playable():
+    """Blue Candle was a no-op: curses stayed unplayable, so its hook never
+    fired. Now: playable, lose 1 HP, exhausted."""
+    from slay_bench.relics_full import BlueCandle
+    from slay_bench.combat import start_combat, play_card
+    from slay_bench.enemies import Cultist
+    from slay_bench.cards import make_card
+    state = new_ironclad_game(42)
+    bc = BlueCandle()
+    state.player.relics.append(bc)
+    enemy = Cultist(state.rng.hp_rng)
+    start_combat(state, [enemy])
+    curse = make_card("Regret")
+    state.combat.hand[:] = [curse]
+    assert curse.can_play(state), "curse must be playable with Blue Candle"
+    hp = state.player.hp
+    energy = state.player.energy
+    play_card(state, curse)
+    assert hp - state.player.hp == 1, f"should cost 1 HP, lost {hp - state.player.hp}"
+    assert state.player.energy == energy, "curse must cost 0 energy (not -1!)"
+    assert any(x is curse for x in state.combat.exhaust_pile), "curse must exhaust"
+    print("[PASS] Blue Candle: curses playable (1 HP, exhaust, 0 energy)")
+
+
+def test_pandoras_box_transforms_basics_only():
+    """Pandora's Box matched 'strike' as a substring and transformed
+    Twin/Perfected/Pommel Strike too."""
+    from slay_bench.relics_full import PandorasBox
+    from slay_bench.cards import Strike, Defend, make_card
+    state = new_ironclad_game(42)
+    state.player.deck = [Strike(), Strike(), Defend(), make_card("Twin Strike"),
+                         make_card("Perfected Strike"), make_card("Pommel Strike")]
+    PandorasBox().on_pickup(state)
+    names = [c.name for c in state.player.deck]
+    for kept in ("Twin Strike", "Perfected Strike", "Pommel Strike"):
+        assert kept in names, f"{kept} wrongly transformed"
+    assert "Strike" not in names and "Defend" not in names, "basics not transformed"
+    print("[PASS] Pandora's Box transforms basic Strikes/Defends only")
+
+
+def test_fairy_in_a_bottle_revives():
+    """Potions were never registered on the bus — Fairy's auto-revive could
+    not fire. start_combat now registers potion hooks."""
+    from slay_bench.potions import FairyInABottle
+    from slay_bench.combat import start_combat
+    from slay_bench.enemies import Cultist
+    from slay_bench.cards import _damage_player
+    state = new_ironclad_game(42)
+    fairy = FairyInABottle()
+    fairy._triggered = False
+    state.player.potions.append(fairy)
+    enemy = Cultist(state.rng.hp_rng)
+    start_combat(state, [enemy])
+    state.player.hp = 5
+    _damage_player(state, 99)
+    expected = max(1, int(state.player.max_hp * 0.3))
+    assert state.player.hp == expected, \
+        f"Fairy should revive to 30% max HP ({expected}), hp={state.player.hp}"
+    assert fairy not in state.player.potions, "Fairy must be consumed"
+    print("[PASS] Fairy in a Bottle registers and revives on lethal damage")
+
+
+def test_random_relic_fallback_stays_in_class():
+    """When every fresh relic of a rarity is owned, the fallback must stay
+    within character-allowed relics (it used to leak the FULL registry)."""
+    from slay_bench.relics import random_relic
+    from slay_bench.relics_full import _RARITY_POOLS, relic_allowed
+    state = new_ironclad_game(42)
+    state.player.relics.extend(cls() for cls in _RARITY_POOLS["common"])
+    for _ in range(10):
+        r = random_relic(state, "common")
+        assert relic_allowed(r.id, "ironclad"), f"off-class relic leaked: {r.id}"
+    print("[PASS] random_relic fallback never leaks off-class relics")
+
+
 if __name__ == "__main__":
     tests = [
         test_map_generation,
@@ -353,6 +486,15 @@ if __name__ == "__main__":
         test_bag_of_preparation_every_combat,
         test_pickup_relics_mutate_deck,
         test_elite_relic_drop_tagging,
+        # 2026-06-11 audit
+        test_neow_gated_to_run_start,
+        test_events_do_not_repeat,
+        test_mind_bloom_war_no_free_gold,
+        test_snecko_skull_buffs_applied_poison,
+        test_blue_candle_makes_curses_playable,
+        test_pandoras_box_transforms_basics_only,
+        test_fairy_in_a_bottle_revives,
+        test_random_relic_fallback_stays_in_class,
     ]
     passed = failed = 0
     for test in tests:

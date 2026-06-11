@@ -76,9 +76,10 @@ def register_power_hooks(state: GameState) -> None:
         from .cards import _damage_player, _apply_power
         player = gs.player
 
-        # Combust: lose HP, deal damage to all enemies
+        # Combust: lose 1 HP per Combust played, deal damage to all enemies
         if PowerId.COMBUST in player.powers:
-            _damage_player(gs, 1, is_hp_loss=True)
+            _damage_player(gs, max(1, getattr(player, '_combust_plays', 1)),
+                           is_hp_loss=True)
             for e in gs.combat.enemies:
                 if e.hp > 0:
                     from .cards import _apply_damage_to_enemy

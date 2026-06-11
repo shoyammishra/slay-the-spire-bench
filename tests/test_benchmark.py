@@ -613,6 +613,23 @@ def test_turn_prompt_states_damage_objective():
     print("[PASS] Turn system prompt states the damage-only objective")
 
 
+def test_duplicate_play_indices_are_illegal():
+    """`plays: [i, i]` used to replay an already-played card through an
+    identical twin (equality membership) and was scored LEGAL with full
+    damage — it could even beat the oracle via hand-counting cards."""
+    state = new_ironclad_game(11)
+    enemy = Cultist(state.rng.hp_rng)
+    start_combat(state, [enemy])
+    strikes = [i for i, c in enumerate(state.combat.hand) if c.name == "Strike"]
+    assert len(strikes) >= 2, "test needs two identical Strikes in the opening hand"
+    i, j = strikes[0], strikes[1]
+    dmg_dup, legal_dup = _simulate_play_sequence(state, [i, i])
+    assert not legal_dup, "duplicate index must be scored illegal"
+    dmg_ok, legal_ok = _simulate_play_sequence(state, [i, j])
+    assert legal_ok and dmg_ok == 12, f"distinct twins must stay legal: {dmg_ok}/{legal_ok}"
+    print("[PASS] Duplicate play indices are illegal; distinct twins legal")
+
+
 if __name__ == "__main__":
     tests = [
         test_structured_prompt,
@@ -647,6 +664,8 @@ if __name__ == "__main__":
         test_synergy_prompts_vary_across_base_seeds,
         test_intent_shows_effective_damage,
         test_turn_prompt_states_damage_objective,
+        # 2026-06-11 audit
+        test_duplicate_play_indices_are_illegal,
     ]
     passed = failed = 0
     for test in tests:

@@ -230,6 +230,12 @@ def _resolve_combat(run: RunState, node: MapNode,
             break
         end_player_turn(state)
 
+    # 100-turn draw: clear the stale combat so between-combat code that keys
+    # on `state.combat is None` doesn't see a dead combat object. (No
+    # COMBAT_END: a draw is not a win — Burning Blood must not heal.)
+    if result["outcome"] is None:
+        state.combat = None
+
     if result["outcome"] == "win":
         end_combat(state)
         # Rewards
@@ -293,7 +299,9 @@ def _resolve_rest(run: RunState, card_choice_fn: Optional[Callable] = None) -> d
 
     # Coffee Dripper makes REST useless → SMITH, unless Fusion Hammer forbids it
     if no_heal and not no_smith:
-        candidates = [c for c in p.deck if not c.upgraded]
+        # Curses/statuses can't be upgraded — picking one wasted the smith
+        candidates = [c for c in p.deck if not c.upgraded
+                      and c.type not in (CardType.CURSE, CardType.STATUS)]
         card = candidates[0] if candidates else None
         resolve_rest(state, RestSiteAction.SMITH, card)
         return {"outcome": "smith", "upgraded": card}

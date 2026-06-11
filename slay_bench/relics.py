@@ -379,10 +379,11 @@ def random_relic(state: GameState, rarity: str = "common") -> Relic:
         pool = _RARITY_POOLS.get(rarity, _RARITY_POOLS["common"])
         character = getattr(state, "character", "ironclad")
         owned = {r.id for r in state.player.relics}
-        filtered = [cls for cls in pool
-                    if relic_allowed(cls.id, character) and cls.id not in owned]
-        if filtered:
-            pool = filtered
+        allowed = [cls for cls in pool if relic_allowed(cls.id, character)]
+        fresh = [cls for cls in allowed if cls.id not in owned]
+        # Staged fallback: never fall back to the FULL registry (which leaks
+        # off-class relics) just because every fresh relic is owned.
+        pool = fresh or allowed or pool
     except ImportError:
         pool = list(RELIC_REGISTRY.values())
     if not pool:

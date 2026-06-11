@@ -36,6 +36,10 @@ def _register_events() -> Dict[str, GameEvent]:
         name="Neow's Lament",
         description="You encounter Neow at the start of your journey.",
         acts=[1],
+        # Run-start ONLY: without the floor gate this sat in the regular event
+        # pool, and the auto-picked choice 0 (1-HP enemies for 3 combats)
+        # trivialised combats mid-run — inflating run-level scores.
+        condition=lambda s: s.player.floor == 0,
         choices=[
             EventChoice("Enemies in your first 3 combats have 1 HP", lambda s: _neow_1hp(s)),
             EventChoice("Obtain 100 gold", lambda s: _give_gold(s, 100)),
@@ -526,7 +530,7 @@ def _shining_light(state: GameState) -> str:
     return f"Lost {loss} HP, upgraded {upgraded} cards."
 
 def _nloths_trade(state: GameState) -> str:
-    if len(state.player.relics) < 2:
+    if len(state.player.relics) < 3:  # matches the event's availability condition
         return "Not enough relics."
     state.player.relics.pop()
     state.player.relics.pop()
@@ -546,8 +550,9 @@ def _falling_lose_card(state: GameState) -> str:
     return "No cards of that type to lose."
 
 def _mind_bloom_war(state: GameState) -> str:
-    state.player.gold += 100
-    return "Fight Act 1 boss! (not implemented in event-only mode)"
+    # The boss fight is not implemented in event-only mode — granting the
+    # 100-gold reward without the fight was a free lunch for the run loop.
+    return "Fight Act 1 boss! (not implemented in event-only mode — no reward)"
 
 def _mind_bloom_awake(state: GameState) -> str:
     gain = len(state.player.deck) // 5
@@ -655,12 +660,17 @@ def available_events(state: GameState) -> List[GameEvent]:
 
 
 def random_event(state: GameState) -> GameEvent:
-    """Select a random event for the current floor."""
-    pool = available_events(state)
+    """Select a random event for the current floor. Events seen this run are
+    excluded until the pool is exhausted (StS events don't repeat)."""
+    seen = getattr(state, '_seen_events', set())
+    available = available_events(state)
+    pool = [e for e in available if e.id not in seen]
     if not pool:
-        pool = list(EVENT_REGISTRY.values())
+        pool = available or list(EVENT_REGISTRY.values())
     idx = state.rng.event_rng.next_int(len(pool))
-    return pool[idx]
+    event = pool[idx]
+    state._seen_events = seen | {event.id}
+    return event
 
 
 def resolve_event(state: GameState, event: GameEvent, choice_index: int) -> str:

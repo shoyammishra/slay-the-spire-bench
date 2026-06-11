@@ -846,11 +846,9 @@ class TimeEater(Enemy):
         else:
             _enemy_attack(state, self, m)
 
-    def check_time_warp(self, state):
-        """Call after each card play — takes extra turn at 12 cards."""
-        if state.combat.cards_played_this_combat % 12 == 0 and state.combat.cards_played_this_combat > 0:
-            # Enemy takes an extra turn
-            self.add_block(self.powers.get(PowerId.STRENGTH, 0))
+    # Time Warp (every 12th card play ends the player's turn + the boss gains
+    # 2 Strength) is enforced by the engine: play_card checks TIME_WARP and
+    # sets combat.time_warp_lock. (The old check_time_warp here was dead code.)
 
 
 # ── Register additions ────────────────────────────────────────────────────────

@@ -179,12 +179,13 @@ class DuplicationPotion(Potion):
 class GamblersBrew(Potion):
     def __init__(self): super().__init__("Gambler's Brew", "Gambler's Brew")
     def use(self, state, target=None):
-        # Discard any number of cards, draw that many
-        from .cards import _draw_cards
+        # Discard any number of cards, draw that many. Route through
+        # _discard_from_hand so discard triggers (Reflex/Tactician/Tingsha,
+        # discarded_this_turn) fire like a real discard.
+        from .cards import _draw_cards, _discard_from_hand
         n = len(state.combat.hand)
         for c in list(state.combat.hand):
-            state.combat.discard_pile.append(c)
-        state.combat.hand.clear()
+            _discard_from_hand(state, c)
         _draw_cards(state, n)
 
 

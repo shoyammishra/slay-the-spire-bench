@@ -314,14 +314,19 @@ def _simulate_play_sequence(state_snapshot, sequence: List[int]) -> Tuple[int, b
     # Snapshot cards by their original index so hand-shifting doesn't corrupt lookups
     initial_hand = list(c.hand)
 
+    used: set = set()
     for raw_idx in sequence:
         # LLMs return strings/null/floats; negative ints would silently index
         # from the end. Anything that isn't a valid hand index = illegal play.
+        # Repeated indices are illegal too: with an identical twin in hand,
+        # equality-based membership let `[2, 2]` replay an already-played card
+        # (scored legal — and hand-counting cards could even beat the oracle).
         idx = _safe_int(raw_idx, default=-1)
-        if idx < 0 or idx >= len(initial_hand):
+        if idx < 0 or idx >= len(initial_hand) or idx in used:
             return (initial_enemy_hp - sum(e.hp for e in c.enemies if e.hp > 0), False)
+        used.add(idx)
         card = initial_hand[idx]
-        if card not in c.hand:
+        if not any(h is card for h in c.hand):  # identity, not __eq__
             return (initial_enemy_hp - sum(e.hp for e in c.enemies if e.hp > 0), False)
         if not card.can_play(s):
             return (initial_enemy_hp - sum(e.hp for e in c.enemies if e.hp > 0), False)
@@ -371,7 +376,10 @@ def _exhaustive_best_sequence(state_snapshot) -> Tuple[int, List[int]]:
             key = (card.name, card.upgraded, card.effective_cost())
             if key in tried:
                 continue
-            if card not in s.combat.hand or not card.can_play(s):
+            # Identity membership: equality let the oracle "play" a card that a
+            # side effect (auto-discard/exhaust) had removed, as long as an
+            # identical twin remained — overstating the legal optimum.
+            if not any(h is card for h in s.combat.hand) or not card.can_play(s):
                 continue
             tried.add(key)
             budget[0] -= 1
@@ -1142,7 +1150,7 @@ class RunEvaluator:
             end_combat(state)
         return False, turns
 
-    def _act_transition(self, state) -> None:
+    def _act_transition(self, state, counters: Optional[dict] = None) -> None:
         """Between-act bookkeeping after an act boss dies: full heal (base-game
         behaviour at Ascension 0) and an LLM-chosen boss relic."""
         from .rewards import generate_boss_relic_choices
@@ -1155,6 +1163,8 @@ class RunEvaluator:
         relic_ids = [r for r in relic_ids if r != "Black Blood"]  # Ironclad-keyed swap relic; keep simple
         if relic_ids:
             try:
+                if counters is not None:
+                    counters["llm_calls"] = counters.get("llm_calls", 0) + 1
                 pick = self._llm_boss_relic_choice(state, relic_ids)
             except RateLimitExhausted:
                 raise
@@ -1251,7 +1261,10 @@ class RunEvaluator:
                     if self._llm_rest_choice(state) == "smith":
                         action = RestSiteAction.SMITH
                 if action == RestSiteAction.SMITH:
-                    candidates = [c for c in p.deck if not c.upgraded]
+                    # Curses/statuses can't be upgraded (CurseBase.upgrade is a
+                    # no-op) — picking one wasted the smith every rest.
+                    candidates = [c for c in p.deck if not c.upgraded
+                                  and c.type not in (CardType.CURSE, CardType.STATUS)]
                     card = candidates[0] if candidates else None
                 resolve_rest(state, action, card)
                 # Dream Catcher: a card reward when you rest
@@ -1333,7 +1346,7 @@ class RunEvaluator:
                 break
             acts_completed += 1
             if act < n_acts:
-                self._act_transition(state)
+                self._act_transition(state, counters)
 
         archetype = _classify_archetype(state.player.deck, state.player.relics,
                                         self.character)
