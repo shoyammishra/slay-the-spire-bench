@@ -1,6 +1,28 @@
 # Decision Log
 
-## 2026-06-11 — Card pile membership is by IDENTITY, never by equality
+## 2026-06-11 (3rd audit) — Block resets at its OWNER's turn start
+**Decision:** Player block resets in `_begin_player_turn`; ENEMY block resets at the start of the enemy phase in `end_player_turn`. Enemy block gained during the enemy phase therefore persists through the player's next turn.
+**Why:** Resetting enemy block at the player's turn start wiped every enemy blocking move (Jaw Worm Bellow, The Champ Defensive Stance, enemy Metallicize, Curl Up...) before the player could attack into it — all enemy defense was a silent no-op, making every combat easier than real StS for BOTH the LLM and the greedy baseline.
+
+## 2026-06-11 (3rd audit) — Three player-damage modes in `_damage_player`
+**Decision:** (1) default = enemy ATTACK damage: block + Intangible + Vulnerable + Torii apply; (2) `from_attack=False` = non-attack damage (Thorns retaliation, Burn/Decay ticks): blockable + Intangible-capped, but never Vulnerable-amplified, no Torii; (3) `is_hp_loss=True` = HP loss (Offering, Combust, player poison, curse ticks): bypasses block/Intangible/Vulnerable entirely. Tungsten Rod applies to all three.
+**Why:** Block used to absorb HP-loss effects (neutering Offering/player-poison/Combust), and player Vulnerable amplified Thorns. These are distinct StS damage classes; one boolean couldn't express them.
+
+## 2026-06-11 (3rd audit) — play_card is identity-strict and raising; repeated turn-eval indices are illegal
+**Decision:** `play_card` checks hand membership by object identity and raises if `_remove_identical` fails; `_simulate_play_sequence` rejects duplicate indices; the turn oracle uses identity membership.
+**Why:** Equality membership let `plays: [2, 2]` replay an already-played card through an identical twin — scored LEGAL with full damage, and hand-counting cards (Fiend Fire) could beat the legal optimum. The same hole let the oracle play side-effect-removed cards. Closes the instrument loophole at engine, simulator, and oracle level.
+
+## 2026-06-11 (3rd audit) — Neow is floor-0 only; events never repeat within a run
+**Decision:** Neow's Lament gets `condition: floor == 0` (events fire at floor ≥ 1, so it is out of the mid-run pool); `random_event` tracks `state._seen_events` and excludes seen events until the pool is exhausted. Unimplemented event fights grant no reward (Mind Bloom "I am War" gold removed).
+**Why:** Run-level integrity: the auto-picked Neow boon (1-HP enemies ×3 combats) could trivialize combats from any event node, and repeatable events let free-reward events compound — both inflated run-level scores.
+
+## 2026-06-11 (3rd audit) — Time Warp ≈ play-lock (engine-level), not an extra enemy turn
+**Decision:** `play_card` checks enemies for `PowerId.TIME_WARP`; every Nth (12th) card play sets `combat.time_warp_lock` (all `can_play` → False until next turn) and grants the boss +2 Strength. `_begin_player_turn` clears the lock.
+**Why:** Real Time Warp ends your turn and the boss acts; a forced mid-call turn-end doesn't fit the play_card API. The lock reproduces the strategic constraint (≤12 plays between enemy turns + ramp) without restructuring the turn loop. The old `check_time_warp` method was dead code — the Act-3 boss's signature mechanic simply didn't exist.
+
+## 2026-06-11 (3rd audit) — Potions are inventory-only BY DESIGN (but registered for passive hooks)
+**Decision:** No policy (greedy or LLM) drinks potions; `Potion.use()` has no callers and POTION_USED is never emitted. `start_combat` now registers potion `register()` hooks so PASSIVE potions (Fairy in a Bottle) work. Documented simplification, revisit if a potion-action dimension is ever wanted.
+**Why:** Wiring potion-drinking into the LLM action space changes every prompt/action schema and the greedy baseline; not worth it pre-paper. But Fairy is passive — leaving it dead was just a bug.
 **Decision:** All pile mutations for a specific card object go through `cards._remove_identical()` / `any(c is card for c in pile)`. `list.remove(card)` and `card in pile` are banned for combat piles.
 **Why:** `Card` is a `@dataclass` → field-based `__eq__`; equality checks matched identical twins (another Strike), so played cards VANISHED from the game whenever a duplicate was in hand, and `_exhaust_card`/`_discard_from_hand` could remove or duplicate the wrong copy. Starter decks (5 Strikes/4 Defends) hit this constantly.
 

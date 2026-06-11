@@ -1,5 +1,23 @@
 # Experiment Log
 
+## 2026-06-11 (later) — 3rd audit + fix batch (NO API runs; mock verification only)
+
+**What ran:** full test suite (**102/102**, was 77; +25 regression tests) and mock
+pipeline (`--provider mock`, seed 42) for Ironclad structured + raw and Silent
+structured — green end-to-end. No API calls.
+
+**What changed (data-validity consequences):** 40 new bugs fixed
+(`docs/bug_audit_2026-06-11.md`). Combat dynamics changed for a FOURTH time:
+HP-loss now bypasses block, Havoc no longer shrinks/duplicates decks, and —
+biggest — **enemy block now actually exists** (it was wiped before the player's
+turn, so all enemy blocking moves were no-ops; enemies are tougher). Turn-eval
+duplicate-index replay loophole closed (legality is stricter — turn scores not
+comparable to stale ones for this reason too). Run-level: Neow's 1-HP boon removed
+from the mid-run event pool, events no longer repeat → the first valid run-level
+pass will be on a fairer, harder run loop. **Synergy n=20 (2026-06-10, de-biased)
+remains the only valid data — unaffected** (one prompt-byte change: Blood for
+Blood's exhaust flag in a single Aggro offer is now false).
+
 ## 2026-06-11 — Engine-fidelity fix batch (NO API runs; mock verification only)
 
 **What ran:** full test suite (77/77, was 56; +21 regression tests) and mock pipeline

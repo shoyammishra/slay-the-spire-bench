@@ -46,6 +46,29 @@
   decks changed (Perfected-Strike removal) → the next synergy run regenerates;
   aggregates comparable, per-row values not.
 
+### M2.8 — Third full audit + same-day fix batch (DONE 2026-06-11)
+- Fresh full-source re-read found **40 NEW bugs** (none regressions); all fixed same
+  day. Full spec + per-item fix notes: `docs/bug_audit_2026-06-11.md`.
+- Instrument: turn-eval **duplicate-index loophole** closed (identity-strict
+  play_card/simulator/oracle; repeated indices illegal); **Neow's Lament removed from
+  the mid-run event pool** (its auto-picked 1-HP boon inflated run-level); events no
+  longer repeat in a run.
+- Engine (3 combat-dynamics changes): **HP-loss effects now bypass block**;
+  **Havoc no longer duplicates the top draw card**; **enemy block now persists
+  through the player's turn** (it was wiped at player-turn start — every enemy
+  blocking move was a no-op; enemies are tougher now). Plus ~15 card fixes
+  (Searing Blow ½-damage, Reaper overheal, Choke/Finisher/BfB/Corruption/
+  Perfected Strike...), relic fixes (Snecko Skull poisoned the PLAYER, Blue Candle
+  no-op, Pandora's Box substring match, Fairy-in-a-Bottle never registered), enemy
+  fidelity (Lagavulin Metallicize, Time Eater Time Warp implemented, Acid Slime
+  Slimed, Slime Boss split HP).
+- **102/102 tests** (was 77; +25 regression tests); mock pipeline green both
+  characters + formats.
+- **Data consequence:** turn/combat stale for a FOURTH reason (B1+B2+B12) —
+  re-baseline before any paid turn/combat collection. **Synergy n=20 stays valid**
+  (no synergy-path change). Run-level still has no valid data (and is now free of
+  the Neow inflation source).
+
 ### M3 — Paper-grade evaluation (IN PROGRESS — blocked on paid Groq)
 - n≥20 samples per dimension per model, ≥5 seeds, both formats, mean±std
 - Models: llama-3.1-8b, llama-4-scout-17b + a 3rd family (qwen3-32b dropped —
@@ -144,5 +167,6 @@ the most money.
 - Bug sweep / hardening (21 fixes, 47 tests): 2026-06-10
 - 2nd instrument audit (5 fixes, 56 tests) + synergy n=20 de-biased: 2026-06-10
 - Engine-fidelity batch (audit Part 2 + Part 3, 77 tests): 2026-06-11
+- 3rd full audit + fix batch (40 bugs, 102 tests): 2026-06-11
 - Paper-grade runs: TBD (gated on paid Groq Dev tier)
 - Draft: TBD

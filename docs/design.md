@@ -51,6 +51,21 @@ slay_bench/
 - **Pile membership is by IDENTITY (2026-06-11)**: `Card` is a dataclass → field-based
   `__eq__`; `list.remove`/`in` on combat piles match identical twins. Use
   `cards._remove_identical()` / `any(c is card for …)` for any specific card object.
+  `play_card` raises if the exact object isn't in hand; the turn-eval simulator
+  additionally rejects repeated hand indices (anti-replay).
+- **Player-damage modes (2026-06-11, 3rd audit)**: `_damage_player` — default = attack
+  damage (block/Intangible/Vulnerable/Torii); `from_attack=False` = non-attack damage
+  (Thorns, Burn/Decay: blockable, Intangible-capped, NO Vulnerable amp, no Torii);
+  `is_hp_loss=True` = HP loss (Offering/Combust/player poison/curses: bypasses
+  block/Intangible/Vulnerable). Tungsten Rod applies to all.
+- **Block resets at its owner's turn start (2026-06-11, 3rd audit)**: player block in
+  `_begin_player_turn`; enemy block at the start of the enemy phase in
+  `end_player_turn` — enemy blocking moves protect through the player's next turn.
+- **Time Warp (2026-06-11, 3rd audit)**: `play_card` sets `combat.time_warp_lock`
+  every Nth play vs an enemy with `PowerId.TIME_WARP` (+2 Str to it); `can_play`
+  returns False under the lock; cleared at next turn start.
+- **Potions (2026-06-11, 3rd audit)**: inventory-only by design (nothing drinks them);
+  `start_combat` registers potion hooks so passive ones (Fairy in a Bottle) fire.
 - **CARD_DISCARD = manual discards only (2026-06-11)**: playing a card and the end-of-turn
   hand discard emit nothing; only `_discard_from_hand` emits (Tingsha-class triggers).
 - **Relic counter lifecycles (2026-06-11)**: per-RUN counters = class attributes, never

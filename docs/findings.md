@@ -1,5 +1,32 @@
 # Findings
 
+## ⚠️ 3rd audit (2026-06-11): enemy block was a no-op, HP-loss was blockable, and the turn eval had a replay loophole
+
+A third full-source audit (after the engine-fidelity batch landed) found 40 more bugs —
+all fixed same day, 102/102 tests (`docs/bug_audit_2026-06-11.md`). Three matter for
+interpreting any past or future numbers:
+
+1. **Every enemy blocking move was a silent no-op** — enemy block was reset at the
+   *player's* turn start, so Bellow/Defensive Stance/enemy Metallicize/Curl Up never
+   protected anything. All simulated combats were easier than real StS (symmetric for
+   LLM and greedy bot, but it shifts win rates and HP margins for both). Block now
+   resets at the enemy phase start.
+2. **HP-loss effects (Offering, Combust, player-side poison) were absorbed by block** —
+   notably, poison *against the player* was largely neutralized by leftover block.
+   Now bypasses block, per StS rules.
+3. **Turn-eval replay loophole:** `plays: [i, i]` with an identical twin in hand
+   replayed an already-played card and was scored *legal* — a model could (and with
+   hand-counting cards like Fiend Fire, would) exceed the legal optimum; damage_ratio's
+   1.0 cap masked it. The duplicate-index path is now illegal and the whole stack
+   (play_card / simulator / oracle) is identity-strict. Stale turn-level legal-rate and
+   damage-ratio numbers are tainted by this in an unmeasurable direction — one more
+   reason they are history-only.
+
+Also closed: **Neow's Lament sat in the mid-run event pool** — its auto-picked boon
+(enemies at 1 HP for 3 combats) could trigger from any EVENT node, an upward bias lying
+in wait for the first valid run-level pass (run-level never had valid data, so no
+published number is affected). Synergy n=20 is untouched by all of the above.
+
 ## ⚠️ Played cards VANISHED from combat — every prior combat simulation under-decked (2026-06-11)
 
 The engine-fidelity batch's pass over the card implementations found that `Card` (a
