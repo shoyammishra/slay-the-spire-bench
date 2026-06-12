@@ -12,8 +12,14 @@
 #     sbatch cluster/turn_combat.sbatch
 # or by editing the defaults below.
 
-: "${HF_REPO:=Qwen/Qwen3-32B}"   # HuggingFace repo to serve (one A100 80GB fits 32B)
-: "${SERVED_NAME:=qwen3-32b}"    # clean alias -> benchmark --model + result filenames
+# NOTE: the installed stack is vLLM 0.6.6 + transformers 4.47.1, which does NOT
+# support the qwen3 architecture (that needs vLLM 0.8.x+ — see CLAUDE.md). So the
+# default is a qwen2.5 model that runs on this stack TODAY. To serve qwen3-32b,
+# first upgrade vLLM (check CUDA-12.8 compat), then override:
+#   HF_REPO=Qwen/Qwen3-32B SERVED_NAME=qwen3-32b sbatch ...
+# A bigger qwen2.5 also fits one A100 80GB: HF_REPO=Qwen/Qwen2.5-32B-Instruct.
+: "${HF_REPO:=Qwen/Qwen2.5-7B-Instruct}"  # HuggingFace repo to serve
+: "${SERVED_NAME:=qwen2.5-7b}"            # clean alias -> --model + result filenames
 : "${VLLM_PORT:=8000}"
 : "${TP_SIZE:=1}"                # tensor-parallel GPU count (set 2 for a 70B over 2 A100s)
 : "${VLLM_EXTRA:=}"             # any extra `vllm serve` args (e.g. --max-model-len 8192)
