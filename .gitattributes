@@ -1,0 +1,5 @@
+# Shell + Slurm scripts run on the Linux GPU cluster — they MUST keep LF line
+# endings, or bash fails with "#!/bin/bash\r: bad interpreter". Pin them so a
+# Windows editor with autocrlf can't sneak CRLF into the repo.
+*.sh    text eol=lf
+*.sbatch text eol=lf
