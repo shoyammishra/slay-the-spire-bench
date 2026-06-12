@@ -23,7 +23,11 @@ fi
 conda activate slaybench
 
 pip install --upgrade pip
-pip install vllm matplotlib
+# Pin to CUDA 12.x compatible versions (cluster driver = CUDA 12.8 / version 12080).
+# vLLM 0.22+ requires CUDA 13.x — pin to 0.6.x which supports CUDA 12.4/12.8.
+# transformers must stay on 4.x — 5.x removed all_special_tokens_extended which vLLM 0.6.6 calls.
+pip install torch==2.5.1 --index-url https://download.pytorch.org/whl/cu124
+pip install vllm==0.6.6 "transformers==4.47.1" matplotlib
 
 # Keep large model weights off the 300 GB home quota — scratch is 1 TB.
 mkdir -p ~/scratch/hf_cache
