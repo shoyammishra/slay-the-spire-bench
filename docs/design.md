@@ -104,6 +104,19 @@ slay_bench/
 - `--seeds 42 43 …` runs the full benchmark per seed, saves per-seed JSON+charts, then writes a
   combined JSON with mean ± std per metric.
 
+## LLM Providers (`LLMInterface` implementations in benchmark.py)
+- `GroqLLM` — Groq SDK; typed 429 detection + 6-attempt backoff → `RateLimitExhausted` for graceful partial-save.
+- `OpenRouterLLM` — OpenAI-shaped HTTP over urllib; 402 = hard "add credits" error, 429 retried.
+- `LocalLLM` (2026-06-12, GPU phase) — OpenAI-compatible `/v1/chat/completions` over urllib for a
+  self-hosted server (vLLM `:8000/v1`, Ollama `:11434/v1`, TGI). `--provider local --base-url URL`
+  (falls back to `$LOCAL_BASE_URL` then `http://localhost:8000/v1`). Differs from `OpenRouterLLM`: no
+  402 wall (a local server never bills → any non-429 HTTP error is surfaced with the response body so a
+  misconfigured endpoint is obvious); 300s timeout (slow single-GPU 32B serving); 8000 max_tokens
+  (reasoning `<think>` blocks). Optional `$LOCAL_API_KEY` for vLLM `--api-key` servers (default `EMPTY`).
+- `MockLLM` — scripted responses for tests/mock pipeline, no network.
+- `complete_json` (shared) strips `<think>…</think>` + markdown fences, then scans for the first valid
+  JSON object; unparseable → `{"error": "parse_failure", "raw": …}`.
+
 ## RNG Streams (9 total)
 hp_rng, card_rng, enemy_rng, event_rng, map_rng, reward_rng, shop_rng, boss_rng, misc_rng
 Each is an independent Java-compatible LCG seeded from the run seed.

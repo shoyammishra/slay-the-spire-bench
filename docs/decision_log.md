@@ -1,5 +1,9 @@
 # Decision Log
 
+## 2026-06-12 (GPU prep) — `--provider local` adapter for self-hosted models
+**Decision:** Added `LocalLLM` (OpenAI-compatible `/v1/chat/completions` over urllib, no new deps) and wired `--provider local --base-url URL` into the CLI (falls back to `$LOCAL_BASE_URL` then `http://localhost:8000/v1`). It is `OpenRouterLLM` with the endpoint parametrized and the 402 path removed; a non-429 HTTP error is surfaced with the response body instead of swallowed. 300s timeout, 8000 max_tokens, optional `$LOCAL_API_KEY`.
+**Why:** The M3a GPU phase serves open-source models (incl. the revived reasoning model) via vLLM/TGI/Ollama — all OpenAI-shaped. One thin adapter unblocks the entire self-hosted matrix the moment the professor's GPU access lands (~2026-06-13), with no Groq TPM cap. A local server never bills, so OpenRouter's 402-as-payment-wall logic is wrong here — failures should be loud (misconfig) not silently fatal.
+
 ## 2026-06-11 (3rd audit) — Block resets at its OWNER's turn start
 **Decision:** Player block resets in `_begin_player_turn`; ENEMY block resets at the start of the enemy phase in `end_player_turn`. Enemy block gained during the enemy phase therefore persists through the player's next turn.
 **Why:** Resetting enemy block at the player's turn start wiped every enemy blocking move (Jaw Worm Bellow, The Champ Defensive Stance, enemy Metallicize, Curl Up...) before the player could attack into it — all enemy defense was a silent no-op, making every combat easier than real StS for BOTH the LLM and the greedy baseline.

@@ -1,5 +1,18 @@
 # Experiment Log
 
+## 2026-06-12 (GPU prep) — `--provider local` adapter (NO API runs; mock + unit verification)
+
+**What ran:** full test suite (**118/118**, +3 new LocalLLM regression tests over the
+4th-audit 115/118 baseline — request shape/URL via stubbed `urlopen`, server-error
+surfacing, `build_llm` wiring) and the mock pipeline (`--provider mock`, seed 42, tiny
+full pass) — green end-to-end. No paid/free/GPU API calls (the GPU is not yet available).
+
+**What changed:** added `LocalLLM` (OpenAI-compatible self-hosted client) + `--provider
+local --base-url`. Commit `a36b42d`. No engine/scoring change → **no data-validity impact**;
+synergy n=20 (2026-06-10, de-biased) remains the only valid data. This is pure
+infrastructure prep for the M3a GPU phase. Next experiment is the GPU smoke test once
+access lands (record tok/s → sizes run-level n).
+
 ## 2026-06-11 (later) — 3rd audit + fix batch (NO API runs; mock verification only)
 
 **What ran:** full test suite (**102/102**, was 77; +25 regression tests) and mock

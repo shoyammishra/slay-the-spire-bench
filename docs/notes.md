@@ -27,6 +27,15 @@
   is only marginally faster than free (same upstream providers). Revisiting qwen3 (or another
   reasoning model) on a paid tier is FUTURE WORK. Result files deleted.
 
+## Status snapshot (2026-06-12) — compute blocker resolved by GPU plan
+- The "gated on paid Groq" blocker below is **superseded**: the professor provides GPU
+  access (~2026-06-13) to self-host all open-source models (M3a), then a path to run
+  Claude/GPT (M3b). qwen3-32b is REVIVED — self-hosting removes the exact free-tier
+  truncation/throttling that killed it (see the qwen3 section above).
+- **Prep done:** `--provider local` adapter landed (`LocalLLM`, commit `a36b42d`) — vLLM/
+  Ollama/TGI ready. 118/118 tests. Next = pick model ladder by VRAM + GPU smoke test
+  (record tok/s → sizes run-level n). Full plan: roadmap.md M3a/M3b + "Prep for the GPU phase".
+
 ## Status snapshot (2026-06-10)
 - A* acceptance changes landed (commit d35771e): Silent character, multi-act (`--acts`),
   `--temperature`, `--seeds` (mean±std aggregation), `--llm-routing`; relic on_pickup/register
