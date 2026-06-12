@@ -210,6 +210,13 @@ D&B reviewers will expect.
 
 ### Run order (M3a, when the GPU is available — same logic applies to M3b later)
 
+> **GPU landed 2026-06-12 (BITS CSIS Slurm cluster).** The steps below are now
+> codified as ready-to-submit Slurm jobs in **`cluster/`** (see `cluster/README.md`):
+> `smoke.sbatch` (step 1) → `turn_combat.sbatch` (step 2) → `synergy.sbatch` (step 3)
+> → `run_level.sbatch` (step 4). Each job serves a model with vLLM on one A100 80 GB
+> then runs `run_benchmark.py --provider local`. Switch model/GPU-count via the
+> `HF_REPO`/`SERVED_NAME`/`TP_SIZE` env vars documented in `cluster/lib.sh`.
+
 Ordered **cheapest → most expensive**: since ALL dimensions need fresh data post-sweep
 (no old baseline to extend), the rational order validates the pipeline on cheap calls
 before committing the bulk of GPU-hours to run-level, where a mid-run failure wastes
