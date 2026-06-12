@@ -161,7 +161,10 @@ def test_turn_evaluator_bad_parse():
     score = evaluator.evaluate(state)
     assert not score.parse_ok
     assert score.llm_sequence == []
-    print(f"[PASS] TurnEvaluator bad parse: parse_ok={score.parse_ok}")
+    # H3: a parse failure must NOT count as a legal (empty) play, or legal_rate
+    # gets inflated by exactly the parse-failure rate.
+    assert not score.legal
+    print(f"[PASS] TurnEvaluator bad parse: parse_ok={score.parse_ok}, legal={score.legal}")
 
 
 # ── CombatEvaluator tests ─────────────────────────────────────────────────────
@@ -265,10 +268,11 @@ def test_synergy_evaluator_raw():
 def test_synergy_eval_fixtures():
     """run_synergy_eval uses hand-crafted decks: confident labels, correct ground
     truth, and a model that answers right scores right."""
-    # Fixture 0 is the Strength deck; best pick idx 1, removal = Strike.
-    mock = MockLLM(['{"archetype": "Strength", "best_card_index": 1, "worst_card_name": "Strike"}'])
+    # seed=0: 0%20=fixture 0=Strength. After rotation (target_pos=0%3=0, rot=(1-0)%3=1),
+    # offer becomes [Bludgeon, Strike_R, Defend_R], expert pick_idx=0 (Bludgeon).
+    mock = MockLLM(['{"archetype": "Strength", "best_card_index": 0, "worst_card_name": "Strike"}'])
     harness = BenchmarkHarness(mock, model_name="mock", prompt_format="structured")
-    scores = harness.run_synergy_eval([42])  # one sample -> fixture 0
+    scores = harness.run_synergy_eval([0])  # seed 0 % 20 = fixture 0 = Strength
     s = scores[0]
     assert s.expert_archetype == "Strength", s.expert_archetype
     assert s.archetype_confident is True          # crafted decks are never ambiguous
@@ -630,6 +634,62 @@ def test_duplicate_play_indices_are_illegal():
     print("[PASS] Duplicate play indices are illegal; distinct twins legal")
 
 
+# ── 2026-06-12 audit regression tests ─────────────────────────────────────────
+
+def test_safe_int_float_strings():
+    """H7: numeric float-strings parse via int(float(v)); null/garbage -> default."""
+    from slay_bench.benchmark import _safe_int
+    assert _safe_int("1.0") == 1
+    assert _safe_int("2.9") == 2
+    assert _safe_int(1.7) == 1
+    assert _safe_int("3") == 3
+    assert _safe_int(None, default=-1) == -1
+    assert _safe_int("garbage", default=-1) == -1
+    assert _safe_int("", default=0) == 0
+    print("[PASS] _safe_int parses float-strings, rejects garbage")
+
+
+def test_combat_negative_target_index_first_alive():
+    """H2: a negative target_index must NOT Python-negative-index to the last
+    enemy — it falls back to the first alive enemy like out-of-range does."""
+    from slay_bench.enemies import AcidSlimeS, SpikeSlimeS
+    # action play card 0 (Strike) at target -1, then end turn.
+    mock = MockLLM(['{"action": "play", "card_index": 0, "target_index": -1}',
+                    '{"action": "end_turn"}'] * 50)
+    ev = CombatEvaluator(mock, prompt_format="structured")
+    state = new_ironclad_game(73)
+    e0 = AcidSlimeS(state.rng.hp_rng)
+    e1 = SpikeSlimeS(state.rng.hp_rng)
+    hp0_before = e0.hp
+    score = ev.evaluate(state, [e0, e1])
+    # The first card (a Strike) must have hit the FIRST enemy (index 0), not the
+    # last. Damage was dealt to e0.
+    assert e0.hp < hp0_before, f"first alive enemy should have taken damage: {e0.hp}/{hp0_before}"
+    print(f"[PASS] Negative target_index hits first alive enemy ({hp0_before}->{e0.hp})")
+
+
+def test_synergy_summary_exposes_n_scored_denominators():
+    """H4: summary's synergy block reports card_pick_n_scored and
+    removal_n_scored (denominators for the parse-fail exclusion policy)."""
+    mock = MockLLM(['{"archetype": "Block", "best_card_index": 0, "worst_card_name": "Strike"}'] * 40)
+    h = BenchmarkHarness(mock, "m", "structured")
+    result = h.run_all(seed=42, n_turn=0, n_combat=0, n_synergy=4, n_run=0)
+    syn = result.summary()["synergy"]
+    assert "card_pick_n_scored" in syn and "removal_n_scored" in syn
+    assert syn["card_pick_n_scored"] == 4 and syn["removal_n_scored"] == 4
+    print(f"[PASS] Synergy summary exposes n_scored denominators "
+          f"(pick={syn['card_pick_n_scored']}, removal={syn['removal_n_scored']})")
+
+
+def test_run_tag_stem_suffix():
+    """H5: --run-tag appends `_<tag>` to the file stem; empty leaves it unchanged."""
+    from run_benchmark import _tagged_stem
+    assert _tagged_stem("llama_structured_seed42", "") == "llama_structured_seed42"
+    assert _tagged_stem("llama_structured_seed42", "rep1") == "llama_structured_seed42_rep1"
+    assert _tagged_stem("m_raw_seeds42_43", "  ") == "m_raw_seeds42_43"  # whitespace = empty
+    print("[PASS] _tagged_stem suffixes only when a tag is set")
+
+
 if __name__ == "__main__":
     tests = [
         test_structured_prompt,
@@ -666,6 +726,11 @@ if __name__ == "__main__":
         test_turn_prompt_states_damage_objective,
         # 2026-06-11 audit
         test_duplicate_play_indices_are_illegal,
+        # 2026-06-12 audit
+        test_safe_int_float_strings,
+        test_combat_negative_target_index_first_alive,
+        test_synergy_summary_exposes_n_scored_denominators,
+        test_run_tag_stem_suffix,
     ]
     passed = failed = 0
     for test in tests:

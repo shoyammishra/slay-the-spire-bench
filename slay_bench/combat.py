@@ -33,15 +33,19 @@ def start_combat(state: GameState, enemies: List[Enemy]) -> None:
     state.combat.draw_pile = draw
 
     # Apply innate cards
+    from .cards import _remove_identical
     innate = [c for c in state.combat.draw_pile if c.innate]
     for c in innate:
-        state.combat.draw_pile.remove(c)
+        _remove_identical(state.combat.draw_pile, c)
         state.combat.hand.append(c)
 
     # (Corruption is per-combat — end_combat clears it, so it can never be
     # active here. Its cost-0 + exhaust effects live in can_play/play_card.)
     # Combust HP-loss counter (1 HP per Combust played) is per-combat too.
     state.player._combust_plays = 0
+    # Brutality is per-combat (one play = lose 1 HP + draw 1 each turn). Reset
+    # defensively here as well as in end_combat so it can never carry over.
+    state.player.brutality = False
 
     # Register power event hooks (fresh for each combat)
     register_power_hooks(state)
@@ -204,7 +208,6 @@ def play_card(state: GameState, card: Card, target: Optional[Enemy] = None) -> N
     # the card resolves (below) so Finisher does not count itself.
     combat.cards_played_this_turn += 1
     combat.cards_played_this_combat += 1
-    player.cards_played_this_combat += 1
 
     # Time Eater's Time Warp: every 12th card play ends the player's turn
     # (approximated as a play-lock until next turn) and buffs the boss.
@@ -401,6 +404,19 @@ def _tick_enemy_powers(state: GameState, enemy: Enemy) -> None:
     if PowerId.REGENERATE in enemy.powers:
         enemy.hp = min(enemy.max_hp, enemy.hp + enemy.powers[PowerId.REGENERATE])
 
+    # Intangible ticks down at end of round, like the player's. Enemies that
+    # should stay intangible (Nemesis phases 1-3, Transient) re-apply it in
+    # select_move, which runs AFTER this tick. Intangible freshly granted during
+    # the enemy phase this round (Awakened One's Rebirth) skips its first tick so
+    # it actually covers the player's next turn.
+    if PowerId.INTANGIBLE in enemy.powers:
+        if getattr(enemy, '_intangible_fresh', False):
+            enemy._intangible_fresh = False
+        else:
+            enemy.powers[PowerId.INTANGIBLE] -= 1
+            if enemy.powers[PowerId.INTANGIBLE] <= 0:
+                del enemy.powers[PowerId.INTANGIBLE]
+
     # Malleable: increases each time blocked — reset stacking here if needed
     # Poison on enemies: direct HP loss, ignores block (StS rule)
     if PowerId.POISON in enemy.powers:
@@ -451,6 +467,7 @@ def end_combat(state: GameState) -> None:
     state.player.block = 0
     state.player.barricade = False
     state.player.berserk = False
+    state.player.brutality = False
     state.player.corruption = False
 
     # Clear combat state

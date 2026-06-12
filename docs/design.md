@@ -107,3 +107,41 @@ slay_bench/
 ## RNG Streams (9 total)
 hp_rng, card_rng, enemy_rng, event_rng, map_rng, reward_rng, shop_rng, boss_rng, misc_rng
 Each is an independent Java-compatible LCG seeded from the run seed.
+
+## Parse-failure scoring policy
+Dimensions handle an unparseable LLM answer differently, by design:
+- **Turn-level**: a parse failure scores `damage_ratio = 0` AND `legal = False` (an
+  empty/garbage answer is not a legal play — counting it as legal would inflate
+  `legal_rate` by exactly the parse-failure rate). `parse_ok_rate` is reported separately.
+- **Synergy**: a parse failure is **excluded** (`None`) from all three accuracies
+  (`archetype_acc`, `card_pick_acc`, `removal_acc`) — synergy accuracy is *knowledge
+  conditional on a parseable answer*, not a parse-success metric. To keep the
+  denominator visible, `summary()` reports `archetype_n_scored`, `card_pick_n_scored`,
+  and `removal_n_scored` alongside `parse_ok_rate`. (Currently moot — `parse_ok=1.0`
+  everywhere — but it would otherwise bias cross-model comparison for a flaky model.)
+
+## Documented simplifications (intentional, not bugs)
+These are deliberate fidelity gaps recorded so future audits don't re-flag them
+(full provenance in `docs/bug_audit_2026-06-12.md` D-items + earlier audits):
+- **Potions are undrinkable** (only Fairy in a Bottle's auto-revive is live). So the
+  Regen Potion's REGENERATE grant is dormant (players don't tick Regenerate) and the
+  Colorless Potion is a no-op (colorless cards unimplemented).
+- **Event-only mode**: combat-promising events (Colosseum, Trial of Fire, Mysterious
+  Sphere, Dead Adventurer 40%, Masked Bandits "fight", Mind Bloom "war") resolve as
+  flavor text — no spawned fight, no reward.
+- **Deterministic event outcomes**: Scrap Ooze always yields its relic by the 4th
+  attempt; Wild Strike / Reckless Charge insert their status at the draw-pile bottom;
+  Sentry Bolt puts Dazed in the draw pile (real: discard).
+- **Relic pool design choices**: Captain's Wheel is gated Defect-only here;
+  `random_relic`'s exhausted-pool fallback can grant a duplicate; N'loth's Gift /
+  Golden Wing pop a relic without reverting its `on_pickup` effect (max HP / energy
+  persist). Prayer Wheel rare-upgrade doubling and Golden Idol +25% gold are comments
+  only in `rewards.py`.
+- **Timing approximations**: Unceasing Top draws on CARD_PLAY (before the played card
+  resolves); Mummified Hand discounts the *next* card "until played".
+- **String power keys**: a few enemy/buff keys are plain strings (`"Calm"`, `"enrage"`)
+  rather than `PowerId` members — intentional, do not "fix".
+- **Archetype substring matching** (H8): archetype mention detection is substring-based,
+  so a hypothetical answer like `"blockade"` could read as a "Block" mention. No observed
+  impact in saved samples; word-boundary hardening is optional future work.
+- **Dead class**: `CenturionAndMystic` is defined but never registered/used.

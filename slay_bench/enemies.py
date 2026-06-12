@@ -512,7 +512,6 @@ class Lagavulin(Enemy):
         hp = hp_rng.next_int(8) + 109  # 109-116
         super().__init__("Lagavulin", "Lagavulin", hp, hp)
         self.powers[PowerId.METALLICIZE] = 8
-        self.powers[PowerId.ARTIFACT] = 0
         self._asleep = True
         self._asleep_turns = 0
         self._awoken = False
@@ -557,7 +556,7 @@ class Sentry(Enemy):
     def __init__(self, hp_rng, index: int = 0):
         hp = hp_rng.next_int(7) + 38  # 38-44
         super().__init__(f"Sentry_{index}", f"Sentry", hp, hp)
-        self.powers[PowerId.ARTIFACT] = 0
+        self.powers[PowerId.ARTIFACT] = 1
         # Sentries alternate based on position parity
         self._first_move = "Beam" if index % 2 == 0 else "Bolt"
         self._toggle = (index % 2 == 0)

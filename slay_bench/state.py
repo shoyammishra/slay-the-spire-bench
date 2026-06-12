@@ -48,11 +48,9 @@ class Player:
     deck: List[Card] = field(default_factory=list)  # master deck outside combat
     # runtime flags set by some powers/cards
     barricade: bool = False        # block doesn't reset
-    berserk: bool = False          # gain 1 energy each turn player is Vulnerable
+    berserk: bool = False          # gain 1 energy at the start of every turn
     brutality: bool = False        # lose 1 HP draw 1 card each turn
-    innate_brutality: bool = False
     corruption: bool = False       # skills cost 0, exhaust
-    cards_played_this_combat: int = 0
 
 
 @dataclass

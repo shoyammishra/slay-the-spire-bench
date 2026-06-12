@@ -765,6 +765,164 @@ def test_time_warp_locks_plays():
     print("[PASS] Time Warp locks the turn at the play threshold")
 
 
+# ── 2026-06-12 audit regression tests ─────────────────────────────────────────
+
+def test_sentinel_plays_and_exhaust_gives_energy():
+    """C1: Sentinel no longer crashes (PowerId.SENTINEL was missing). Playing it
+    gives block only; exhausting one gives +2 (+3 upgraded) energy."""
+    from slay_bench.cards import Sentinel, _exhaust_card
+    state = new_ironclad_game(42)
+    enemy = Cultist(state.rng.hp_rng)
+    start_combat(state, [enemy])
+    sen = Sentinel()
+    state.combat.hand[:] = [sen]
+    state.player.energy = 3
+    blk = state.player.block
+    play_card(state, sen, enemy)  # must NOT raise
+    assert state.player.block - blk == 5, f"Sentinel block, got {state.player.block - blk}"
+    # Now exhaust a Sentinel -> energy bonus
+    sen2 = Sentinel()
+    state.combat.hand[:] = [sen2]
+    e_before = state.player.energy
+    _exhaust_card(state, sen2)
+    assert state.player.energy - e_before == 2, f"exhaust energy {state.player.energy - e_before}"
+    sen3 = Sentinel(); sen3.upgrade()
+    state.combat.hand[:] = [sen3]
+    e_before = state.player.energy
+    _exhaust_card(state, sen3)
+    assert state.player.energy - e_before == 3, "upgraded Sentinel exhaust = +3 energy"
+    print("[PASS] Sentinel plays (block) + exhaust grants energy (2/3)")
+
+
+def test_berserk_energy_unconditional():
+    """E1: Berserk gives +1 energy every turn, not only while Vulnerable."""
+    from slay_bench.enums import PowerId
+    from slay_bench.cards import Berserk
+    state = new_ironclad_game(42)
+    enemy = Cultist(state.rng.hp_rng)
+    start_combat(state, [enemy])
+    b = Berserk()
+    state.combat.hand[:] = [b]
+    state.player.energy = 3
+    play_card(state, b, enemy)
+    # Remove Vulnerable to prove energy still flows.
+    state.player.powers.pop(PowerId.VULNERABLE, None)
+    end_player_turn(state)  # advances to next player turn (TURN_START fires)
+    assert state.player.energy >= state.player.energy_per_turn + 1, \
+        f"Berserk must add 1 energy: energy={state.player.energy}"
+    print("[PASS] Berserk grants energy every turn (no Vulnerable needed)")
+
+
+def test_brutality_resets_across_combats():
+    """E2: Brutality is per-combat; it must not persist into the next fight."""
+    from slay_bench.cards import Brutality
+    state = new_ironclad_game(42)
+    enemy = Cultist(state.rng.hp_rng)
+    start_combat(state, [enemy])
+    br = Brutality()
+    state.combat.hand[:] = [br]
+    state.player.energy = 3
+    play_card(state, br, enemy)
+    assert state.player.brutality is True
+    end_combat(state)
+    assert state.player.brutality is False, "Brutality must reset in end_combat"
+    start_combat(state, [Cultist(state.rng.hp_rng)])
+    assert state.player.brutality is False, "Brutality must stay reset at combat start"
+    print("[PASS] Brutality resets between combats")
+
+
+def test_brutality_upgrade_is_innate():
+    """E3: Brutality+ is Innate via the card flag (innate_brutality field gone)."""
+    from slay_bench.cards import Brutality
+    assert Brutality().innate is False
+    assert Brutality(upgraded=True).innate is True
+    b = Brutality(); b.upgrade()
+    assert b.innate is True
+    assert not hasattr(new_ironclad_game(42).player, "innate_brutality")
+    print("[PASS] Brutality+ is Innate; dead field removed")
+
+
+def test_pride_curse_copies_to_draw_top_not_hand():
+    """E5: Pride exhausts on play (no hand copy); a copy goes to the TOP of the
+    draw pile at end of turn while in hand."""
+    from slay_bench.cards import Pride
+    state = new_ironclad_game(42)
+    enemy = Cultist(state.rng.hp_rng)
+    start_combat(state, [enemy])
+    c = state.combat
+    p = Pride()
+    c.hand[:] = [p]
+    c.draw_pile.clear(); c.discard_pile.clear()
+    state.player.energy = 3
+    play_card(state, p, enemy)
+    assert any(x is p for x in c.exhaust_pile), "Pride must exhaust on play"
+    assert not any(isinstance(x, Pride) for x in c.hand), "no Pride copy added to hand on play"
+    # End-of-turn effect (fired by the TURN_END hook while in hand) puts a copy on
+    # the TOP of the draw pile — draw pops from the end of the list, so top = end.
+    p2 = Pride()
+    c.draw_pile.clear()
+    p2.end_of_turn_effect(state)
+    assert c.draw_pile and isinstance(c.draw_pile[-1], Pride) and c.draw_pile[-1] is not p2, \
+        "Pride must put a fresh copy on top (end) of the draw pile at end of turn"
+    print("[PASS] Pride exhausts on play, copies to draw-pile top at end of turn")
+
+
+def test_sentry_has_artifact():
+    """E6: Sentry has Artifact 1 (was the no-op 0); Lagavulin's dead ARTIFACT
+    key is gone."""
+    from slay_bench.enemies import Sentry, Lagavulin
+    from slay_bench.enums import PowerId
+    state = new_ironclad_game(42)
+    assert Sentry(state.rng.hp_rng).powers.get(PowerId.ARTIFACT) == 1
+    assert PowerId.ARTIFACT not in Lagavulin(state.rng.hp_rng).powers
+    print("[PASS] Sentry Artifact 1; Lagavulin has no Artifact key")
+
+
+def test_awakened_one_damageable_after_rebirth():
+    """E4: enemy Intangible now ticks down; Awakened One's Rebirth grants only a
+    single round of Intangible, so it is damageable again the next round."""
+    from slay_bench.enemies_act2 import AwakenedOne
+    from slay_bench.enemies import Move, IntentType
+    from slay_bench.enums import PowerId
+    from slay_bench.combat import _tick_enemy_powers
+    state = new_ironclad_game(42)
+    awo = AwakenedOne(state.rng.hp_rng)
+    start_combat(state, [awo])
+    # Force the Rebirth move and execute it (grants Intangible during enemy phase).
+    awo.current_move = Move("Rebirth", IntentType.BUFF)
+    awo.execute_move(state)
+    assert awo.powers.get(PowerId.INTANGIBLE) == 1
+    # Round-end tick must NOT remove a freshly-granted Intangible (covers next turn).
+    _tick_enemy_powers(state, awo)
+    assert awo.powers.get(PowerId.INTANGIBLE) == 1, "fresh Rebirth Intangible should survive this tick"
+    # Next round's tick removes it -> damageable again.
+    _tick_enemy_powers(state, awo)
+    assert PowerId.INTANGIBLE not in awo.powers, "Awakened One must be damageable the round after Rebirth"
+    print("[PASS] Awakened One is damageable again the round after Rebirth")
+
+
+def test_empty_cage_counts_removals():
+    """E12: Empty Cage bumps the run-wide _cards_removed counter by 2."""
+    from slay_bench.relics_full import EmptyCage
+    state = new_ironclad_game(42)
+    state.player._cards_removed = 0
+    before = len(state.player.deck)
+    EmptyCage().on_pickup(state)
+    assert len(state.player.deck) == before - 2
+    assert state.player._cards_removed == 2, f"_cards_removed={state.player._cards_removed}"
+    print("[PASS] Empty Cage counts its 2 removals")
+
+
+def test_no_duplicate_relics_in_pools():
+    """E8: FULL_RELIC_LIST de-duped — no _RARITY_POOLS pool has a doubled class."""
+    from slay_bench.relics_full import _RARITY_POOLS
+    for rarity, pool in _RARITY_POOLS.items():
+        names = [cls.__name__ for cls in pool]
+        assert len(names) == len(set(names)), \
+            f"{rarity} pool has duplicates: {[n for n in names if names.count(n) > 1]}"
+    print("[PASS] No duplicate relic classes in any rarity pool")
+
+
 if __name__ == "__main__":
     tests = [
         test_cultist_fight_determinism,
@@ -807,6 +965,16 @@ if __name__ == "__main__":
         test_escape_plan_detects_twin_draw,
         test_play_card_rejects_replayed_card,
         test_time_warp_locks_plays,
+        # 2026-06-12 audit
+        test_sentinel_plays_and_exhaust_gives_energy,
+        test_berserk_energy_unconditional,
+        test_brutality_resets_across_combats,
+        test_brutality_upgrade_is_innate,
+        test_pride_curse_copies_to_draw_top_not_hand,
+        test_sentry_has_artifact,
+        test_awakened_one_damageable_after_rebirth,
+        test_empty_cage_counts_removals,
+        test_no_duplicate_relics_in_pools,
     ]
     passed = 0
     failed = 0

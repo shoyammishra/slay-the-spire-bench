@@ -35,8 +35,9 @@ def register_power_hooks(state: GameState) -> None:
             _damage_player(gs, 1, is_hp_loss=True)
             _draw_cards(gs, 1)
 
-        # Berserk: if Vulnerable, gain 1 energy
-        if player.berserk and PowerId.VULNERABLE in player.powers:
+        # Berserk: gain 1 energy at the start of EVERY turn (the self-Vulnerable
+        # is the upfront cost, not an ongoing condition).
+        if player.berserk:
             player.energy += 1
 
         # Energized: gain 1 extra energy
@@ -193,6 +194,10 @@ def register_power_hooks(state: GameState) -> None:
         if PowerId.FEEL_NO_PAIN in player.powers:
             from .cards import _gain_block
             _gain_block(gs, player.powers[PowerId.FEEL_NO_PAIN])
+
+        # Sentinel: gain energy when this card is exhausted
+        if card is not None and card.__class__.__name__ == 'Sentinel':
+            player.energy += 3 if card.upgraded else 2
 
         # Dead Branch relic handled in relics
 

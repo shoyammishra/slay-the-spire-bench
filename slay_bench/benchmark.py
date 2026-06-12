@@ -292,11 +292,16 @@ class RunScore:
 
 def _safe_int(v, default: int = 0) -> int:
     """Coerce an LLM-supplied index to an int. Models sometimes return null, a
-    string, a float, or omit the field — all become `default` (0 = first option)."""
+    string, a float, or omit the field. Plain ints/floats and integer strings
+    parse directly; numeric float-strings ("1.0") fall back through int(float(v)).
+    Null/garbage become `default` (0 = first option)."""
     try:
         return int(v)
     except (TypeError, ValueError):
-        return default
+        try:
+            return int(float(v))
+        except (TypeError, ValueError):
+            return default
 
 
 def _simulate_play_sequence(state_snapshot, sequence: List[int]) -> Tuple[int, bool]:
@@ -437,6 +442,11 @@ class TurnEvaluator:
         # Score LLM sequence
         llm_dmg, llm_legal = _simulate_play_sequence(snapshot, llm_sequence)
 
+        # A parse failure is NOT a legal (empty) play — an empty sequence trivially
+        # simulates as legal, which would inflate legal_rate by the parse-fail rate.
+        if not parse_ok:
+            llm_legal = False
+
         # Optimal via exhaustive search
         opt_dmg, opt_seq = _exhaustive_best_sequence(snapshot)
 
@@ -527,7 +537,7 @@ class CombatEvaluator:
                         continue
                     card = hand[idx]
                     enemies_alive = [e for e in state.combat.enemies if e.hp > 0]
-                    target = enemies_alive[target_idx] if target_idx < len(enemies_alive) else (
+                    target = enemies_alive[target_idx] if 0 <= target_idx < len(enemies_alive) else (
                         enemies_alive[0] if enemies_alive else None)
                     if card.can_play(state):
                         play_card(state, card, target)
@@ -807,9 +817,13 @@ _SYNERGY_FIXTURES = [
       "Strike_R", "Strike_R", "Defend_R", "Defend_R"],
      ["Corruption", "Anger", "Strike_R"], 0),            # Corruption = Exhaust payoff
     ("Aggro",
+     # Twin Strike (not Perfected Strike): the removal target here is "Strike",
+     # and Strikes feed Perfected Strike — picking it then keeping Strikes is
+     # logically consistent yet would score wrong on removal. Twin Strike is the
+     # same Aggro strike-payoff pattern as fixtures 4 and 20 without that clash.
      ["Blood for Blood", "Rampage", "Reckless Charge", "Wild Strike", "Clash",
       "Strike_R", "Strike_R", "Defend_R", "Defend_R", "Bash"],
-     ["Perfected Strike", "Iron Wave", "Defend_R"], 0),  # Perfected Strike = Aggro payoff
+     ["Twin Strike", "Iron Wave", "Defend_R"], 0),  # Twin Strike = Aggro strike-payoff
     ("Strength",
      ["Inflame", "Whirlwind", "Heavy Blade", "Demon Form", "Uppercut",
       "Strike_R", "Strike_R", "Defend_R", "Defend_R", "Bash"],
@@ -1129,7 +1143,7 @@ class RunEvaluator:
                     hand = state.combat.hand
                     if 0 <= idx < len(hand) and hand[idx].can_play(state):
                         enemies_alive = [e for e in state.combat.enemies if e.hp > 0]
-                        target = enemies_alive[tidx] if tidx < len(enemies_alive) else (
+                        target = enemies_alive[tidx] if 0 <= tidx < len(enemies_alive) else (
                             enemies_alive[0] if enemies_alive else None)
                         play_card(state, hand[idx], target)
                     else:
@@ -1410,9 +1424,13 @@ class BenchmarkResult:
             "card_pick_acc": avg([float(s.card_pick_correct)
                                   for s in self.synergy_scores
                                   if s.card_pick_correct is not None]),
+            "card_pick_n_scored": sum(1 for s in self.synergy_scores
+                                      if s.card_pick_correct is not None),
             "removal_acc": avg([float(s.removal_correct)
                                 for s in self.synergy_scores
                                 if s.removal_correct is not None]),
+            "removal_n_scored": sum(1 for s in self.synergy_scores
+                                    if s.removal_correct is not None),
             "parse_ok_rate": avg([float(s.parse_ok) for s in self.synergy_scores]),
             "samples": [
                 {

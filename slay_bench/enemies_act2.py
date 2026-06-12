@@ -162,6 +162,9 @@ class Transient(Enemy):
 
     def select_move(self, state):
         self._turns += 1
+        # Transient stays Intangible the whole fight; enemy INTANGIBLE now ticks
+        # down each round, so re-apply it here (runs after the round-end tick).
+        self.powers[PowerId.INTANGIBLE] = 1
         if self._turns >= 3:
             self.current_move = Move("Swift Strike", IntentType.ATTACK, damage=10, hits=self._turns)
         else:
@@ -581,9 +584,14 @@ class Nemesis(Enemy):
     def select_move(self, state):
         if self._phase < 3:
             self._phase += 1
+            # Stay Intangible through the first 3 turns. Enemy INTANGIBLE now
+            # ticks down each round (_tick_enemy_powers), so re-apply it here
+            # (select_move runs after that tick) until phase 3 is reached.
+            if self._phase < 3:
+                self.powers[PowerId.INTANGIBLE] = 1
+            else:
+                self.powers.pop(PowerId.INTANGIBLE, None)
             self.current_move = Move("Scythe", IntentType.ATTACK, damage=45)
-            if self._phase >= 3:
-                del self.powers[PowerId.INTANGIBLE]
         else:
             pattern = ["Debuff", "Scythe", "Scythe"]
             idx = (self._phase - 3) % len(pattern)
@@ -795,7 +803,11 @@ class AwakenedOne(Enemy):
         if m.name in ("Slash", "Soul Strike"):
             _enemy_attack(state, self, m)
         elif m.name == "Rebirth":
+            # 1 round of Intangible. Granted during the enemy phase, so mark it
+            # "fresh" to skip this round's end-of-round tick (it then covers the
+            # player's next turn, after which it ticks away).
             self.powers[PowerId.INTANGIBLE] = 1
+            self._intangible_fresh = True
         elif m.name == "Dark Echo":
             from .cards import _apply_power
             _apply_power(state, state.player, PowerId.VULNERABLE, 2)

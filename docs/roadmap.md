@@ -69,17 +69,53 @@
   (no synergy-path change). Run-level still has no valid data (and is now free of
   the Neow inflation source).
 
-### M3 — Paper-grade evaluation (IN PROGRESS — blocked on paid Groq)
-- n≥20 samples per dimension per model, ≥5 seeds, both formats, mean±std
-- Models: llama-3.1-8b, llama-4-scout-17b + a 3rd family (qwen3-32b dropped —
-  a reasoning model needs a paid tier; revisit as model #4)
+### M3 — Paper-grade evaluation (IN PROGRESS — professor's two-phase compute plan, 2026-06-12)
+
+The compute blocker is resolved by the professor's plan (announced 2026-06-12,
+GPU access expected 2026-06-13):
+
+- **M3a — GPU phase (open-source models, self-hosted).** Professor provides a GPU;
+  run all open-source experiments there. No TPM caps, no per-token cost → the
+  full n≥20 × 5-seed matrix (including run-level, the long pole) becomes feasible.
+  Also **revives the reasoning-model slot**: qwen3-32b (or a DeepSeek-R1 distill)
+  was dropped only because free tiers truncated/throttled it — self-hosting fixes
+  exactly that failure mode.
+- **M3b — Frontier API phase (Claude / GPT).** Once the M3a results are in, the
+  professor shares a way to run the same experiments on Claude/GPT models. This
+  fills the "3rd family / frontier model" gap the novelty review flagged as
+  required for NeurIPS D&B credibility. Same seeds, same formats, same n — the
+  M3a tables define the exact protocol M3b repeats.
+- Targets unchanged: n≥20 samples per dimension per model, ≥5 seeds, both
+  formats, mean±std.
 
 ### M4 — Write-up
 - findings.md → draft.md → final paper/report
 - Figures: radar charts, bar charts per dimension
 - Ablations: structured vs raw; Ironclad vs Silent; greedy vs LLM routing
 
-## What can be done NOW (free tier, before paid Groq)
+## Prep for the GPU phase (do BEFORE access arrives, ~tomorrow 2026-06-13)
+
+0. **Checkpoint/commit the 2026-06-12 fix batch** (4th audit: 23 fixes, 115/115 tests)
+   — it is currently uncommitted in the working tree; experiments must run on a
+   committed, tagged state so results are reproducible against a SHA.
+1. **Add a `--provider local` adapter** (OpenAI-compatible chat-completions client with
+   a `--base-url` flag). A GPU box will serve models via vLLM / TGI / Ollama, all of
+   which expose the OpenAI API shape; `OpenRouterLLM` is already 95% of this client —
+   parametrize the endpoint URL and drop the OpenRouter-specific 402 handling.
+   ~30-minute task, unblocks everything the moment access lands.
+2. **Decide the open-source model ladder by VRAM** (confirm GPU size first):
+   - llama-3.1-8b-instruct — re-run locally even though Groq numbers exist: same
+     weights / different serving stack = a free **provider-robustness check**.
+   - llama-4-scout-17b (if it fits) — continuity with the pilot.
+   - **qwen3-32b or DeepSeek-R1-distill (reasoning)** — the revived model #4;
+     needs high max_tokens for `<think>` blocks (already handled in complete_json).
+   - One more family if VRAM allows (gemma / mistral) for cross-family breadth.
+3. **Throughput sanity math before committing to run-level:** run-level is sequential
+   and stateful (dozens–hundreds of calls/run, no batching possible). On a single GPU
+   at ~50–100 tok/s for a 32B model, one run can take 30–60+ min. Measure with the
+   smoke test, THEN size n for run-level per model.
+
+## What can be done NOW (free tier, before the GPU)
 
 1. ~~**Merge `synergy-rework` → main.**~~ DONE 2026-06-10 (merge commit `6398bb1`,
    47/47 tests verified on main). Work continues on main.
@@ -95,6 +131,15 @@
      repeated k≥5 times → mean±std per metric (sampling variance on a fixed exam).
    - **seed sweep:** `--only synergy --n-synergy 20 --seeds 42 142 242 342 442` ×8 combos →
      per-seed JSON + auto-aggregated mean±std (the `_aggregate_summaries` path, key-bug-fixed).
+     - ⚠️ **H6 (don't over-interpret the std):** synergy fixture selection is keyed on
+       `seed % 20`, and the recommended seeds `42 142 242 342 442` are all ≡ 2 (mod 20).
+       So every seed in that sweep sees the *identical* fixture sequence; the multi-seed std
+       then measures only offer-rotation pairing (+ sampling variance at temp>0), NOT
+       different fixtures. This is the intended post-2nd-audit design (seed-keyed prompts);
+       just report the std as "instrument/rotation variance," not "fixture-set variance."
+       For fixture-set variance, choose base seeds that differ mod 20 (e.g. `42 43 44 45 46`).
+     - To avoid the overwrite-by-seed filename collision when k-sampling the same command,
+       pass `--run-tag <s>` (e.g. `--run-tag rep1`) so each repeat writes a distinct stem.
    Either yields the mean±std synergy tables the paper needs. **This is the planned next-session
    task** (along with re-confirming all 8 clean n=20 — NOTE: the re-confirm regenerates the
    numbers anyway, since the 4 Aggro fixture decks changed in the 2026-06-11 batch and the
@@ -103,19 +148,23 @@
 
 ## Paper-grade run matrix (M3)
 
-Everything below is **compute/credit-bound, not code-bound**. The single hard blocker is
-the free-tier Groq 6000 TPM cap for combat/run dimensions; a **paid Groq Dev tier**
-unblocks all of it. Check items off as runs land.
+Everything below is **compute-bound, not code-bound**. The old blocker (free-tier Groq
+6000 TPM) is superseded by the professor's plan: **GPU (M3a) for open-source models,
+then frontier API access (M3b) for Claude/GPT**. Check items off as runs land.
 
 ### Models (capability ladder)
-| # | Model | Provider | Status | Notes |
-|---|---|---|---|---|
-| 1 | llama-3.1-8b-instant | Groq | synergy valid (n=20, seed-42 point est.); turn/combat stale; run none | small baseline |
-| 2 | meta-llama/llama-4-scout-17b | Groq | synergy valid (n=20, seed-42 point est.); turn/combat stale; run none | mid baseline |
-| 3 | **a 3rd family** (e.g. GPT-4o-mini / Claude Haiku / Gemini Flash) | TBD | **not started** | needed for cross-family signal |
-| 4 | **a reasoning model** (qwen3-32b or similar) | paid OpenRouter/Groq | **dropped on free tier** | optional but strengthens scale story |
+| # | Model | Provider | Phase | Status | Notes |
+|---|---|---|---|---|---|
+| 1 | llama-3.1-8b(-instruct) | Groq → **local GPU** | M3a | synergy valid (n=20, seed-42 point est.); turn/combat stale; run none | small baseline; local re-run doubles as provider-robustness check |
+| 2 | meta-llama/llama-4-scout-17b | Groq → **local GPU** (if VRAM fits) | M3a | synergy valid (n=20, seed-42 point est.); turn/combat stale; run none | mid baseline |
+| 3 | **reasoning model** (qwen3-32b / DeepSeek-R1-distill) | **local GPU** | M3a | dropped on free tier — **REVIVED by GPU** | the truncation/throttling failure mode disappears when self-hosted |
+| 4 | **Claude (e.g. Haiku/Sonnet)** | professor's API path | M3b | not started | frontier family #1 |
+| 5 | **GPT (e.g. 4o-mini/4o)** | professor's API path | M3b | not started | frontier family #2 |
 
-Minimum for a credible paper: **3 models across ≥2 families**. Models 1–2 alone are same-family.
+Minimum for a credible paper: **3 models across ≥2 families** — the two-phase plan
+delivers up to 4 families (Llama, Qwen/DeepSeek, Anthropic, OpenAI) incl. a reasoning
+model, which is exactly the matrix `docs/novelty_and_related_work.md` says NeurIPS
+D&B reviewers will expect.
 
 ### Sample sizes (per model, per format)
 | Dimension | Current data | Paper-grade target | Why |
@@ -137,16 +186,18 @@ Minimum for a credible paper: **3 models across ≥2 families**. Models 1–2 al
 - Every metric reported as **mean ± std (or 95% CI)** across the n samples — no point estimates.
 - Per-dimension bar/radar charts + structured-vs-raw ablation per model.
 
-### Run order (when paid tier is available)
+### Run order (M3a, when the GPU is available — same logic applies to M3b later)
 
 Ordered **cheapest → most expensive**: since ALL dimensions need fresh data post-sweep
 (no old baseline to extend), the rational order validates the pipeline on cheap calls
-before committing the bulk of the credits to run-level, where a mid-run failure wastes
-the most money.
+before committing the bulk of GPU-hours to run-level, where a mid-run failure wastes
+the most time. (On the GPU the cost is wall-clock hours, not credits — the ordering
+logic is identical. For M3b it is credits again, so the order matters even more.)
 
-1. **Paid smoke test** — one tiny full pass (`--n-turn 2 --n-combat 1 --n-synergy 2
-   --n-run 1`) on llama-3.1-8b to confirm key, throughput, and post-sweep outputs
-   end-to-end. Minutes, pennies.
+1. **Smoke test** — serve one model (vLLM/Ollama), then one tiny full pass
+   (`--n-turn 2 --n-combat 1 --n-synergy 2 --n-run 1`) via `--provider local` to
+   confirm endpoint, throughput, and post-fix-batch outputs end-to-end. Record
+   tok/s — it sizes the run-level budget (step 4).
 2. **Turn + combat, n≥20 × 5 seeds** (`--only turn combat --seeds ...`) × 2 models ×
    2 formats. Cheap (1 call/turn-sample; ~5–15 calls/combat), re-baselines the
    dimensions invalidated by the engine fix, and produces the first publishable
@@ -156,10 +207,16 @@ the most money.
 4. **Run-level, n≥20 × 5 seeds** — the longest pole and biggest spend, run once the
    pipeline is proven above. Start single-act; this is the headline "no valid data yet"
    gap. (`--only run --n-run 20 --seeds ...`)
-5. **Model #3 (new family)** — repeat steps 2–4; optionally model #4 (reasoning, paid).
+5. **Reasoning model (qwen3-32b / R1-distill)** — repeat steps 2–4 on the GPU. Watch
+   max_tokens (think blocks) and tok/s; this model dominates wall-clock, so run it
+   after the protocol is proven on the small models.
 6. **Optional breadth ablations:** `--acts 3` multi-act run-level; `--llm-routing`
    (decision-scope ablation); Silent run-level.
-7. **Fold numbers** (mean±std) into findings.md → report.md/report.html → draft.md.
+7. **Fold M3a numbers** (mean±std) into findings.md → report.md/report.html → draft.md.
+   **These tables define the locked protocol for M3b.**
+8. **M3b — Claude/GPT via the professor's access:** repeat steps 2–4 verbatim (same
+   seeds, same n, same formats, same fixture set — zero protocol drift), starting with
+   the cheapest tier models. Run-level last, sized by observed cost per run.
 
 ## Timeline
 - Pilot complete: 2026-06-07
@@ -168,5 +225,8 @@ the most money.
 - 2nd instrument audit (5 fixes, 56 tests) + synergy n=20 de-biased: 2026-06-10
 - Engine-fidelity batch (audit Part 2 + Part 3, 77 tests): 2026-06-11
 - 3rd full audit + fix batch (40 bugs, 102 tests): 2026-06-11
-- Paper-grade runs: TBD (gated on paid Groq Dev tier)
-- Draft: TBD
+- 4th full audit + fix batch (Sentinel crash + 22 more, 115 tests): 2026-06-12
+- Professor's compute plan announced (GPU → frontier API): 2026-06-12
+- **M3a GPU runs (open-source): expected start 2026-06-13**
+- M3b frontier runs (Claude/GPT): after M3a results
+- Draft: after M3b

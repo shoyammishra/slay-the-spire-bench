@@ -481,8 +481,14 @@ class Pride(CurseBase):
         super().__init__("Pride", "Pride", CardType.CURSE, CardRarity.CURSE, 1, innate=True, exhaust=True)
 
     def play(self, state, target=None):
-        _add_card_to_hand(state, Pride())
+        # Pride is playable + exhausts (no copy on play). The copy is created at
+        # END of turn while in hand (see end_of_turn_effect).
         _exhaust_card(state, self)
+
+    def end_of_turn_effect(self, state):
+        # At end of turn, while in hand, put a copy on TOP of the draw pile.
+        # _draw_cards pops from the end, so the top of the pile is the list end.
+        state.combat.draw_pile.append(Pride())
 
 
 class Regret(CurseBase):
@@ -1311,9 +1317,11 @@ class Sentinel(Card):
         super().__init__("Sentinel", "Sentinel", CardType.SKILL, CardRarity.UNCOMMON, 1, upgraded)
 
     def play(self, state, target=None):
-        from .enums import PowerId
+        # Gain block. "If this card is Exhausted, gain 2 (3) Energy" — the energy
+        # bonus is granted by the CARD_EXHAUST hook in powers.py (on_exhaust), so
+        # it only fires when something exhausts a Sentinel (Corruption, Sever
+        # Soul, etc.), not on a plain play.
         _gain_block(state, 8 if self.upgraded else 5)
-        state.player.powers[PowerId.SENTINEL] = state.player.powers.get(PowerId.SENTINEL, 0) + (3 if self.upgraded else 2)
 
     def upgrade(self):
         self.upgraded = True
@@ -1443,15 +1451,16 @@ class Bludgeon(Card):
 
 class Brutality(Card):
     def __init__(self, upgraded: bool = False):
-        super().__init__("Brutality", "Brutality", CardType.POWER, CardRarity.RARE, 0, upgraded)
+        # Brutality+ is Innate (a property of the card).
+        super().__init__("Brutality", "Brutality", CardType.POWER, CardRarity.RARE, 0,
+                         upgraded, innate=upgraded)
 
     def play(self, state, target=None):
         state.player.brutality = True
-        if self.upgraded:
-            state.player.innate_brutality = True
 
     def upgrade(self):
         self.upgraded = True
+        self.innate = True
 
 
 class Corruption(Card):

@@ -45,7 +45,7 @@ def _enemy_summary(e, player=None) -> dict:
         "max_hp": e.max_hp,
         "block": e.block,
         "powers": {k.value if hasattr(k, 'value') else str(k): v
-                   for k, v in (e.powers or {}).items()},
+                   for k, v in (e.powers or {}).items() if v},
         "intent": intent,
     }
 

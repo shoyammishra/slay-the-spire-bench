@@ -29,7 +29,7 @@ def build_llm(provider: str, model: str):
         responses = [
             '{"plays": [0], "reasoning": "mock"}',
             '{"action": "end_turn", "reasoning": "mock"}',
-            '{"archetype": "Aggro", "best_card_index": 0, "worst_card_name": "Defend"}',
+            '{"archetype": "Aggro", "best_card_index": 0, "worst_card_name": "Strike"}',
             '{"pick": 0, "reasoning": "mock"}',
             '{"choice": "rest", "reasoning": "mock"}',
             '{"path": 0, "reasoning": "mock"}',
@@ -48,6 +48,15 @@ def build_llm(provider: str, model: str):
         return OpenRouterLLM(model=model, api_key=key)
     else:
         sys.exit(f"Unknown provider: {provider}")
+
+
+def _tagged_stem(stem: str, run_tag: str) -> str:
+    """Append `_<run_tag>` to an output-file stem when a tag is set. Empty tag
+    (the default) returns the stem unchanged — byte-identical to current
+    filenames. Used to keep k-sampling / repeated-seed runs from overwriting
+    each other (results/<model>_<fmt>_seed<N>.json collides otherwise)."""
+    tag = (run_tag or "").strip()
+    return f"{stem}_{tag}" if tag else stem
 
 
 def _merge_existing(fname: Path, summary: dict) -> dict:
@@ -101,6 +110,11 @@ def main():
     parser.add_argument("--llm-routing", action="store_true", default=False,
                         help="Use LLM for path, rest-site, and boss-relic choices in "
                              "run-level eval (default: greedy heuristics).")
+    parser.add_argument("--run-tag", default="",
+                        help="Optional suffix appended to every output file stem "
+                             "(e.g. --run-tag rep1). Default empty = current "
+                             "filenames. Lets k-sampling / repeated-seed runs avoid "
+                             "overwriting results/<model>_<fmt>_seed<N>.* .")
     parser.add_argument("--out-dir", default="results")
     args = parser.parse_args()
 
@@ -156,7 +170,7 @@ def main():
         summary = result.summary()
         print(json.dumps(summary, indent=2))
 
-        stem = f"{safe_model}_{args.fmt}_seed{primary_seed}"
+        stem = _tagged_stem(f"{safe_model}_{args.fmt}_seed{primary_seed}", args.run_tag)
         fname = out_dir / f"{stem}.json"
         summary = _merge_existing(fname, summary)
         fname.write_text(json.dumps(summary, indent=2))
@@ -180,7 +194,7 @@ def main():
                 n_run=args.n_run,
             )
             summary = result.summary()
-            stem = f"{safe_model}_{args.fmt}_seed{seed}"
+            stem = _tagged_stem(f"{safe_model}_{args.fmt}_seed{seed}", args.run_tag)
             fname = out_dir / f"{stem}.json"
             summary = _merge_existing(fname, summary)
             fname.write_text(json.dumps(summary, indent=2))
@@ -191,7 +205,8 @@ def main():
 
         # Aggregate
         agg = _aggregate_summaries(per_seed_summaries, args.model, args.fmt, args.character, seeds)
-        agg_stem = f"{safe_model}_{args.fmt}_seeds{'_'.join(str(s) for s in seeds)}"
+        agg_stem = _tagged_stem(
+            f"{safe_model}_{args.fmt}_seeds{'_'.join(str(s) for s in seeds)}", args.run_tag)
         agg_fname = out_dir / f"{agg_stem}.json"
         agg_fname.write_text(json.dumps(agg, indent=2))
         print(f"\nAggregated results ({len(seeds)} seeds) -> {agg_fname}")
@@ -232,6 +247,7 @@ def _aggregate_summaries(summaries: list, model: str, fmt: str,
     synergy = _agg_dim("synergy", [
         "archetype_acc", "card_pick_acc", "removal_acc", "parse_ok_rate",
         "archetype_n_scored", "archetype_n_ambiguous",
+        "card_pick_n_scored", "removal_n_scored",
     ])
     run = _agg_dim("run", ["survival_rate", "avg_hp_fraction",
                             "avg_draft_coherence", "avg_floors_reached", "avg_progress"])

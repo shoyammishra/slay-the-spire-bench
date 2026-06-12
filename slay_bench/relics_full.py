@@ -138,7 +138,10 @@ class Orichalcum(Relic):
     def register(self, state):
         def on_turn_end(gs, **kw):
             if gs.player.block == 0:
+                # Relic block is flat (no Dex/Frail), so don't route through
+                # _gain_block — but still emit BLOCK_GAINED so Juggernaut fires.
                 gs.player.block += 6
+                gs.bus.emit(Event.BLOCK_GAINED, gs, amount=6)
         state.bus.subscribe(Event.TURN_END, on_turn_end)
 
 
@@ -522,7 +525,8 @@ class CaptainsWheel(Relic):
     def register(self, state):
         def on_turn_start(gs, **kw):
             if gs.combat and gs.combat.turn == 3:
-                gs.player.block += 18
+                gs.player.block += 18  # flat relic block (no Dex/Frail)
+                gs.bus.emit(Event.BLOCK_GAINED, gs, amount=18)
         state.bus.subscribe(Event.TURN_START, on_turn_start)
 
 
@@ -531,7 +535,10 @@ class CloakClasp(Relic):
     name = "Cloak Clasp"
     def register(self, state):
         def on_turn_end(gs, **kw):
-            gs.player.block += len(gs.combat.hand)
+            amt = len(gs.combat.hand)
+            if amt:
+                gs.player.block += amt  # flat relic block (no Dex/Frail)
+                gs.bus.emit(Event.BLOCK_GAINED, gs, amount=amt)
         state.bus.subscribe(Event.TURN_END, on_turn_end)
 
 
@@ -566,6 +573,9 @@ class EmptyCage(Relic):
             if state.player.deck:
                 idx = state.rng.misc_rng.next_int(len(state.player.deck))
                 state.player.deck.pop(idx)
+                # Count toward the run-wide removal counter (Winged Statue etc.)
+                state.player._cards_removed = \
+                    getattr(state.player, '_cards_removed', 0) + 1
 
 
 class FossilizedHelix(Relic):
@@ -1047,14 +1057,15 @@ FULL_RELIC_LIST = [
     PrayerWheel, RunicCube, SacredBark, SelfFormingClay, SlaverCollar,
     Sozu, TheAbacus, TheBoot, TinghSha, Torii, ToughBandages,
     ToyOrnithopter, TungstenRod, Turnip, UnceasingTop, VelvetChoker,
-    # Shop
+    # Shop (HandDrill already listed under Uncommon; it is in both pool sets so
+    # one FULL_RELIC_LIST entry suffices for both — do not relist it here)
     Cauldron, ChemicalX, ClockworkSouvenir, DollysMirror, FrozenEye,
-    HandDrill, MembershipCard, TinyHouse,
-    # Boss
-    Brimstone, BustedCrown, CallingBell, CoffeeDripper, CursedKey,
-    Ectoplasm, EmptyCage, FusionHammer, HolyWater, Inserter, NuclearBattery,
-    PandorasBox, PhilosophersStone, RunicPyramid, SacredBark, Sozu,
-    VelvetChoker, VioletLotus,
+    MembershipCard, TinyHouse,
+    # Boss (BustedCrown/EmptyCage/SacredBark/Sozu/VelvetChoker already listed
+    # under Rare; pool membership is by class name, so one entry covers both)
+    Brimstone, CallingBell, CoffeeDripper, CursedKey,
+    Ectoplasm, FusionHammer, HolyWater, Inserter, NuclearBattery,
+    PandorasBox, PhilosophersStone, RunicPyramid, VioletLotus,
 ]
 
 BOSS_RELIC_POOL = [
