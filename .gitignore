@@ -1,6 +1,11 @@
 # Secrets
 .env
 
+# Internal cluster docs — contain the private login IP + contacts; never commit
+# to this public repo.
+*CSIS*Cluster*SOP*.pdf
+CSIS_Cluster_SOP-BITS-v1.pdf
+
 # Python
 __pycache__/
 *.py[cod]

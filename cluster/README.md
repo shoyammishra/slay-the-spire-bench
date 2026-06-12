@@ -7,13 +7,18 @@ the benchmark against it over `localhost`, using the repo's `--provider local`
 adapter. Full cluster policy is in the department's CSIS cluster SOP (internal
 doc, not committed to this public repo — keep your copy locally).
 
+> **Login IP, support email, and room are intentionally omitted** — this is a
+> public repo. Get the real login-node IP and support contact from the
+> department's CSIS cluster SOP (the internal PDF the professor shared), and
+> substitute `<login-node-ip>` below with it. Do not commit those values.
+
 ## Cluster facts (from the SOP)
 - **Login node:** `ssh <username>@<login-node-ip>` (campus network or institute VPN required).
 - **Compute nodes:** 2× **NVIDIA A100 80 GB** per node — one A100 comfortably serves a 32B model.
 - **Storage:** 300 GB home quota; `~/scratch` (1 TB shared, **auto-deleted after 30 days**) — put model weights here via `HF_HOME`.
 - **GPU partitions:** `gpu-short` (8 h), `gpu-long` (12 h), `gpu-1day` (24 h, up to 2 GPUs), `gpu-3day` (72 h).
 - **Don't** run anything heavy (or `nvidia-smi`) on the login node — GPUs live only on compute nodes via Slurm.
-- **Support:** vincem@pilani.bits-pilani.ac.in / CSIS Lab Room 6017 (include job ID + the `.out` tail on errors).
+- **Support:** see the SOP for the support email + lab room (include job ID + the `.out` tail on errors).
 
 ## One-time setup
 From your Windows machine (MobaXterm or PowerShell), on the campus network:
