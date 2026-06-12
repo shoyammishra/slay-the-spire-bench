@@ -56,7 +56,29 @@ A second contribution is **optimality-relative scoring**. Where most game benchm
 
 A third contribution is **prompt format as a controlled variable**. We run every model on identical RNG seeds in both structured JSON and raw English, allowing a clean ablation of representation effects independent of task difficulty. This is a *format* ablation (whole state representation), complementary to the *content* ablation (card names) of Bateni and Whitehead (2024). Our pilot indicates format effects are model- and horizon-dependent, with no single format dominating.
 
-*A fuller novelty/positioning analysis — including an honest assessment of overlap with prior STS work and conference-readiness — is maintained in `docs/novelty_and_related_work.md`. References to be completed with full citations before submission.*
+*A fuller novelty/positioning analysis — including an honest assessment of overlap with prior STS work, venue ladder, and synthetic-benchmark comparison — is maintained in `docs/novelty_and_related_work.md`. References to be completed with full citations before submission.*
 
 ---
-*Content to be filled after paper-grade runs (n≥20 per dimension, ≥3 models).*
+
+## Publication Notes (updated 2026-06-12)
+
+### Venue ladder
+
+| Paper state | Target venue |
+|---|---|
+| Current (pilot — missing run data, n < 10, 2 Llama models) | Workshop: NeurIPS/ICLR workshop, FDG, IEEE COG, AIIDE |
+| + Valid run-level data + n ≥ 20–30 + ≥ 5 seeds + 3 model families incl. a reasoning model | NeurIPS Datasets & Benchmarks track |
+| All above + second STS character or Monster Train + horizon degradation curve | NeurIPS D&B strong or ICLR main track |
+| All above + causal analysis of why long-horizon planning fails | NeurIPS/ICLR main track |
+
+### Critical gaps before submission (ranked)
+1. **Valid run-level data** — the four-horizon framing cannot be defended without it. This is the most urgent gap. (Unblocked by professor's GPU access, expected 2026-06-13.)
+2. **Scale to n ≥ 20–30, ≥ 5 seeds** — current n = 5/3/20/0 with single seeds; no error bars.
+3. **3+ model families including a reasoning model** — currently 2 models from one family (Llama). Reasoning model behaviour at different planning horizons is exactly what reviewers will want to see.
+4. **Careful FDG 2024 framing** — synergy name-vs-play result must be framed as confirming/extending Bateni & Whitehead (2024), not as an independent discovery.
+
+### What slay-bench vs. synthetic difficulty benchmarks
+Synthetic benchmarks (Tower of Hanoi, SokoBench, seqBench) measure *how many steps of the same reasoning sustain* — they tell you where a chain breaks. Slay-bench measures *across qualitatively distinct planning types* — it tells you which cognitive links were never present. A model could score near-optimally at the turn level while completely failing synergy, not because a chain broke but because deck-archetype reasoning was never there.
+
+---
+*Experiments section to be filled after paper-grade runs (n ≥ 20 per dimension, ≥ 3 model families).*

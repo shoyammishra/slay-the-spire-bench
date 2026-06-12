@@ -130,13 +130,43 @@ Ranked by effort-to-payoff. The selection criterion is: **does the game have gen
 
 ---
 
-## 7. One-paragraph answer to send the professor
+## 7. How slay-bench differs from synthetic planning benchmarks
+
+An independent line of work tests planning degradation using synthetic domains: Tower of Hanoi, synthetic mazes, SokoBench, the 8-puzzle, seqBench. These all share the same structure — one domain, one difficulty knob (number of disks, path length, solution depth) — and a performance curve as the knob increases. They all answer the same question: **how many steps of identical reasoning can an LLM sustain before it fails?**
+
+slay-bench is doing something different. The four horizons are not just larger versions of the same problem:
+
+- **Turn-level** is combinatorial optimization (≤720 permutations, exhaustive oracle).
+- **Combat** is multi-turn state management under adversarial pressure.
+- **Synergy** requires understanding emergent interactions between cards that are nowhere stated explicitly.
+- **Run-level** is global strategic planning under uncertainty across 15 floors.
+
+The synthetic benchmarks tell you *where the chain breaks* — at what depth the same reasoning fails. Slay-bench tells you *which links were never there* — which qualitatively distinct type of planning is missing. A model could play individual turns near-optimally (high turn score) while completely failing deck construction (low synergy score), not because a longer chain broke but because a different cognitive operation was never present. That distinction is the contribution synthetic difficulty curves cannot provide.
+
+**Framing for the paper:** cite Tower of Hanoi / SokoBench-style work as "depth benchmarks" — they measure how far a single planning type extends. slay-bench is a "breadth benchmark" — it measures across qualitatively distinct planning types. The two are complementary, not competing.
+
+---
+
+## 8. Venue ladder (updated 2026-06-12)
+
+| Paper state | Target venue |
+|---|---|
+| Current (pilot — missing run data, n < 10, 2 Llama models) | Workshop: NeurIPS/ICLR workshop, FDG, IEEE COG, AIIDE |
+| + Valid run-level data + n ≥ 20–30 + ≥ 5 seeds + 3 model families incl. a reasoning model | NeurIPS Datasets & Benchmarks track; benchmark short paper |
+| All above + second STS character or Monster Train + horizon degradation curve across model scales | NeurIPS D&B strong submission or ICLR main track |
+| All above + causal analysis of why long-horizon planning fails | NeurIPS/ICLR main track (not just D&B) |
+
+The single most important step is valid run-level data + n ≥ 20 + reasoning model. Everything else is secondary to that.
+
+---
+
+## 9. One-paragraph answer to send the professor
 
 > slay-bench is not the first LLM-in-Slay-the-Spire work — FDG 2024 ("Language-Driven Play") and the Orak benchmark already use STS — so we cite and differentiate against them explicitly. Their work, like every other LLM game benchmark (Orak, GameBench, DSGBench, BALROG), scores *whole-game play* or *maps one game to one skill*. Our novelty is structural: we take a **single shared simulator** and decompose it into **four nested planning horizons** (turn → combat → synergy → run), each with **its own ground-truth oracle** (exhaustive optimum, greedy baseline, hand-crafted archetypes, survival), so a score gap *between* horizons isolates a planning-horizon effect rather than a domain change. No prior benchmark does single-domain, multi-horizon, oracle-scored decomposition, and we add a seed-matched structured-vs-raw prompt-format ablation. The contribution is a **reusable methodology**, not one game: we'll demonstrate breadth by extending it to additional STS characters (Silent/Defect/Watcher) and flag Monster Train / Into the Breach / NetHack as natural next instantiations. To be top-tier-competitive on the benchmark track we still need n ≥ 20–30 with ≥ 5 seeds, 3+ model families including a reasoning model, and — most urgently — valid run-level (longest-horizon) data, which is currently blocked on compute, not design.
 
 ---
 
-## 8. Sources
+## 10. Sources
 - Language-Driven Play: LLMs as Game-Playing Agents in Slay the Spire (FDG 2024) — https://dl.acm.org/doi/10.1145/3649921.3650013
 - MiniSTS engine — https://github.com/iambb5445/MiniSTS
 - Orak: A Foundational Benchmark for Training and Evaluating LLM Agents on Diverse Video Games — https://arxiv.org/abs/2506.03610
