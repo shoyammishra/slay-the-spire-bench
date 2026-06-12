@@ -17,27 +17,30 @@
 #   - multi-act:  --acts 3   (Acts 1->3)
 #   - gpu-3day partition for very long multi-seed multi-act runs
 
-# --- VALIDATION PASS (~18 min) ---
-#SBATCH --job-name=slay_run
-#SBATCH --partition=gpu-short
-#SBATCH --gres=gpu:a100-80gb:1
-#SBATCH --time=01:00:00
-#SBATCH --ntasks=1
-#SBATCH --cpus-per-task=8
-#SBATCH --mem=64G
-#SBATCH --output=slay_run_%j.out
-#SBATCH --error=slay_run_%j.err
-
-# --- PAPER-GRADE PASS (~4 h) — uncomment and comment out the block above ---
-##SBATCH --job-name=slay_run_paper
-##SBATCH --partition=gpu-1day
+# --- VALIDATION PASS (~18 min) — commented out; using paper-grade below ---
+##SBATCH --job-name=slay_run
+##SBATCH --partition=gpu-short
 ##SBATCH --gres=gpu:a100-80gb:1
-##SBATCH --time=06:00:00
+##SBATCH --time=01:00:00
 ##SBATCH --ntasks=1
 ##SBATCH --cpus-per-task=8
 ##SBATCH --mem=64G
 ##SBATCH --output=slay_run_%j.out
 ##SBATCH --error=slay_run_%j.err
+
+# --- PAPER-GRADE PASS (~4 h) ---
+# QOS wall caps (sacctmgr, 2026-06-13): gpu-1day=24h, gpu-short=8h, gpu-long=12h.
+# 06:00:00 on gpu-1day is well within the cap. (An earlier 24:00:00 was rejected
+# because it equals the cap exactly — stay strictly under it.)
+#SBATCH --job-name=slay_run_paper
+#SBATCH --partition=gpu-1day
+#SBATCH --gres=gpu:a100-80gb:1
+#SBATCH --time=06:00:00
+#SBATCH --ntasks=1
+#SBATCH --cpus-per-task=8
+#SBATCH --mem=64G
+#SBATCH --output=slay_run_%j.out
+#SBATCH --error=slay_run_%j.err
 
 cd "${SLURM_SUBMIT_DIR}"
 source /nfs_home/software/miniconda/etc/profile.d/conda.sh
@@ -48,23 +51,23 @@ source cluster/lib.sh
 start_vllm
 wait_for_vllm
 
-# VALIDATION PASS — n=5, single seed
+# PAPER-GRADE PASS — n=20, 5 seeds
 for FMT in structured raw; do
-  echo "=== run-level, format=${FMT} ==="
+  echo "=== run-level paper, format=${FMT} ==="
   python run_benchmark.py --provider local --base-url "${BASE_URL}" \
       --model "${SERVED_NAME}" \
-      --only run --n-run 5 \
-      --seed 42 \
+      --only run --n-run 20 \
+      --seeds 42 43 44 45 46 \
       --format "${FMT}"
 done
 
-# PAPER-GRADE PASS — n=20, 5 seeds (uncomment; comment out the block above)
+# VALIDATION PASS — n=5, single seed (kept for reference)
 # for FMT in structured raw; do
-#   echo "=== run-level paper, format=${FMT} ==="
+#   echo "=== run-level, format=${FMT} ==="
 #   python run_benchmark.py --provider local --base-url "${BASE_URL}" \
 #       --model "${SERVED_NAME}" \
-#       --only run --n-run 20 \
-#       --seeds 42 43 44 45 46 \
+#       --only run --n-run 5 \
+#       --seed 42 \
 #       --format "${FMT}"
 # done
 
