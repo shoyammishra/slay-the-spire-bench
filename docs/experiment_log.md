@@ -1,5 +1,31 @@
 # Experiment Log
 
+## 2026-06-13 (CLUSTER) — first real self-hosted runs on BITS CSIS Slurm (Qwen2.5-7B)
+
+**Hardware:** A100 80 GB (csis.cn2), vLLM 0.6.6 + transformers 4.47.1 + torch 2.5.1+cu124,
+served `Qwen/Qwen2.5-7B-Instruct` as `qwen2.5-7b` via `cluster/*.sbatch`.
+
+**Smoke (job 7536) — PASSED.** Tiny full pass (`--n-turn 2 --n-combat 1 --n-synergy 4
+--n-run 1`, structured, seed 42) ran end-to-end and wrote `results/qwen2.5-7b_structured_seed42.*`.
+- Wall time: **1m35s** (`time` real) for the benchmark; vLLM startup ~3.5 min separately.
+- Throughput from `vllm_7536.log`: **~82 tok/s generation**, ~700–900 tok/s prompt.
+- Used to calibrate `run_level.sbatch`: n=5 validation ≈18 min; paper-grade n=20×5 seeds ≈4h.
+
+**Turn+combat re-baseline (job 7539) — RUNNING.** `--only turn combat --n-turn 20 --n-combat 20
+--seeds 42 43 44 45 46` ×2 formats, Ironclad, Qwen2.5-7B. Early turn-level signal healthy:
+parse_ok=1.0 (instrument clean), ~50/50 legal-optimal vs illegal-bust for the 7B, dmg_ratios
+clustering at 1.0/0.67/0.0 (quantization from short low-energy opening turns, not a bug).
+
+**Cluster issues hit + resolved (full notes in CLAUDE.md "CLUSTER GOTCHAS"):**
+- `lib.sh` defaulted to `Qwen/Qwen3-32B` which vLLM 0.6.6 can't load → defaulted to Qwen2.5-7B (`30551a9`).
+- `#SBATCH --time=24:00:00` rejected by QOS (`QOSMaxWallDurationPerJobLimit`) → submit with `--time=03:00:00` override.
+- Confirmed result filenames are character-namespaced (Ironclad untagged, Silent `_silent`),
+  so the `--only` merge + synergy's both-character loop don't collide — no code change needed.
+
+**Next:** finish 7539 → verify tail → `sbatch --time=03:00:00 cluster/synergy.sbatch` → run_level.
+
+---
+
 ## 2026-06-12 (GPU prep) — `--provider local` adapter (NO API runs; mock + unit verification)
 
 **What ran:** full test suite (**118/118**, +3 new LocalLLM regression tests over the
