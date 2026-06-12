@@ -23,8 +23,8 @@ from dotenv import load_dotenv
 load_dotenv()
 
 
-def build_llm(provider: str, model: str):
-    from slay_bench.benchmark import GroqLLM, OpenRouterLLM, MockLLM
+def build_llm(provider: str, model: str, base_url: str = None):
+    from slay_bench.benchmark import GroqLLM, OpenRouterLLM, LocalLLM, MockLLM
     if provider == "mock":
         responses = [
             '{"plays": [0], "reasoning": "mock"}',
@@ -46,6 +46,12 @@ def build_llm(provider: str, model: str):
         if not key:
             sys.exit("OPENROUTER_API_KEY not set.")
         return OpenRouterLLM(model=model, api_key=key)
+    elif provider == "local":
+        # Self-hosted OpenAI-compatible server (vLLM / TGI / Ollama). No key
+        # needed by default; LOCAL_API_KEY is honoured if the server sets one.
+        url = base_url or os.environ.get("LOCAL_BASE_URL") or "http://localhost:8000/v1"
+        key = os.environ.get("LOCAL_API_KEY")
+        return LocalLLM(model=model, base_url=url, api_key=key)
     else:
         sys.exit(f"Unknown provider: {provider}")
 
@@ -77,7 +83,13 @@ def _merge_existing(fname: Path, summary: dict) -> dict:
 def main():
     parser = argparse.ArgumentParser(description="slay-bench: LLM planning benchmark")
     parser.add_argument("--model", default="llama-3.1-8b-instant")
-    parser.add_argument("--provider", default="groq", choices=["groq", "openrouter", "mock"])
+    parser.add_argument("--provider", default="groq",
+                        choices=["groq", "openrouter", "local", "mock"])
+    parser.add_argument("--base-url", default=None,
+                        help="Base URL for --provider local (OpenAI-compatible "
+                             "endpoint, e.g. http://localhost:8000/v1 for vLLM, "
+                             "http://localhost:11434/v1 for Ollama). Falls back to "
+                             "$LOCAL_BASE_URL then http://localhost:8000/v1.")
     parser.add_argument("--format", dest="fmt", default="structured",
                         choices=["structured", "raw"])
     # Seed / multi-seed
@@ -128,7 +140,7 @@ def main():
     seeds = args.seeds if args.seeds else [args.seed]
     primary_seed = seeds[0]
 
-    llm = build_llm(args.provider, args.model)
+    llm = build_llm(args.provider, args.model, base_url=args.base_url)
 
     from slay_bench.benchmark import BenchmarkHarness
     harness = BenchmarkHarness(

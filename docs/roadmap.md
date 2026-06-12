@@ -98,11 +98,19 @@ GPU access expected 2026-06-13):
 0. **Checkpoint/commit the 2026-06-12 fix batch** (4th audit: 23 fixes, 115/115 tests)
    — it is currently uncommitted in the working tree; experiments must run on a
    committed, tagged state so results are reproducible against a SHA.
-1. **Add a `--provider local` adapter** (OpenAI-compatible chat-completions client with
-   a `--base-url` flag). A GPU box will serve models via vLLM / TGI / Ollama, all of
-   which expose the OpenAI API shape; `OpenRouterLLM` is already 95% of this client —
-   parametrize the endpoint URL and drop the OpenRouter-specific 402 handling.
-   ~30-minute task, unblocks everything the moment access lands.
+1. ~~**Add a `--provider local` adapter**~~ DONE 2026-06-12. `LocalLLM` in
+   `slay_bench/benchmark.py` — OpenAI-compatible chat-completions client (urllib, no
+   new deps), wired into `run_benchmark.py` via `--provider local --base-url URL`
+   (falls back to `$LOCAL_BASE_URL` then `http://localhost:8000/v1`). Clone of
+   `OpenRouterLLM` with the endpoint parametrized; dropped the 402 wall (a local
+   server never bills → any non-429 HTTP error is surfaced with the response body so a
+   misconfigured endpoint is obvious), 300s timeout (slow 32B serving), 8000 max_tokens
+   (reasoning `<think>` blocks). Optional `$LOCAL_API_KEY` for vLLM `--api-key` servers;
+   defaults to a harmless "EMPTY" Bearer. 3 regression tests (stubbed urlopen): request
+   shape/URL, server-error surfacing, build_llm wiring. Works with vLLM
+   (`:8000/v1`), Ollama (`:11434/v1`), TGI — all OpenAI-shaped. **118/118 tests, mock
+   pipeline green.** Smoke command:
+   `python run_benchmark.py --provider local --base-url http://localhost:8000/v1 --model <m> --n-turn 2 --n-combat 1 --n-synergy 2 --n-run 1`
 2. **Decide the open-source model ladder by VRAM** (confirm GPU size first):
    - llama-3.1-8b-instruct — re-run locally even though Groq numbers exist: same
      weights / different serving stack = a free **provider-robustness check**.

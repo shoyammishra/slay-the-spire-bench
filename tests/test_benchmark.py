@@ -690,6 +690,102 @@ def test_run_tag_stem_suffix():
     print("[PASS] _tagged_stem suffixes only when a tag is set")
 
 
+def test_local_llm_builds_openai_request():
+    """--provider local posts an OpenAI-compatible chat-completions request to
+    {base_url}/chat/completions and returns choices[0].message.content. No real
+    network: urllib.request.urlopen is stubbed."""
+    import urllib.request
+    from slay_bench.benchmark import LocalLLM
+
+    captured = {}
+
+    class _FakeResp:
+        def __init__(self, body): self._body = body
+        def read(self): return self._body
+        def __enter__(self): return self
+        def __exit__(self, *a): return False
+
+    def _fake_urlopen(req, timeout=None):
+        captured["url"] = req.full_url
+        captured["headers"] = dict(req.header_items())
+        captured["body"] = json.loads(req.data.decode())
+        captured["timeout"] = timeout
+        return _FakeResp(json.dumps(
+            {"choices": [{"message": {"content": '{"plays": [0]}'}}]}).encode())
+
+    orig = urllib.request.urlopen
+    urllib.request.urlopen = _fake_urlopen
+    try:
+        llm = LocalLLM(model="qwen3-32b", base_url="http://localhost:8000/v1/",
+                       api_key="secret", timeout=123)
+        out = llm.complete("sys", "user", temperature=0.7, max_tokens=4096)
+    finally:
+        urllib.request.urlopen = orig
+
+    assert out == '{"plays": [0]}'
+    # trailing slash on base_url is stripped, endpoint appended exactly once
+    assert captured["url"] == "http://localhost:8000/v1/chat/completions"
+    assert captured["timeout"] == 123
+    assert captured["body"]["model"] == "qwen3-32b"
+    assert captured["body"]["temperature"] == 0.7
+    assert captured["body"]["max_tokens"] == 4096
+    assert captured["body"]["messages"][0] == {"role": "system", "content": "sys"}
+    assert captured["body"]["messages"][1] == {"role": "user", "content": "user"}
+    # api key flows into the Bearer header (header names are title-cased by urllib)
+    assert captured["headers"].get("Authorization") == "Bearer secret"
+    print("[PASS] LocalLLM posts an OpenAI-compatible request to the right URL")
+
+
+def test_local_llm_surfaces_server_error():
+    """A non-429 HTTP error from the local server is surfaced (not swallowed as a
+    payment wall like OpenRouter's 402) so a misconfigured endpoint is obvious."""
+    import urllib.request, urllib.error, io
+    from slay_bench.benchmark import LocalLLM
+
+    def _fake_urlopen(req, timeout=None):
+        raise urllib.error.HTTPError(
+            req.full_url, 400, "Bad Request", {},
+            io.BytesIO(b'{"error": "model not found"}'))
+
+    orig = urllib.request.urlopen
+    urllib.request.urlopen = _fake_urlopen
+    try:
+        llm = LocalLLM(model="missing", base_url="http://localhost:8000/v1")
+        raised = None
+        try:
+            llm.complete("sys", "user")
+        except RuntimeError as e:
+            raised = e
+    finally:
+        urllib.request.urlopen = orig
+
+    assert raised is not None, "a 400 should raise RuntimeError"
+    assert "HTTP 400" in str(raised) and "model not found" in str(raised)
+    print("[PASS] LocalLLM surfaces a server HTTP error with the response body")
+
+
+def test_build_llm_local_provider():
+    """build_llm('local', ...) returns a LocalLLM with the resolved base_url,
+    honouring the explicit --base-url over the default."""
+    from run_benchmark import build_llm
+    from slay_bench.benchmark import LocalLLM
+
+    llm = build_llm("local", "qwen3-32b", base_url="http://gpu-box:8000/v1")
+    assert isinstance(llm, LocalLLM)
+    assert llm.model == "qwen3-32b"
+    assert llm.base_url == "http://gpu-box:8000/v1"
+
+    # default when neither --base-url nor $LOCAL_BASE_URL is set
+    prev = os.environ.pop("LOCAL_BASE_URL", None)
+    try:
+        d = build_llm("local", "m")
+        assert d.base_url == "http://localhost:8000/v1"
+    finally:
+        if prev is not None:
+            os.environ["LOCAL_BASE_URL"] = prev
+    print("[PASS] build_llm wires the local provider with the right base_url")
+
+
 if __name__ == "__main__":
     tests = [
         test_structured_prompt,
@@ -731,6 +827,10 @@ if __name__ == "__main__":
         test_combat_negative_target_index_first_alive,
         test_synergy_summary_exposes_n_scored_denominators,
         test_run_tag_stem_suffix,
+        # 2026-06-12 GPU prep — local provider adapter
+        test_local_llm_builds_openai_request,
+        test_local_llm_surfaces_server_error,
+        test_build_llm_local_provider,
     ]
     passed = failed = 0
     for test in tests:

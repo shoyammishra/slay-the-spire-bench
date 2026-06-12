@@ -188,6 +188,85 @@ class OpenRouterLLM(LLMInterface):
         raise RateLimitExhausted(str(last_err))
 
 
+class LocalLLM(LLMInterface):
+    """OpenAI-compatible chat-completions client for a self-hosted model server.
+
+    vLLM, TGI, and Ollama all expose the OpenAI `/v1/chat/completions` shape, so
+    one client covers every GPU-box serving stack. This is OpenRouterLLM with the
+    endpoint parametrized (`base_url`) and the OpenRouter-specific 402 handling
+    dropped — a local server never bills, so a non-200 is a real error to surface,
+    not a payment wall.
+
+    base_url should include the API root (e.g. http://localhost:8000/v1 for vLLM,
+    http://localhost:11434/v1 for Ollama). An API key is usually unnecessary
+    locally; vLLM started with --api-key expects a Bearer token, so we still send
+    one (LOCAL_API_KEY env or a harmless "EMPTY" placeholder).
+
+    Timeout defaults to 300s: a 32B model on a single GPU at ~50 tok/s can take
+    minutes to emit a long reasoning + JSON response. max_tokens defaults to 8000
+    to leave room for <think> blocks (reasoning models), like OpenRouterLLM.
+    """
+
+    def __init__(self, model: str, base_url: str = "http://localhost:8000/v1",
+                 api_key: Optional[str] = None, timeout: float = 300.0):
+        self.model = model
+        self.base_url = base_url.rstrip("/")
+        self._api_key = api_key
+        self.timeout = timeout
+
+    def complete(self, system: str, user: str, **kwargs) -> str:
+        import os, time, urllib.request, urllib.error
+        key = self._api_key or os.environ.get("LOCAL_API_KEY") or "EMPTY"
+        url = f"{self.base_url}/chat/completions"
+        payload = json.dumps({
+            "model": self.model,
+            "messages": [
+                {"role": "system", "content": system},
+                {"role": "user", "content": user},
+            ],
+            "temperature": kwargs.get("temperature", 0.0),
+            "max_tokens": kwargs.get("max_tokens", 8000),
+        }).encode()
+        last_err = None
+        for attempt in range(5):
+            try:
+                req = urllib.request.Request(
+                    url,
+                    data=payload,
+                    headers={
+                        "Authorization": f"Bearer {key}",
+                        "Content-Type": "application/json",
+                    },
+                )
+                with urllib.request.urlopen(req, timeout=self.timeout) as r:
+                    data = json.loads(r.read())
+                return data["choices"][0]["message"]["content"]
+            except urllib.error.HTTPError as e:
+                last_err = e
+                # 429 can still happen if the server caps concurrency; back off.
+                # Everything else (4xx/5xx) is a real server error — surface it
+                # with the response body so a misconfigured endpoint is obvious.
+                if e.code == 429:
+                    wait = 2 ** attempt
+                    print(f"    [rate limit] retry {attempt+1}/5 in {wait}s...", flush=True)
+                    time.sleep(wait)
+                else:
+                    body = ""
+                    try:
+                        body = e.read().decode(errors="replace")[:500]
+                    except Exception:  # noqa: BLE001
+                        pass
+                    raise RuntimeError(
+                        f"Local server returned HTTP {e.code} from {url}: {body}"
+                    ) from e
+            except Exception as e:  # noqa: BLE001 — transient network/timeout: retry
+                last_err = e
+                wait = 2 ** attempt
+                print(f"    [network error] retry {attempt+1}/5 in {wait}s: {e}", flush=True)
+                time.sleep(wait)
+        raise RateLimitExhausted(str(last_err))
+
+
 class MockLLM(LLMInterface):
     """Deterministic mock for unit tests — returns scripted responses."""
 
