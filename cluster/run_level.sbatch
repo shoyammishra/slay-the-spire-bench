@@ -57,7 +57,7 @@ for FMT in structured raw; do
   python run_benchmark.py --provider local --base-url "${BASE_URL}" \
       --model "${SERVED_NAME}" \
       --only run --n-run 20 \
-      --seeds 42 43 44 45 46 \
+      --seeds 42 1042 2042 3042 4042 \
       --format "${FMT}"
 done
 

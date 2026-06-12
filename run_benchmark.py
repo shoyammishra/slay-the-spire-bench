@@ -5,7 +5,9 @@ Usage:
     python run_benchmark.py --model llama-3.1-8b-instant --provider groq --seed 42
     python run_benchmark.py --model mock --provider mock   # dry-run with no API calls
     python run_benchmark.py --character silent --acts 3 --temperature 0.7
-    python run_benchmark.py --seeds 42 43 44 45 46        # multi-seed run
+    python run_benchmark.py --seeds 42 1042 2042 3042 4042   # multi-seed run
+    (space base seeds >=1000 apart: per-sample seeds are contiguous from the
+     base, so adjacent bases like 42,43 share 19/20 samples -> fake std)
 """
 import argparse
 import json
@@ -98,7 +100,10 @@ def main():
     parser.add_argument("--seeds", type=int, nargs="+", default=None,
                         metavar="SEED",
                         help="Run with multiple seeds and aggregate mean±std. "
-                             "Overrides --seed. E.g. --seeds 42 43 44 45 46")
+                             "Overrides --seed. Space base seeds >=1000 apart "
+                             "(per-sample seeds are contiguous from each base, "
+                             "so close bases share samples and understate std). "
+                             "E.g. --seeds 42 1042 2042 3042 4042")
     # Sample counts
     parser.add_argument("--n-turn", type=int, default=5)
     parser.add_argument("--n-combat", type=int, default=3)

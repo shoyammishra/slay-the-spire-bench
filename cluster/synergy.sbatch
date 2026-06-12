@@ -29,7 +29,7 @@ for CHAR in ironclad silent; do
         --model "${SERVED_NAME}" \
         --only synergy --n-synergy 20 \
         --character "${CHAR}" \
-        --seeds 42 43 44 45 46 \
+        --seeds 42 1042 2042 3042 4042 \
         --format "${FMT}"
   done
 done

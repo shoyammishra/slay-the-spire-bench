@@ -105,7 +105,11 @@ python run_benchmark.py --provider local --base-url http://localhost:8000/v1 --m
 python run_benchmark.py --provider groq --model llama-3.1-8b-instant --acts 3 --n-run 5 --format structured
 
 # Multi-seed run (mean ± std — paper-grade)
-python run_benchmark.py --provider groq --model llama-3.1-8b-instant --seeds 42 43 44 45 46 --n-turn 20 --n-combat 20 --n-synergy 20 --n-run 5 --format structured
+# ⚠️ Space base seeds ≥1000 apart: per-sample seeds are contiguous ranges from each base
+# (base..base+n-1, with +100/+200/+300 dimension offsets), so adjacent bases (42,43,…)
+# share 19/20 samples → fake std≈0. Found 2026-06-13. 1000 is a multiple of 20, so each
+# base still covers all 20 synergy fixtures once.
+python run_benchmark.py --provider groq --model llama-3.1-8b-instant --seeds 42 1042 2042 3042 4042 --n-turn 20 --n-combat 20 --n-synergy 20 --n-run 5 --format structured
 
 # Sampling temperature (for synergy variance / error bars)
 python run_benchmark.py --provider groq --model llama-3.1-8b-instant --temperature 0.7 --only synergy --n-synergy 20
