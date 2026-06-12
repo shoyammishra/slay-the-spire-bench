@@ -84,6 +84,20 @@ slay_bench/
   not in the chest "rare" pool.
 - **MERCHANT nodes** run `nodes.greedy_shop_visit` (deterministic: Meal Ticket heal +
   worst-card removal) identically in both run loops.
+- **justApplied covers the end-of-turn window too (2026-06-12, 5th audit)**:
+  `CombatState.turn_end_window` is True during the TURN_END emit; player debuffs applied
+  then (Doubt/Shame `end_of_turn_effect`) are flagged `just_applied` like enemy-phase
+  debuffs, so they survive the same-round tick and cover the player's next turn.
+- **Partial-save on ANY error (2026-06-12, 5th audit)**: `run_run_eval` (per run-seed)
+  and `run_all` (per dimension) catch all exceptions except KeyboardInterrupt — print
+  loudly, stop the affected scope, return everything completed. A vLLM HTTP 400
+  (context overflow) surfaced as RuntimeError must never discard finished runs.
+- **`complete_json` fallback is raw_decode-based (2026-06-12, 5th audit)**: one
+  `JSONDecoder.raw_decode` attempt per `{` (first success wins) — never re-scan end
+  positions; garbage/truncated reasoning dumps must fail in milliseconds, not minutes.
+- **BLOCK_GAINED on every relic block grant**: flat relic block bypasses `_gain_block`
+  (no Dex/Frail) but must still emit `Event.BLOCK_GAINED` so Juggernaut fires
+  (Orichalcum, Captain's Wheel, Cloak Clasp, The Abacus, Tough Bandages, Anchor).
 
 ## Prompt Formats
 - `structured`: compact JSON with card names, costs, HP numbers

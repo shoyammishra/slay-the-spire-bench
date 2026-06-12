@@ -75,7 +75,10 @@ class Anchor(Relic):
 
     def register(self, state: GameState) -> None:
         def on_combat_start(gs: GameState, **kw):
+            # Flat relic block (no Dex/Frail), but emit BLOCK_GAINED so
+            # Juggernaut and friends fire (E9 / L1 consistency).
             gs.player.block += 10
+            gs.bus.emit(Event.BLOCK_GAINED, gs, amount=10)
         state.bus.subscribe(Event.COMBAT_START, on_combat_start)
 
 
@@ -268,17 +271,27 @@ class DeadBranch(Relic):
 
     def register(self, state: GameState) -> None:
         def on_exhaust(gs: GameState, card=None, **kw):
-            # Add a random character card to hand
-            from .cards import IRONCLAD_CARD_CLASSES, make_card_for
-            if getattr(gs, "character", "ironclad") == "silent":
+            # Add a random character CARD (attack/skill/power) to hand. Real Dead
+            # Branch never adds curses or statuses — the unfiltered class registry
+            # included Burn/Wound/Void/Pride/every curse, actively poisoning the
+            # exhaust deck it is meant to reward.
+            from .cards import IRONCLAD_CARD_CLASSES, make_card_for, _add_card_to_hand
+            from .enums import CardType, CardRarity
+            character = getattr(gs, "character", "ironclad")
+            if character == "silent":
                 from .cards_silent import SILENT_CARD_CLASSES as classes
             else:
                 classes = IRONCLAD_CARD_CLASSES
-            idx = gs.rng.misc_rng.next_int(len(classes))
-            card_name = list(classes.keys())[idx]
-            from .cards import _add_card_to_hand
-            _add_card_to_hand(gs, make_card_for(
-                getattr(gs, "character", "ironclad"), card_name))
+            candidates = []
+            for name in classes.keys():
+                c = make_card_for(character, name)
+                if (c.type in (CardType.ATTACK, CardType.SKILL, CardType.POWER)
+                        and c.rarity != CardRarity.BASIC):
+                    candidates.append(name)
+            if not candidates:
+                return
+            idx = gs.rng.misc_rng.next_int(len(candidates))
+            _add_card_to_hand(gs, make_card_for(character, candidates[idx]))
         state.bus.subscribe(Event.CARD_EXHAUST, on_exhaust)
 
 
@@ -306,8 +319,13 @@ class MarkOfPain(Relic):
     def register(self, state: GameState) -> None:
         def on_combat_start(gs: GameState, **kw):
             from .cards import Wound
-            gs.combat.draw_pile.append(Wound())
-            gs.combat.draw_pile.append(Wound())
+            # Shuffle each Wound into the draw pile (real StS). append() put both
+            # on TOP (draw pops the end), so the first two draws of EVERY combat
+            # were Wounds.
+            for _ in range(2):
+                pile = gs.combat.draw_pile
+                idx = gs.rng.shuffle_rng.next_int(len(pile) + 1)
+                pile.insert(idx, Wound())
         state.bus.subscribe(Event.COMBAT_START, on_combat_start)
 
 

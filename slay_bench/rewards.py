@@ -91,7 +91,19 @@ def generate_card_reward(state: GameState, count: int = 3) -> List[Card]:
         if rarity == CardRarity.RARE and state.rng.card_rng.next_int(100) < 25:
             upgraded = True
 
-        offers.append(make_card_for(character, name, upgraded))
+        card = make_card_for(character, name, upgraded)
+        # Eggs: a matching owned egg upgrades the offered card (real StS effect
+        # is "whenever you ADD a card of this type"; applied at reward-generation
+        # time like the rare-upgrade roll above). Upgrade IN PLACE (card.upgrade()
+        # consumes no RNG) so the existing card_rng call order is unchanged.
+        if not card.upgraded:
+            from .enums import CardType
+            p = state.player
+            if ((card.type == CardType.POWER and getattr(p, '_frozen_egg', False)) or
+                    (card.type == CardType.ATTACK and getattr(p, '_molten_egg', False)) or
+                    (card.type == CardType.SKILL and getattr(p, '_toxic_egg', False))):
+                card.upgrade()
+        offers.append(card)
 
     return offers
 

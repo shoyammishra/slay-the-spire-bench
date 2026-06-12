@@ -584,15 +584,15 @@ class Nemesis(Enemy):
     def select_move(self, state):
         if self._phase < 3:
             self._phase += 1
-            # Stay Intangible through the first 3 turns. Enemy INTANGIBLE now
-            # ticks down each round (_tick_enemy_powers), so re-apply it here
-            # (select_move runs after that tick) until phase 3 is reached.
-            if self._phase < 3:
-                self.powers[PowerId.INTANGIBLE] = 1
-            else:
-                self.powers.pop(PowerId.INTANGIBLE, None)
+            # Stay Intangible through player turns 1-3 (documented 3-turn
+            # simplification), droppable from turn 4. Enemy INTANGIBLE ticks down
+            # each round (_tick_enemy_powers) and select_move runs AFTER that
+            # tick, so re-apply it on phases 1,2,3 — this keeps the turn-3 attack
+            # capped at 1. It is popped when phase 4 is selected (else branch).
+            self.powers[PowerId.INTANGIBLE] = 1
             self.current_move = Move("Scythe", IntentType.ATTACK, damage=45)
         else:
+            self.powers.pop(PowerId.INTANGIBLE, None)
             pattern = ["Debuff", "Scythe", "Scythe"]
             idx = (self._phase - 3) % len(pattern)
             self._phase += 1

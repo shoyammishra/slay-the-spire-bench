@@ -85,9 +85,12 @@ class HappyFlower(Relic):
 class JuzuBracelet(Relic):
     id = "Juzu Bracelet"
     name = "Juzu Bracelet"
+    # Real effect: "? rooms can no longer become combats." DOCUMENTED no-op by
+    # design in this sim — EVENT nodes never spawn combats here (the fight
+    # branches of events are text stubs), so the relic has nothing to gate. Same
+    # documented-design treatment as Mummified Hand. No speculative logic added.
     def register(self, state):
-        # No curses appear in card rewards
-        state.player._juzu = True
+        pass
 
 
 class Lantern(Relic):
@@ -231,7 +234,12 @@ class BlueCandle(Relic):
         state.player._blue_candle = True
         def on_card_play(gs, card=None, **kw):
             from .enums import CardType
-            if card and card.type == CardType.CURSE:
+            # Only the curses Blue Candle MAKES playable (the unplayable ones)
+            # are handled here. Pride is naturally playable and self-exhausts in
+            # its own play() — firing here too double-entered it in the exhaust
+            # pile and double-emitted CARD_EXHAUST (Feel No Pain/Dark Embrace/
+            # Sentinel double-fired) and double-charged its 1-HP loss.
+            if card and card.type == CardType.CURSE and getattr(card, 'unplayable', False):
                 from .cards import _exhaust_card, _damage_player
                 _damage_player(gs, 1, is_hp_loss=True)
                 _exhaust_card(gs, card)
@@ -721,6 +729,7 @@ class TheAbacus(Relic):
     def register(self, state):
         def on_shuffle(gs, **kw):
             gs.player.block += 6
+            gs.bus.emit(Event.BLOCK_GAINED, gs, amount=6)
         state.bus.subscribe(Event.SHUFFLE, on_shuffle)
 
 
@@ -756,6 +765,7 @@ class ToughBandages(Relic):
     def register(self, state):
         def on_discard(gs, card=None, **kw):
             gs.player.block += 3
+            gs.bus.emit(Event.BLOCK_GAINED, gs, amount=3)
         state.bus.subscribe(Event.CARD_DISCARD, on_discard)
 
 
@@ -865,10 +875,12 @@ class TinyHouse(Relic):
     id = "Tiny House"
     name = "Tiny House"
     def on_pickup(self, state):
+        # Real Tiny House (shop relic): potion, 50 gold, +5 max HP, a card, and
+        # UPGRADE a card. It does NOT grant +1 energy/turn — that was a stray
+        # Busted-Crown-grade effect on a shop relic.
         state.player.gold += 50
         state.player.max_hp += 5
         state.player.hp += 5
-        state.player.energy_per_turn += 1
         from .rewards import generate_card_reward
         reward = generate_card_reward(state, 1)
         if reward:
@@ -876,6 +888,13 @@ class TinyHouse(Relic):
         from .potions import random_potion
         if len(state.player.potions) < 3:
             state.player.potions.append(random_potion(state))
+        # Upgrade 1 random un-upgraded, non-curse/status card.
+        from .enums import CardType
+        candidates = [c for c in state.player.deck if not c.upgraded
+                      and c.type not in (CardType.CURSE, CardType.STATUS)]
+        if candidates:
+            idx = state.rng.misc_rng.next_int(len(candidates))
+            candidates[idx].upgrade()
 
 
 # ── Boss Relics ───────────────────────────────────────────────────────────────
@@ -1071,10 +1090,14 @@ FULL_RELIC_LIST = [
 BOSS_RELIC_POOL = [
     "Black Blood", "Mark of Pain", "Runic Dome", "Brimstone", "Busted Crown",
     "Calling Bell", "Coffee Dripper", "Cursed Key", "Ectoplasm", "Empty Cage",
-    "Fusion Hammer", "Holy Water", "Pandora's Box",
+    "Fusion Hammer", "Pandora's Box",
     "Philosopher's Stone", "Runic Pyramid", "Sacred Bark", "Slaver's Collar",
     "Snecko Eye", "Sozu", "Velvet Choker",
 ]
+# Holy Water / Violet Lotus removed outright (Watcher-only; Nuclear Battery
+# precedent) — their stand-in implementations are off-spec and a regression of
+# the relic_allowed gate would otherwise expose them. Classes + _WATCHER_ONLY
+# entries kept as belt-and-suspenders.
 # Nuclear Battery removed: Defect-only (orbs), same precedent as Inserter.
 
 
@@ -1130,11 +1153,13 @@ _RARITY_POOLS = {
         "Cauldron", "ChemicalX", "ClockworkSouvenir", "DollysMirror",
         "FrozenEye", "HandDrill", "MembershipCard", "TinyHouse",
     }],
+    # HolyWater / VioletLotus removed (Watcher-only, off-spec stand-ins); see
+    # the BOSS_RELIC_POOL note above.
     "boss": [r for r in FULL_RELIC_LIST if r.__name__ in {
         "Brimstone", "BustedCrown", "CallingBell", "CoffeeDripper",
-        "CursedKey", "Ectoplasm", "EmptyCage", "FusionHammer", "HolyWater",
+        "CursedKey", "Ectoplasm", "EmptyCage", "FusionHammer",
         "PandorasBox", "PhilosophersStone",
-        "RunicPyramid", "SacredBark", "Sozu", "VelvetChoker", "VioletLotus",
+        "RunicPyramid", "SacredBark", "Sozu", "VelvetChoker",
     }],
 }
 

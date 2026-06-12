@@ -95,9 +95,23 @@ GPU access expected 2026-06-13):
 
 ## Prep for the GPU phase (do BEFORE access arrives, ~tomorrow 2026-06-13)
 
-0. **Checkpoint/commit the 2026-06-12 fix batch** (4th audit: 23 fixes, 115/115 tests)
-   — it is currently uncommitted in the working tree; experiments must run on a
-   committed, tagged state so results are reproducible against a SHA.
+0. ~~**Checkpoint/commit the 2026-06-12 fix batch**~~ DONE (4th audit committed as
+   `0de519a`; experiments must run on a committed state so results are reproducible
+   against a SHA).
+0b. ~~**5th audit ("one last pass")**~~ DONE 2026-06-12 — line-by-line review of the
+   two newest commits + fresh full engine/harness read found **2 HIGH + 5 MEDIUM +
+   10 LOW**; all fixed same day by an Opus 4.8 subagent (spec + per-item notes in
+   `docs/bug_audit_2026-06-12b.md`). The two GPU-phase-critical ones: (H1) a single
+   non-429 server error (e.g. vLLM HTTP 400 on a context-overflow prompt) crashed the
+   whole benchmark and discarded every completed run — partial-save now catches ALL
+   exceptions at the run-seed and dimension level; (H2) the `complete_json` brace-scan
+   fallback was ~O(n²) per parse failure (minutes of CPU on a truncated 32k `<think>`
+   dump — exactly the revived-reasoning-model failure mode) — now one `raw_decode` per
+   `{`. Also: Doubt/Shame curses were no-ops (debuff ticked away same round), Blue
+   Candle+Pride double-exhaust, Dead Branch added curses/statuses, Tiny House granted
+   +1 energy/turn it shouldn't, Nemesis intangible off-by-one, eggs were dead relics.
+   **133/133 tests, mock pipeline green ×4.** No synergy prompt bytes changed →
+   synergy n=20 stays valid.
 1. ~~**Add a `--provider local` adapter**~~ DONE 2026-06-12. `LocalLLM` in
    `slay_bench/benchmark.py` — OpenAI-compatible chat-completions client (urllib, no
    new deps), wired into `run_benchmark.py` via `--provider local --base-url URL`

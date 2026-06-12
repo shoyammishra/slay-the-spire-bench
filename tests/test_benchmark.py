@@ -786,6 +786,114 @@ def test_build_llm_local_provider():
     print("[PASS] build_llm wires the local provider with the right base_url")
 
 
+# ── 2026-06-12b audit regression tests ────────────────────────────────────────
+
+def test_run_eval_keeps_partial_on_server_error():
+    """H1: a non-429 server error mid-run (e.g. vLLM HTTP 400) must stop
+    run-level and KEEP completed runs, not propagate and discard everything."""
+    from slay_bench.benchmark import LLMInterface
+
+    class _RaiseAfter(LLMInterface):
+        """Acts like an always-end-turn model, but raises RuntimeError on the
+        Nth complete() call (simulating a context-overflow HTTP 400)."""
+        def __init__(self, raise_on):
+            self.n = 0
+            self.raise_on = raise_on
+        def complete(self, system, user, **kw):
+            self.n += 1
+            if self.n >= self.raise_on:
+                raise RuntimeError("server returned HTTP 400: prompt too long")
+            return '{"action": "end_turn", "reasoning": "mock"}'
+
+    # Measure the exact call count of a single run on a FIXED seed (all end-turn
+    # → deterministic loss), so we can raise on the very next call when that same
+    # seed is replayed as run 1 of a multi-run pass.
+    counter = MockLLM(['{"action": "end_turn"}'])
+    h0 = BenchmarkHarness(counter, "m", "structured")
+    import io, contextlib
+    with contextlib.redirect_stdout(io.StringIO()):
+        h0.run_run_eval([901])
+    calls_per_run = len(counter._calls)
+    assert calls_per_run > 0
+
+    # Replay seed 901 as run 1 (completes identically), then raise on the first
+    # call of run 2 → run 1's score must survive.
+    stub = _RaiseAfter(raise_on=calls_per_run + 1)
+    h = BenchmarkHarness(stub, "m", "structured")
+    with contextlib.redirect_stdout(io.StringIO()):
+        scores = h.run_run_eval([901, 902])
+    assert len(scores) == 1, f"must keep the 1 completed run, got {len(scores)}"
+    print(f"[PASS] run_run_eval keeps {len(scores)} completed run(s) on a server error")
+
+
+def test_run_all_keeps_partial_on_dimension_error():
+    """H1: a non-429 exception from a dimension aborts the rest but keeps the
+    dimensions completed so far (mirrors the RateLimitExhausted path)."""
+    from slay_bench.benchmark import LLMInterface
+
+    class _RaiseOnRun(LLMInterface):
+        """Returns valid synergy/turn/combat answers, but raises once a run-level
+        prompt arrives (run prompts mention 'move to' / 'pick')."""
+        def complete(self, system, user, **kw):
+            if "Output JSON: {\"pick\"" in user or "move to" in user:
+                raise RuntimeError("server died mid-run")
+            return ('{"plays": [0], "archetype": "Aggro", "best_card_index": 0, '
+                    '"worst_card_name": "Strike", "action": "end_turn"}')
+
+    h = BenchmarkHarness(_RaiseOnRun(), "m", "structured")
+    import io, contextlib
+    with contextlib.redirect_stdout(io.StringIO()):
+        result = h.run_all(seed=42, n_turn=1, n_combat=1, n_synergy=2, n_run=2)
+    # Earlier dimensions collected; run-level aborted but did not crash run_all.
+    assert result.synergy_scores, "synergy results must survive a later-dimension crash"
+    assert isinstance(result.elapsed_seconds, float)
+    print("[PASS] run_all keeps partial results when a dimension errors")
+
+
+def test_complete_json_first_object_and_fast_on_garbage():
+    """H2: complete_json still returns the FIRST embedded JSON object, and the
+    raw_decode fallback is fast on a long brace-only garbage dump."""
+    import time as _t
+    # First valid object wins, trailing junk ignored.
+    mock = MockLLM(['noise {"a": 1} then {"b": 2} tail'])
+    obj = mock.complete_json("s", "u")
+    assert obj == {"a": 1}, obj
+    # A truncated reasoning dump (50k '{' with no closing brace) must fail fast.
+    mock2 = MockLLM(["{" * 50000])
+    t0 = _t.time()
+    res = mock2.complete_json("s", "u")
+    elapsed = _t.time() - t0
+    assert res.get("error") == "parse_failure", res
+    assert elapsed < 3.0, f"parse-failure fallback too slow: {elapsed:.2f}s"
+    print(f"[PASS] complete_json returns first object; garbage fails in {elapsed:.3f}s")
+
+
+def test_act_transition_counts_llm_call_only_when_made():
+    """L7: _act_transition must not count an llm_call when the boss-relic helper
+    short-circuits (≤1 relic offered → no API call)."""
+    from slay_bench.benchmark import RunEvaluator
+    mock = MockLLM(['{"pick": 0}'])
+    ev = RunEvaluator(mock, "structured")
+    state = new_ironclad_game(42)
+    counters = {"llm_calls": 0}
+    # Monkeypatch the relic-choice helpers so no real relic logic runs and only
+    # ONE relic is offered (forces the short-circuit).
+    import slay_bench.benchmark as bm
+    orig_gen = bm.generate_boss_relic_choices if hasattr(bm, "generate_boss_relic_choices") else None
+    # generate_boss_relic_choices is imported inside _act_transition; patch the source.
+    import slay_bench.rewards as rw
+    orig = rw.generate_boss_relic_choices
+    rw.generate_boss_relic_choices = lambda s, n=3: ["Sozu"]  # single offer
+    try:
+        ev._act_transition(state, counters)
+    finally:
+        rw.generate_boss_relic_choices = orig
+    assert counters["llm_calls"] == 0, \
+        f"no LLM call should be counted for a single-relic offer, got {counters['llm_calls']}"
+    assert mock._calls == [], "no LLM call should have been made"
+    print("[PASS] _act_transition counts no llm_call when none is made")
+
+
 if __name__ == "__main__":
     tests = [
         test_structured_prompt,
@@ -831,6 +939,11 @@ if __name__ == "__main__":
         test_local_llm_builds_openai_request,
         test_local_llm_surfaces_server_error,
         test_build_llm_local_provider,
+        # 2026-06-12b audit
+        test_run_eval_keeps_partial_on_server_error,
+        test_run_all_keeps_partial_on_dimension_error,
+        test_complete_json_first_object_and_fast_on_garbage,
+        test_act_transition_counts_llm_call_only_when_made,
     ]
     passed = failed = 0
     for test in tests:

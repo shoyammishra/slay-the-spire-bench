@@ -462,6 +462,70 @@ def test_random_relic_fallback_stays_in_class():
     print("[PASS] random_relic fallback never leaks off-class relics")
 
 
+# ── 2026-06-12b audit regression tests ────────────────────────────────────────
+
+def test_eggs_upgrade_matching_reward_cards():
+    """L2: an owned egg upgrades offered cards of its type at reward generation
+    (POWER<->Frozen, ATTACK<->Molten, SKILL<->Toxic)."""
+    from slay_bench.enums import CardType
+    # Baseline: without eggs, count upgraded ATTACK/SKILL/POWER offers across seeds.
+    def count_upgraded(set_flags):
+        upg = {CardType.ATTACK: 0, CardType.SKILL: 0, CardType.POWER: 0}
+        tot = {CardType.ATTACK: 0, CardType.SKILL: 0, CardType.POWER: 0}
+        for seed in range(100, 140):
+            state = new_ironclad_game(seed)
+            for f in set_flags:
+                setattr(state.player, f, True)
+            for c in generate_card_reward(state, 3):
+                if c.type in tot:
+                    tot[c.type] += 1
+                    if c.upgraded:
+                        upg[c.type] += 1
+        return upg, tot
+    # Molten egg: every offered ATTACK must be upgraded.
+    upg, tot = count_upgraded(["_molten_egg"])
+    assert tot[CardType.ATTACK] > 0 and upg[CardType.ATTACK] == tot[CardType.ATTACK], \
+        f"Molten Egg must upgrade all attack offers ({upg[CardType.ATTACK]}/{tot[CardType.ATTACK]})"
+    # Toxic egg: every offered SKILL upgraded.
+    upg, tot = count_upgraded(["_toxic_egg"])
+    assert tot[CardType.SKILL] > 0 and upg[CardType.SKILL] == tot[CardType.SKILL], \
+        f"Toxic Egg must upgrade all skill offers ({upg[CardType.SKILL]}/{tot[CardType.SKILL]})"
+    # Frozen egg: every offered POWER upgraded.
+    upg, tot = count_upgraded(["_frozen_egg"])
+    assert tot[CardType.POWER] > 0 and upg[CardType.POWER] == tot[CardType.POWER], \
+        f"Frozen Egg must upgrade all power offers ({upg[CardType.POWER]}/{tot[CardType.POWER]})"
+    print("[PASS] Eggs upgrade matching reward cards")
+
+
+def test_eggs_preserve_reward_rng_order():
+    """L2: the egg upgrade is in-place (no RNG) — reward card NAMES are identical
+    with or without an egg (only their upgrade flag differs)."""
+    s_no = new_ironclad_game(123)
+    names_no = [c.name for c in generate_card_reward(s_no, 3)]
+    s_egg = new_ironclad_game(123)
+    s_egg.player._molten_egg = True
+    s_egg.player._toxic_egg = True
+    s_egg.player._frozen_egg = True
+    names_egg = [c.name for c in generate_card_reward(s_egg, 3)]
+    assert names_no == names_egg, f"egg upgrade must not perturb RNG: {names_no} != {names_egg}"
+    print("[PASS] Eggs preserve reward RNG order")
+
+
+def test_tiny_house_no_energy_upgrades_card():
+    """M4: Tiny House grants no +1 energy/turn and upgrades one card."""
+    from slay_bench.relics_full import TinyHouse
+    state = new_ironclad_game(42)
+    e_before = state.player.energy_per_turn
+    up_before = sum(1 for c in state.player.deck if c.upgraded)
+    TinyHouse().on_pickup(state)
+    assert state.player.energy_per_turn == e_before, "Tiny House must NOT grant +1 energy/turn"
+    up_after = sum(1 for c in state.player.deck if c.upgraded)
+    # One added card + one upgrade. The added reward card may itself be upgraded,
+    # but the deck must gain at least one upgraded card from the upgrade step.
+    assert up_after >= up_before + 1, "Tiny House must upgrade a card"
+    print("[PASS] Tiny House: no energy, upgrades a card")
+
+
 if __name__ == "__main__":
     tests = [
         test_map_generation,
@@ -495,6 +559,10 @@ if __name__ == "__main__":
         test_pandoras_box_transforms_basics_only,
         test_fairy_in_a_bottle_revives,
         test_random_relic_fallback_stays_in_class,
+        # 2026-06-12b audit
+        test_eggs_upgrade_matching_reward_cards,
+        test_eggs_preserve_reward_rng_order,
+        test_tiny_house_no_energy_upgrades_card,
     ]
     passed = failed = 0
     for test in tests:

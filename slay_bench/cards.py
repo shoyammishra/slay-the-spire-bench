@@ -273,10 +273,14 @@ def _apply_power(state: GameState, target, power_id, amount: int) -> None:
             and getattr(state.player, '_snecko_skull', False)):
         amount += 1
     target.powers[power_id] = target.powers.get(power_id, 0) + amount
-    # StS justApplied rule: debuffs enemies put on the player during the enemy
-    # phase must survive the end-of-round tick of that same round.
+    # StS justApplied rule: debuffs put on the player during the enemy phase OR
+    # during the end-of-turn window (Doubt/Shame curses fire there) must survive
+    # the end-of-round tick of that same round, so they cover the player's next
+    # turn. (Berserk's self-Vulnerable is applied during the player's main phase
+    # — neither flag set — so it still ticks correctly at end of round.)
     if (target is state.player and state.combat is not None
-            and state.combat.enemy_phase):
+            and (state.combat.enemy_phase
+                 or getattr(state.combat, 'turn_end_window', False))):
         state.combat.just_applied.add(power_id)
 
 
@@ -1508,9 +1512,15 @@ class Exhume(Card):
                          0 if upgraded else 1, upgraded, exhaust=True)
 
     def play(self, state, target=None):
-        if state.combat.exhaust_pile:
-            card = state.combat.exhaust_pile.pop()
-            _add_card_to_hand(state, card)
+        # Exhume cannot retrieve another Exhume — pop the most recent
+        # non-Exhume entry (identity-safe scan from the end). No-op if only
+        # Exhumes are exhausted.
+        pile = state.combat.exhaust_pile
+        for i in range(len(pile) - 1, -1, -1):
+            if pile[i].name != "Exhume":
+                card = pile.pop(i)
+                _add_card_to_hand(state, card)
+                break
         _exhaust_card(state, self)
 
     def upgrade(self):
@@ -1599,7 +1609,13 @@ class LimitBreak(Card):
     def play(self, state, target=None):
         from .enums import PowerId
         strength = state.player.powers.get(PowerId.STRENGTH, 0)
-        state.player.powers[PowerId.STRENGTH] = strength * 2
+        result = strength * 2
+        # Don't materialize a STRENGTH:0 entry at 0 Strength — it lingers in
+        # state and trips `PowerId.STRENGTH in powers` checks. Clean up like Flex.
+        if result:
+            state.player.powers[PowerId.STRENGTH] = result
+        else:
+            state.player.powers.pop(PowerId.STRENGTH, None)
         if not self.upgraded:
             _exhaust_card(state, self)
 

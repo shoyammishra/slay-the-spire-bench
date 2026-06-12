@@ -284,8 +284,16 @@ def end_player_turn(state: GameState) -> None:
     combat = state.combat
     player = state.player
 
-    # Emit turn end (Combust, Flex, Constricted, Burn cards, etc.)
-    state.bus.emit(Event.TURN_END, state)
+    # Emit turn end (Combust, Flex, Constricted, Burn cards, etc.). The curse
+    # end_of_turn_effect loop (Doubt/Shame) runs INSIDE the TURN_END handler in
+    # powers.py, so wrapping just the emit covers it: any player debuff applied
+    # during this window is flagged just_applied (in cards.py _apply_power) and
+    # skips its first tick at end of round.
+    combat.turn_end_window = True
+    try:
+        state.bus.emit(Event.TURN_END, state)
+    finally:
+        combat.turn_end_window = False
 
     # Choke ("Choked" enemies lose HP per card played) lasts only the turn
     # Choke was played — it never expired before.

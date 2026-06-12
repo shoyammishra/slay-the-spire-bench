@@ -27,6 +27,10 @@ class CombatState:
     # during the enemy phase must not tick down at the end of that same round.
     enemy_phase: bool = False
     just_applied: set = field(default_factory=set)
+    # Set around the TURN_END emit: debuffs applied during the end-of-turn
+    # window (Doubt/Shame curses) are marked just_applied so they don't tick
+    # down before they cover the player's next turn (StS justApplied rule).
+    turn_end_window: bool = False
     # Time Eater's Time Warp: set when the card-play threshold is hit;
     # blocks further plays this turn (≈ "ends your turn"). Reset at turn start.
     time_warp_lock: bool = False

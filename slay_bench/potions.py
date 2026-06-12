@@ -127,15 +127,18 @@ class AncientPotion(Potion):
 class PowerPotion(Potion):
     def __init__(self): super().__init__("Power Potion", "Power Potion")
     def use(self, state, target=None):
-        # Play a random power card
-        from .rewards import _IRONCLAD_POOL
+        # Play a random power card. Use the character's own pool (was hardcoded
+        # _IRONCLAD_POOL — a Silent player would have played Ironclad cards).
+        from .rewards import card_pool_for
         from .enums import CardRarity
-        from .cards import make_card
-        powers_in_pool = [n for n in _IRONCLAD_POOL[CardRarity.UNCOMMON] + _IRONCLAD_POOL[CardRarity.RARE]
-                          if make_card(n).type.name == "POWER"]
+        from .cards import make_card_for
+        character = getattr(state, "character", "ironclad")
+        pool = card_pool_for(state)
+        powers_in_pool = [n for n in pool[CardRarity.UNCOMMON] + pool[CardRarity.RARE]
+                          if make_card_for(character, n).type.name == "POWER"]
         if powers_in_pool:
             idx = state.rng.misc_rng.next_int(len(powers_in_pool))
-            card = make_card(powers_in_pool[idx])
+            card = make_card_for(character, powers_in_pool[idx])
             card.cost_override = 0
             card.play(state, target)
 
@@ -143,14 +146,17 @@ class PowerPotion(Potion):
 class SkillPotion(Potion):
     def __init__(self): super().__init__("Skill Potion", "Skill Potion")
     def use(self, state, target=None):
-        from .rewards import _IRONCLAD_POOL
+        # Character-aware pool (was hardcoded _IRONCLAD_POOL).
+        from .rewards import card_pool_for
         from .enums import CardRarity
-        from .cards import make_card, CardType
-        skills = [n for n in _IRONCLAD_POOL[CardRarity.COMMON] + _IRONCLAD_POOL[CardRarity.UNCOMMON]
-                  if make_card(n).type == CardType.SKILL]
+        from .cards import make_card_for, CardType
+        character = getattr(state, "character", "ironclad")
+        pool = card_pool_for(state)
+        skills = [n for n in pool[CardRarity.COMMON] + pool[CardRarity.UNCOMMON]
+                  if make_card_for(character, n).type == CardType.SKILL]
         if skills:
             idx = state.rng.misc_rng.next_int(len(skills))
-            card = make_card(skills[idx])
+            card = make_card_for(character, skills[idx])
             card.cost_override = 0
             state.combat.hand.append(card)
 
@@ -192,6 +198,11 @@ class GamblersBrew(Potion):
 class RegenPotion(Potion):
     def __init__(self): super().__init__("Regen Potion", "Regen Potion")
     def use(self, state, target=None):
+        # NOTE: only the ENEMY power-tick path reads PowerId.REGENERATE, so the
+        # player's REGENERATE never heals. Dead by design until potions become
+        # drinkable (they are undrinkable by design today); add a player-side
+        # TURN_END heal here if/when potion use is wired up. Left as a no-op heal
+        # to avoid introducing new RNG/heal interactions to re-baseline.
         from .enums import PowerId
         state.player.powers[PowerId.REGENERATE] = state.player.powers.get(PowerId.REGENERATE, 0) + 5 * _sacred_bark(state)
 

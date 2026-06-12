@@ -55,15 +55,21 @@ class LLMInterface(ABC):
             return json.loads(text)
         except json.JSONDecodeError:
             pass
-        # Try to extract the first valid JSON object from the text
+        # Try to extract the first valid JSON object from the text. Use
+        # raw_decode (parses a prefix, ignores trailing junk) per '{' instead of
+        # the old reverse end-scan: that scan tried every end position for every
+        # '{', i.e. ~(#braces × len) parse attempts each O(len) — minutes of CPU
+        # on a truncated 32k-char reasoning dump with no closing brace. raw_decode
+        # keeps identical accepted-input semantics (first decodable object wins)
+        # at linear-ish cost.
         import re
+        decoder = json.JSONDecoder()
         for m in re.finditer(r'\{', text):
-            for end in range(len(text), m.start(), -1):
-                candidate = text[m.start():end]
-                try:
-                    return json.loads(candidate)
-                except json.JSONDecodeError:
-                    continue
+            try:
+                obj, _end = decoder.raw_decode(text[m.start():])
+                return obj
+            except json.JSONDecodeError:
+                continue
         return {"error": "parse_failure", "raw": raw}
 
 
@@ -1256,7 +1262,9 @@ class RunEvaluator:
         relic_ids = [r for r in relic_ids if r != "Black Blood"]  # Ironclad-keyed swap relic; keep simple
         if relic_ids:
             try:
-                if counters is not None:
+                # Only count an LLM call when one actually happens: the helper
+                # short-circuits (returns 0, no API call) for ≤1 relic offered.
+                if counters is not None and len(relic_ids) > 1:
                     counters["llm_calls"] = counters.get("llm_calls", 0) + 1
                 pick = self._llm_boss_relic_choice(state, relic_ids)
             except RateLimitExhausted:
@@ -1680,6 +1688,17 @@ class BenchmarkHarness:
                 print(f"    [rate limit] stopping run-level after {len(scores)} "
                       f"completed run(s); keeping partial results. ({e})", flush=True)
                 break
+            except KeyboardInterrupt:
+                raise
+            except Exception as e:  # noqa: BLE001
+                # A single non-429 server error (e.g. vLLM HTTP 400 on a prompt
+                # that overflows the context window, hundreds of calls into a run)
+                # used to kill the whole process and discard every completed run.
+                # Surface it loudly, stop, and keep the runs finished so far.
+                print(f"    [error] run-level aborted after {len(scores)} completed "
+                      f"run(s) (seed={seed}); keeping partial results. ({type(e).__name__}: {e})",
+                      flush=True)
+                break
             scores.append(score)
             print(f"    survived={score.survived}  acts={score.acts_completed}/{score.n_acts}  "
                   f"floors={score.floors_reached}/{score.total_floors}  "
@@ -1714,6 +1733,15 @@ class BenchmarkHarness:
         except RateLimitExhausted as e:
             print(f"\n[rate limit] aborting remaining dimensions; saving partial "
                   f"results collected so far. ({e})", flush=True)
+        except KeyboardInterrupt:
+            raise
+        except Exception as e:  # noqa: BLE001
+            # Any non-429 evaluator failure (e.g. a server HTTP error that the
+            # provider client re-raises as RuntimeError) stops the remaining
+            # dimensions but keeps everything collected so far — the JSON merge in
+            # run_benchmark.py preserves prior dimensions from disk.
+            print(f"\n[error] aborting remaining dimensions; saving partial results "
+                  f"collected so far. ({type(e).__name__}: {e})", flush=True)
         result.elapsed_seconds = time.time() - t0
 
         return result

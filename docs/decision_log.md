@@ -1,5 +1,17 @@
 # Decision Log
 
+## 2026-06-12 (5th audit) — Partial-save catches ALL exceptions, not just rate limits
+**Decision:** `run_run_eval` and `run_all` now catch any `Exception` (KeyboardInterrupt re-raised) at the run-seed and dimension boundaries: print the error loudly, stop the affected scope, keep everything completed so far. No retry, no silent swallowing.
+**Why:** Only `RateLimitExhausted` triggered partial-save. On the GPU box, vLLM returns HTTP 400 when a prompt overflows the model's context window — `LocalLLM` (correctly) surfaces that as `RuntimeError`, which would have killed the process hundreds of calls into a run-level pass and discarded every completed run. The error must still be loud (it usually means a misconfigured endpoint or an undersized context), but losing finished work to it is never right.
+
+## 2026-06-12 (5th audit) — `complete_json` fallback uses raw_decode, not an end-position scan
+**Decision:** The JSON-extraction fallback tries `json.JSONDecoder().raw_decode(text[m.start():])` once per `{` (first success wins) instead of attempting `json.loads` on every (start, end) substring pair.
+**Why:** The old scan was ~O(#braces × len²) on garbage input. A truncated 32k-char `<think>` dump (the exact qwen3 failure mode the GPU phase revives) contains no valid JSON and many braces — each parse failure burned minutes of CPU on top of the lost call. `raw_decode` parses a prefix and ignores trailing junk, so accepted inputs are identical and cost is linear-ish.
+
+## 2026-06-12 (5th audit) — justApplied extends to the end-of-turn window (`turn_end_window`)
+**Decision:** `CombatState.turn_end_window` is True during the TURN_END emit in `end_player_turn`; `_apply_power` marks player debuffs `just_applied` when applied during the enemy phase OR this window.
+**Why:** Doubt/Shame apply Weak/Frail from `end_of_turn_effect` (inside the TURN_END handler). With only the enemy-phase flag, `_tick_player_debuffs` deleted the single stack at the end of the same round — both curses were complete no-ops. Real StS marks these justApplied so they cover the player's next turn. Berserk's self-Vulnerable (applied mid-turn, neither flag set) still ticks the same round, as it should.
+
 ## 2026-06-12 (GPU prep) — `--provider local` adapter for self-hosted models
 **Decision:** Added `LocalLLM` (OpenAI-compatible `/v1/chat/completions` over urllib, no new deps) and wired `--provider local --base-url URL` into the CLI (falls back to `$LOCAL_BASE_URL` then `http://localhost:8000/v1`). It is `OpenRouterLLM` with the endpoint parametrized and the 402 path removed; a non-429 HTTP error is surfaced with the response body instead of swallowed. 300s timeout, 8000 max_tokens, optional `$LOCAL_API_KEY`.
 **Why:** The M3a GPU phase serves open-source models (incl. the revived reasoning model) via vLLM/TGI/Ollama — all OpenAI-shaped. One thin adapter unblocks the entire self-hosted matrix the moment the professor's GPU access lands (~2026-06-13), with no Groq TPM cap. A local server never bills, so OpenRouter's 402-as-payment-wall logic is wrong here — failures should be loud (misconfig) not silently fatal.

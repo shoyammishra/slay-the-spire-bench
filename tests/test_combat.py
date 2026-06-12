@@ -923,6 +923,190 @@ def test_no_duplicate_relics_in_pools():
     print("[PASS] No duplicate relic classes in any rarity pool")
 
 
+# ── 2026-06-12b audit regression tests ────────────────────────────────────────
+
+def test_doubt_curse_weak_covers_next_turn():
+    """M1: Doubt's end-of-turn Weak is applied during the TURN_END window, so it
+    is flagged just_applied and survives the end-of-round tick — active during
+    the player's NEXT turn, gone the round after."""
+    from slay_bench.cards import Doubt
+    from slay_bench.enums import PowerId
+    state = new_ironclad_game(42)
+    enemy = Cultist(state.rng.hp_rng)
+    start_combat(state, [enemy])
+    c = state.combat
+    c.hand[:] = [Doubt()]
+    c.draw_pile.clear()
+    assert PowerId.WEAK not in state.player.powers
+    end_player_turn(state)  # TURN_END fires Doubt; round-end tick must NOT remove it
+    assert state.player.powers.get(PowerId.WEAK, 0) >= 1, \
+        "Doubt's Weak must be active on the player's next turn"
+    # End the next turn with no Doubt in hand -> Weak ticks away.
+    c.hand[:] = []
+    end_player_turn(state)
+    assert PowerId.WEAK not in state.player.powers, "Weak must expire the round after"
+    print("[PASS] Doubt curse Weak covers the next turn, expires after")
+
+
+def test_blue_candle_pride_single_exhaust():
+    """M2: with Blue Candle owned, playing Pride (naturally playable, self-
+    exhausting) produces exactly one exhaust entry and one CARD_EXHAUST."""
+    from slay_bench.cards import Pride
+    from slay_bench.relics_full import BlueCandle
+    from slay_bench.events import Event
+    state = new_ironclad_game(42)
+    state.player.relics.append(BlueCandle())
+    enemy = Cultist(state.rng.hp_rng)
+    start_combat(state, [enemy])
+    c = state.combat
+    p = Pride()
+    c.hand[:] = [p]
+    c.exhaust_pile.clear()
+    fired = []
+    state.bus.subscribe(Event.CARD_EXHAUST, lambda gs, card=None, **kw: fired.append(card))
+    state.player.energy = 3
+    hp_before = state.player.hp
+    play_card(state, p, enemy)
+    assert sum(1 for x in c.exhaust_pile if x is p) == 1, "Pride must exhaust exactly once"
+    assert fired.count(p) == 1, f"CARD_EXHAUST fired {fired.count(p)} times for Pride"
+    assert hp_before - state.player.hp == 0, "Blue Candle must not charge Pride 1 HP"
+    print("[PASS] Blue Candle + Pride: single exhaust, single CARD_EXHAUST")
+
+
+def test_dead_branch_adds_no_curse_or_status():
+    """M3: Dead Branch never adds a curse/status/basic card to hand."""
+    from slay_bench.relics import DeadBranch
+    from slay_bench.cards import _exhaust_card, Strike
+    from slay_bench.enums import CardType, CardRarity
+    state = new_ironclad_game(42)
+    state.player.relics.append(DeadBranch())
+    enemy = Cultist(state.rng.hp_rng)
+    start_combat(state, [enemy])
+    c = state.combat
+    bad = 0
+    for _ in range(50):
+        before = len(c.hand)
+        _exhaust_card(state, Strike())  # triggers Dead Branch's CARD_EXHAUST hook
+        for card in c.hand[before:]:
+            if card.type in (CardType.CURSE, CardType.STATUS) or card.rarity == CardRarity.BASIC:
+                bad += 1
+        c.hand.clear()
+    assert bad == 0, f"Dead Branch added {bad} curse/status/basic cards"
+    print("[PASS] Dead Branch never adds curse/status/basic cards")
+
+
+def test_nemesis_intangible_through_turn_three():
+    """M5: Nemesis stays Intangible through player turns 1-3 (attacks capped at
+    1), droppable from turn 4."""
+    from slay_bench.enemies_act2 import Nemesis
+    from slay_bench.enums import PowerId
+    state = new_ironclad_game(42)
+    nem = Nemesis(state.rng.hp_rng)
+    start_combat(state, [nem])
+    # Survive Nemesis's 45-damage Scythe across the round transitions.
+    state.player.max_hp = 1000
+    state.player.hp = 1000
+    for player_turn in (1, 2, 3):
+        nem.block = 0
+        hp0 = nem.hp
+        s2 = Strike()
+        state.combat.hand[:] = [s2]
+        state.player.energy = 3
+        play_card(state, s2, nem)
+        assert hp0 - nem.hp <= 1, f"turn {player_turn}: Intangible must cap Strike at 1 (lost {hp0 - nem.hp})"
+        end_player_turn(state)  # executes enemy move, ticks, re-selects
+    # Turn 4: no longer intangible.
+    nem.block = 0
+    hp0 = nem.hp
+    s4 = Strike()
+    state.combat.hand[:] = [s4]
+    state.player.energy = 3
+    play_card(state, s4, nem)
+    assert hp0 - nem.hp > 1, f"turn 4: Nemesis must take full damage (lost {hp0 - nem.hp})"
+    print("[PASS] Nemesis Intangible caps turns 1-3, full damage turn 4")
+
+
+def test_anchor_block_emits_block_gained():
+    """L1: Anchor's flat combat-start block emits BLOCK_GAINED (Juggernaut etc.)."""
+    from slay_bench.relics import Anchor
+    from slay_bench.events import Event
+    state = new_ironclad_game(42)
+    enemy = Cultist(state.rng.hp_rng)
+    start_combat(state, [enemy])  # clears the bus
+    gained = []
+    state.bus.subscribe(Event.BLOCK_GAINED, lambda gs, amount=0, **kw: gained.append(amount))
+    # Register Anchor on the live bus, then fire COMBAT_START to trigger its hook.
+    Anchor().register(state)
+    state.bus.emit(Event.COMBAT_START, state)
+    assert 10 in gained, f"Anchor must emit BLOCK_GAINED(10); got {gained}"
+    print("[PASS] Anchor block emits BLOCK_GAINED")
+
+
+def test_mark_of_pain_shuffles_wounds():
+    """L4: Mark of Pain shuffles its 2 Wounds into the draw pile rather than
+    stacking them on top (the first two draws were always Wounds)."""
+    from slay_bench.relics import MarkOfPain
+    state = new_ironclad_game(42)
+    mop = MarkOfPain()
+    mop.on_pickup(state)
+    state.player.relics.append(mop)
+    drawn_a_wound = 0
+    for _ in range(20):
+        enemy = Cultist(state.rng.hp_rng)
+        start_combat(state, [enemy])
+        pile = state.combat.draw_pile
+        hand = state.combat.hand
+        # Both Wounds present (draw pile + opening hand) — none lost.
+        assert sum(1 for c in (pile + hand) if c.name == "Wound") == 2, \
+            "exactly 2 Wounds expected across draw pile + hand"
+        # If shuffled in, a Wound is sometimes NOT in the opening 5-card hand.
+        if not any(c.name == "Wound" for c in hand):
+            drawn_a_wound += 1
+    # With both Wounds always on top (old bug), both are always drawn turn 1 →
+    # never absent from hand. Shuffling makes them sometimes deeper in the pile.
+    assert drawn_a_wound > 0, "Wounds must not always land in the opening hand"
+    print("[PASS] Mark of Pain shuffles Wounds into the draw pile")
+
+
+def test_exhume_cannot_return_exhume():
+    """L5: Exhume retrieves the most recent non-Exhume exhausted card, never
+    another Exhume."""
+    from slay_bench.cards import Exhume, Strike
+    state = new_ironclad_game(42)
+    enemy = Cultist(state.rng.hp_rng)
+    start_combat(state, [enemy])
+    c = state.combat
+    other_exhume = Exhume()
+    strk = Strike()
+    c.exhaust_pile[:] = [strk, other_exhume]  # Exhume is the MOST recent
+    ex = Exhume()
+    c.hand[:] = [ex]
+    c.discard_pile.clear()
+    state.player.energy = 3
+    play_card(state, ex, enemy)
+    assert any(x is strk for x in c.hand), "Exhume must retrieve the Strike, not the Exhume"
+    assert not any(isinstance(x, Exhume) and x is not ex for x in c.hand), \
+        "Exhume must never retrieve another Exhume"
+    print("[PASS] Exhume cannot return another Exhume")
+
+
+def test_limit_break_no_zero_strength_key():
+    """L6: Limit Break at 0 Strength must not write a STRENGTH:0 powers entry."""
+    from slay_bench.cards import LimitBreak
+    from slay_bench.enums import PowerId
+    state = new_ironclad_game(42)
+    enemy = Cultist(state.rng.hp_rng)
+    start_combat(state, [enemy])
+    state.player.powers.pop(PowerId.STRENGTH, None)
+    lb = LimitBreak()
+    state.combat.hand[:] = [lb]
+    state.player.energy = 3
+    play_card(state, lb, enemy)
+    assert PowerId.STRENGTH not in state.player.powers, \
+        "Limit Break at 0 Strength must not materialize a STRENGTH:0 entry"
+    print("[PASS] Limit Break writes no zero-Strength entry")
+
+
 if __name__ == "__main__":
     tests = [
         test_cultist_fight_determinism,
@@ -975,6 +1159,15 @@ if __name__ == "__main__":
         test_awakened_one_damageable_after_rebirth,
         test_empty_cage_counts_removals,
         test_no_duplicate_relics_in_pools,
+        # 2026-06-12b audit
+        test_doubt_curse_weak_covers_next_turn,
+        test_blue_candle_pride_single_exhaust,
+        test_dead_branch_adds_no_curse_or_status,
+        test_nemesis_intangible_through_turn_three,
+        test_anchor_block_emits_block_gained,
+        test_mark_of_pain_shuffles_wounds,
+        test_exhume_cannot_return_exhume,
+        test_limit_break_no_zero_strength_key,
     ]
     passed = 0
     failed = 0
