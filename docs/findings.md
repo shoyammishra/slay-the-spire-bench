@@ -24,9 +24,23 @@ First complete self-hosted, multi-seed, post-audit matrix (full tables in
 4. **Silent synergy > Ironclad synergy** (archetype 0.60 vs 0.37 structured) — replicates the
    earlier finding that Silent's mechanic labels (Poison/Shiv/Block/Discard) read more
    literally off card text than Ironclad's abstractions.
-5. **raw archetype_acc is seed-invariant** (Ironclad std=0.0, always 5/20). Likely the model
-   collapses to a fixed wrong guess in raw format — a real finding to verify per-sample, not
-   an instrument bug. parse_ok=1.0 everywhere → instrument clean.
+5. **raw archetype collapses to a single guess — VERIFIED per-sample, not a bug.** In raw
+   format the model labels **17/20 fixtures "Block" on every seed** (the rest jitter by one
+   between Aggro/Strength), so std≈0 is the *signature* of the collapse, not a measurement
+   artifact. The 20 Ironclad fixtures are exactly 5 Exhaust / 5 Aggro / 5 Strength / 5 Block;
+   raw scores **5/20 = precisely the 5 Block decks and nothing else** → raw archetype accuracy
+   = the **Block base rate of its constant guess** (0.25), which is actually *below* the same
+   model's structured 0.35–0.40 and only a hair above 6-way chance. Confirmed it's a prompt
+   effect, not an instrument bug, by three checks: (a) `expert_archetype` cycles all 4
+   archetypes so the model *is* receiving different decks; (b) the same model on the same
+   fixtures in **structured spreads its answers** (Block 10–11, Strength 6–8, Aggro 1–3, occ.
+   Exhaust) and scores 7–8/20 — if the instrument were broken both formats would collapse
+   identically, they don't; (c) parse_ok=1.0, so it's emitting a valid chosen label, not
+   defaulting. **Interpretation:** the verbose English prompt mentions Block/defense in nearly
+   every card description, so the 7B anchors on "Block" and stops discriminating; compact JSON
+   forces it to read the actual card list. This is the cleanest single illustration of the
+   format-ablation thesis — same seed/deck, only rendering changes, and raw kills per-deck
+   reasoning. (Per-sample data: `results/qwen2.5-7b_{raw,structured}_seed*.json` → `synergy.samples`.)
 
 **Carry-forward caveats:** combat hp_ratio just above 1.0 is "on par," not "beats" (the old
 >100% was a Burning-Blood artifact, fixed). Silent turn/combat/run not yet run (sbatch jobs

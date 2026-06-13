@@ -229,8 +229,11 @@ archetype 0.60→0.42); turn raw also ~2× variance. (2) **combat/run are format
 (gated by engine survival, not prompt comprehension). (3) **run survival is a floor effect** —
 greedy baseline survives Act 1 ~1% (~12.5 floors); Qwen 12.8–13.4 floors ≈ greedy → cite
 avg_floors/progress, frame "on par, NOT beating." (4) combat hp_ratio 1.04–1.07 = on par (old
->100% was the fixed Burning-Blood artifact). (5) Silent synergy > Ironclad. (6) raw archetype_acc
-std≈0 (seed-invariant fixed guess — likely a real finding, verify per-sample). See docs/findings.md.
+>100% was the fixed Burning-Blood artifact). (5) Silent synergy > Ironclad. (6) **raw archetype
+collapses to a constant "Block" guess — VERIFIED per-sample, not a bug:** raw labels 17/20
+fixtures "Block" every seed (std≈0 = the collapse signature), so its 5/20 acc = the Block base
+rate (5 of 20 fixtures are Block decks); structured spreads answers + scores higher → prompt
+effect, not instrument (parse_ok=1.0; fixtures cycle all archetypes). See docs/findings.md.
 
 ### Earlier Groq llama/scout synergy n=20 (2026-06-10, history)
 Held for cross-model comparison; same instrument, de-biased. Exhaust(IC)/Discard(Si) pooled 5%

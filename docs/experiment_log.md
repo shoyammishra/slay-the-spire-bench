@@ -61,10 +61,16 @@ was a stale vLLM holding :8000 — fixed in `cluster/lib.sh` (`f2c9a6b`: per-job
 - **Silent synergy > Ironclad synergy** (archetype 0.60 vs 0.37; removal 0.36 vs 0.24,
   structured) — consistent with the earlier llama/scout finding that Silent's
   Poison/Shiv/Block/Discard labels read more literally off the cards.
-- **raw archetype_acc has std = 0.0** for Ironclad (always 5/20) and near-0 for Silent — the
-  model gives essentially seed-invariant (and wrong) archetype labels in raw format. Likely a
-  real finding (raw collapses archetype reasoning to a fixed guess), not an instrument bug;
-  worth a per-sample look before the paper.
+- **raw archetype collapses to a constant "Block" guess — VERIFIED per-sample (not a bug).**
+  Ironclad raw labels **17/20 fixtures "Block" every seed** (std≈0 is the collapse signature).
+  The 20 fixtures are 5 each Exhaust/Aggro/Strength/Block; raw's 5/20 is **exactly the 5 Block
+  decks** → raw archetype acc = the Block base rate of its single guess (0.25), *below* the
+  same model's structured 0.35–0.40. Confirmed prompt-driven, not instrument: (a) fixtures do
+  cycle all archetypes; (b) structured on the same fixtures spreads answers (Block 10–11,
+  Strength 6–8, Aggro 1–3) and scores 7–8/20 — both formats would collapse if the instrument
+  were broken; (c) parse_ok=1.0. Verbose English mentions Block/defense in nearly every card
+  description → 7B anchors on it; compact JSON forces reading the card list. Per-sample data in
+  `results/qwen2.5-7b_{raw,structured}_seed*.json` (`synergy.samples`). See docs/findings.md.
 
 **Greedy baseline anchor (for the paper):** scripted greedy bot survives Act 1 ~1/100,
 avg ~12.5 floors. Use this to frame run-level/combat as "on par with greedy," never "beats."
