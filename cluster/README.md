@@ -56,16 +56,44 @@ tok/s makes one full run take 30–60+ min; size `--n-run` and pick the partitio
 from that measurement before launching `run_level`.
 
 ## Choosing / changing the model
-All jobs default to **`Qwen/Qwen3-32B`** (one A100; revives the reasoning-model
-slot that free tiers couldn't run). Override per submission without editing files:
+All jobs default to **`Qwen/Qwen2.5-7B-Instruct`** (alias `qwen2.5-7b`) — the model
+the proven vLLM 0.6.6 stack can serve TODAY (defaults live at the top of
+`cluster/lib.sh`). Override per submission without editing files (always pass
+`--export=ALL` so the env vars reach the job):
 
 ```bash
 # llama-3.1-8b baseline (provider-robustness check vs the old Groq numbers)
 HF_REPO=meta-llama/Llama-3.1-8B-Instruct SERVED_NAME=llama-3.1-8b sbatch --export=ALL cluster/smoke.sbatch
 
+# a bigger qwen2.5 still on the 0.6.6 stack (one A100 80GB)
+HF_REPO=Qwen/Qwen2.5-32B-Instruct SERVED_NAME=qwen2.5-32b sbatch --export=ALL cluster/turn_combat.sbatch
+
 # a 70B over both A100s (gpu-1day gives 2 GPUs)
 HF_REPO=meta-llama/Llama-3.1-70B-Instruct SERVED_NAME=llama70b TP_SIZE=2 sbatch --export=ALL cluster/turn_combat.sbatch
 ```
+
+## Serving a reasoning model: qwen3-32b (vLLM 0.8.x — second env)
+The default `slaybench` env is **vLLM 0.6.6, which CANNOT serve the qwen3
+architecture**. Build a *separate* env so the proven 0.6.6 stack stays intact as
+a fallback, then point jobs at it with `CONDA_ENV=slaybench08`:
+
+```bash
+bash cluster/setup_vllm08.sh          # one-time: conda env 'slaybench08' on vLLM 0.8.x
+
+# SMOKE-TEST FIRST — CUDA-12.8 compat for vLLM 0.8.x is unverified on this cluster.
+# Read vllm_<jobid>.log; if it dies at CUDA init, see setup_vllm08.sh for fallbacks.
+CONDA_ENV=slaybench08 HF_REPO=Qwen/Qwen3-32B SERVED_NAME=qwen3-32b \
+    sbatch --export=ALL cluster/smoke.sbatch
+
+# then the full matrix, same pattern on each job:
+CONDA_ENV=slaybench08 HF_REPO=Qwen/Qwen3-32B SERVED_NAME=qwen3-32b \
+    sbatch --export=ALL cluster/turn_combat.sbatch
+```
+
+Qwen3 emits `<think>...</think>` reasoning; the harness already strips it in
+`complete_json` and the 5th audit hardened the parse fallback against truncated
+think-dumps. Watch the result files for `parse_ok` — a low rate means the
+reasoning is overflowing `max_tokens` and getting truncated mid-think.
 
 `SERVED_NAME` is the clean alias used for both the API call and the result
 filenames (`results/<SERVED_NAME>_<format>_seed<N>.*`). Defaults live at the top

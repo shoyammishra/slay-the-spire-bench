@@ -15,7 +15,7 @@
 
 cd "${SLURM_SUBMIT_DIR}"
 source /nfs_home/software/miniconda/etc/profile.d/conda.sh
-conda activate slaybench
+conda activate "${CONDA_ENV:-slaybench}"   # CONDA_ENV=slaybench08 for the qwen3 (vLLM 0.8.x) stack
 export HF_HOME=~/scratch/hf_cache
 
 source cluster/lib.sh
