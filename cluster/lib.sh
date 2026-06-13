@@ -20,7 +20,11 @@
 # A bigger qwen2.5 also fits one A100 80GB: HF_REPO=Qwen/Qwen2.5-32B-Instruct.
 : "${HF_REPO:=Qwen/Qwen2.5-7B-Instruct}"  # HuggingFace repo to serve
 : "${SERVED_NAME:=qwen2.5-7b}"            # clean alias -> --model + result filenames
-: "${VLLM_PORT:=8000}"
+# Derive a per-job port from the Slurm job id so two jobs landing on the SAME
+# node never collide on 8000. (Job 7542 died exactly this way: a stale vLLM from
+# a prior job still held :8000, our server got [Errno 98] address already in use
+# and shut down, while wait_for_vllm was fooled "ready" by the stale server.)
+: "${VLLM_PORT:=$(( 8000 + (${SLURM_JOB_ID:-0} % 1000) ))}"
 : "${TP_SIZE:=1}"                # tensor-parallel GPU count (set 2 for a 70B over 2 A100s)
 : "${VLLM_EXTRA:=}"             # any extra `vllm serve` args (e.g. --max-model-len 8192)
 
@@ -29,6 +33,9 @@ VLLM_LOG="vllm_${SLURM_JOB_ID:-local}.log"
 VLLM_PID=""
 
 start_vllm() {
+  # Free a stale holder of the port (leftover vLLM from a prior job on this node)
+  # so our server can actually bind it instead of dying with [Errno 98].
+  fuser -k "${VLLM_PORT}/tcp" 2>/dev/null && sleep 2
   echo "[lib] serving ${HF_REPO} as '${SERVED_NAME}' on :${VLLM_PORT} (tensor-parallel=${TP_SIZE})"
   vllm serve "${HF_REPO}" \
       --served-model-name "${SERVED_NAME}" \
@@ -43,7 +50,17 @@ wait_for_vllm() {
   # First-time weight load for a 32B model can take several minutes.
   local tries=0 max=240   # 240 * 5s = 20 min ceiling
   echo "[lib] waiting for vLLM to become ready..."
-  until curl -s "http://localhost:${VLLM_PORT}/v1/models" >/dev/null 2>&1; do
+  # Require the readiness probe to see OUR served model name, not just any server
+  # answering on the port (job 7542 was fooled "ready" by a stale vLLM that then
+  # vanished -> connection-refused for the whole benchmark).
+  until curl -s "http://localhost:${VLLM_PORT}/v1/models" 2>/dev/null | grep -q "${SERVED_NAME}"; do
+    # If vLLM logged a bind failure, our server will never come up — fail fast.
+    if grep -q 'address already in use' "${VLLM_LOG}" 2>/dev/null; then
+      echo "[lib] ERROR: vLLM could not bind :${VLLM_PORT} (address already in use)."
+      echo "[lib] A stale server is holding the port. Last 40 log lines:"
+      tail -n 40 "${VLLM_LOG}"
+      exit 1
+    fi
     if ! kill -0 "${VLLM_PID}" 2>/dev/null; then
       echo "[lib] ERROR: vLLM died during startup. Last 40 log lines:"
       tail -n 40 "${VLLM_LOG}"
