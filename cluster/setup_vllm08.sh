@@ -30,12 +30,16 @@ fi
 conda activate slaybench08
 
 pip install --upgrade pip
-# vLLM 0.8.5.post1 is the last 0.8.x; it adds Qwen3ForCausalLM and pulls a
-# compatible torch (2.6.x, cu124 wheels — forward-compatible with the 12.8 driver).
-# Let vLLM resolve its own torch/transformers rather than pinning them by hand
-# (0.8.x needs transformers>=4.51 for Qwen3 — the 4.47.1 pin from the 0.6.6 env
-# would BREAK Qwen3 here).
-pip install "vllm==0.8.5.post1" matplotlib
+# vLLM 0.8.5.post1 adds Qwen3ForCausalLM and pulls a compatible torch (2.6.x,
+# cu124 wheels — forward-compatible with the 12.8 driver).
+#
+# ⚠️ transformers MUST be pinned. Left unpinned, vLLM 0.8.5's deps resolve to
+# transformers 5.0.0, which REMOVED `all_special_tokens_extended` — a method
+# vLLM 0.8.5's get_cached_tokenizer still calls, so Qwen3 startup dies with
+# `Qwen2Tokenizer has no attribute all_special_tokens_extended`. We need a
+# version that (a) still has that attribute [< 5.0] AND (b) is new enough to
+# know Qwen3 [>= 4.51]. 4.51.3 satisfies both.
+pip install "vllm==0.8.5.post1" "transformers==4.51.3" matplotlib
 
 # Share the same weight cache as the 0.6.6 env — weights are stack-independent.
 mkdir -p ~/scratch/hf_cache

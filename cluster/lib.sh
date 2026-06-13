@@ -26,7 +26,16 @@
 # and shut down, while wait_for_vllm was fooled "ready" by the stale server.)
 : "${VLLM_PORT:=$(( 8000 + (${SLURM_JOB_ID:-0} % 1000) ))}"
 : "${TP_SIZE:=1}"                # tensor-parallel GPU count (set 2 for a 70B over 2 A100s)
-: "${VLLM_EXTRA:=}"             # any extra `vllm serve` args (e.g. --max-model-len 8192)
+# Cap the KV cache so a 32B model leaves room for it on one 80GB A100, and bump
+# memory utilization. Qwen3-32B defaults to max_seq_len=40960, which demands a
+# ~10 GiB KV cache; with vLLM 0.8.x's default gpu_memory_utilization=0.9 the
+# smoke test (job 7568) found only ~4 GiB free after the ~65 GB weights load and
+# died at KV-cache init. We never prompt anywhere near 40k tokens (largest run-
+# level prompt ~3.4k, +8k generation budget), so 16384 is ample headroom and
+# leaves plenty of KV cache. Override with VLLM_MAX_LEN / VLLM_GPU_UTIL if needed.
+: "${VLLM_MAX_LEN:=16384}"       # --max-model-len (context window cap)
+: "${VLLM_GPU_UTIL:=0.95}"       # --gpu-memory-utilization
+: "${VLLM_EXTRA:=}"             # any extra `vllm serve` args (e.g. --enforce-eager)
 
 BASE_URL="http://localhost:${VLLM_PORT}/v1"
 VLLM_LOG="vllm_${SLURM_JOB_ID:-local}.log"
@@ -41,6 +50,8 @@ start_vllm() {
       --served-model-name "${SERVED_NAME}" \
       --port "${VLLM_PORT}" \
       --tensor-parallel-size "${TP_SIZE}" \
+      --max-model-len "${VLLM_MAX_LEN}" \
+      --gpu-memory-utilization "${VLLM_GPU_UTIL}" \
       ${VLLM_EXTRA} > "${VLLM_LOG}" 2>&1 &
   VLLM_PID=$!
   echo "[lib] vLLM pid=${VLLM_PID}  (server log -> ${VLLM_LOG})"
