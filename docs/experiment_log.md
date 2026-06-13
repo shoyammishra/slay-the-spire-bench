@@ -4,8 +4,9 @@
 
 **First complete paper-grade matrix.** Qwen2.5-7B-Instruct, self-hosted (vLLM 0.6.6, A100
 80 GB, csis.cn2), `--seeds 42 1042 2042 3042 4042` (spaced 1000 apart → disjoint per-sample
-windows, real std), both prompt formats. Turn/combat/run = Ironclad n=20 (run n=20); synergy
-= n=20 for BOTH Ironclad and Silent. All four `results/qwen2.5-7b*_seeds42_1042_2042_3042_4042.json`
+windows, real std), both prompt formats. Ironclad n=20 all four dimensions; **Silent now also
+complete on all four** (synergy 2026-06-13; turn/combat/run added 2026-06-14). All
+`results/qwen2.5-7b*_seeds42_1042_2042_3042_4042.json`
 scp'd to the laptop. This **supersedes all stale pilot turn/combat numbers and all earlier
 synergy data** (this is the first multi-seed, self-hosted, post-5-audit pass). parse_ok=1.0
 on every dimension/format → instrument clean.
@@ -34,15 +35,39 @@ was a stale vLLM holding :8000 — fixed in `cluster/lib.sh` (`f2c9a6b`: per-job
 
 (parse_ok = 1.0 on turn + synergy in both formats.)
 
-### Silent — synergy only (n=20, 5 seeds, mean ± std)
+### Silent — turn / combat / synergy / run (n=20, 5 seeds, mean ± std)
 
-| Metric | structured | raw |
-|---|---|---|
-| archetype_acc | 0.60 ± 0.0 | 0.42 ± 0.027 |
-| card_pick_acc | 0.53 ± 0.084 | 0.45 ± 0.05 |
-| removal_acc | 0.36 ± 0.022 | 0.18 ± 0.045 |
+Synergy collected in the 2026-06-13 pass; **turn/combat/run added 2026-06-14** via the new
+`cluster/turn_combat_silent.sbatch` + `cluster/run_level_silent.sbatch` (Silent counterparts —
+the Ironclad turn/combat/run sbatch jobs scope themselves to Ironclad). Silent is now a
+**complete 4-dimension matrix**, both formats. parse_ok=1.0 throughout.
 
-(Silent turn/combat/run not run this pass — the sbatch jobs scope those to Ironclad.)
+| Dimension | Metric | structured | raw |
+|---|---|---|---|
+| Turn | avg_damage_ratio | 0.663 ± 0.035 | 0.681 ± 0.047 |
+| Turn | legal_rate | 0.87 ± 0.045 | 0.84 ± 0.082 |
+| Combat | win_rate | 1.00 ± 0.0 | 1.00 ± 0.0 |
+| Combat | avg_hp_ratio | 1.024 ± 0.015 | 1.007 ± 0.021 |
+| Combat | avg_parse_errors | 0.92 ± 0.179 | 3.38 ± 0.192 |
+| Synergy | archetype_acc | 0.60 ± 0.0 | 0.42 ± 0.027 |
+| Synergy | card_pick_acc | 0.53 ± 0.084 | 0.45 ± 0.05 |
+| Synergy | removal_acc | 0.36 ± 0.022 | 0.18 ± 0.045 |
+| Run | survival_rate | 0.00 ± 0.0 | 0.01 ± 0.022 |
+| Run | avg_floors_reached | 11.85 ± 0.449 | 10.86 ± 0.781 |
+| Run | avg_progress | 0.741 ± 0.028 | 0.679 ± 0.049 |
+| Run | avg_draft_coherence | 0.344 ± 0.035 | 0.348 ± 0.005 |
+
+**Silent-specific observations (new turn/combat/run):**
+- **Turn-level format effect vanishes / mildly reverses on Silent** (raw 0.681 ≈ structured
+  0.663, within noise; raw even nudges ahead). Unlike Ironclad, where structured won turn
+  (0.701 vs 0.665). → The turn-format effect is **character-dependent**, not universal; the
+  robust format signal lives in synergy for both characters.
+- **Combat format-insensitive on outcome** (both win 1.0, hp_ratio ≈ 1.0–1.02, on par with
+  greedy). The only format trace is parse_errors: raw 3.38 vs structured 0.92 — the verbose
+  English combat state is harder to act on cleanly even when it doesn't change the win.
+- **Silent reaches fewer floors than Ironclad** (10.9–11.9 vs 12.8–13.4) and survival ≈ 0.
+  Silent's lower-block starter makes the post-audit Act-1 greedy combat harsher; survival is
+  still a floor effect → report avg_floors / avg_progress, frame "on par, not beating."
 
 **Key results:**
 - **Structured beats raw on every reasoning-heavy metric, both characters.** Synergy is the

@@ -42,10 +42,20 @@ First complete self-hosted, multi-seed, post-audit matrix (full tables in
    format-ablation thesis — same seed/deck, only rendering changes, and raw kills per-deck
    reasoning. (Per-sample data: `results/qwen2.5-7b_{raw,structured}_seed*.json` → `synergy.samples`.)
 
+6. **Silent is now a complete 4-dimension matrix (added 2026-06-14).** Two Silent-specific
+   results sharpen the story: (a) **the turn-level format effect is character-dependent** —
+   on Silent raw ≈ structured (0.681 vs 0.663, raw even nudges ahead), the opposite of
+   Ironclad where structured won turn; so the *robust* format signal is synergy, not turn.
+   (b) **Silent reaches fewer run floors than Ironclad** (10.9–11.9 vs 12.8–13.4, survival ≈ 0)
+   — its lower-block starter makes the post-audit Act-1 greedy combat harsher; still a floor
+   effect, report avg_floors/progress. (c) Combat stays format-insensitive on outcome, with the
+   only trace in parse_errors (Silent raw 3.38 vs structured 0.92 — verbose state is messier to
+   parse even when the win is unchanged).
+
 **Carry-forward caveats:** combat hp_ratio just above 1.0 is "on par," not "beats" (the old
->100% was a Burning-Blood artifact, fixed). Silent turn/combat/run not yet run (sbatch jobs
-scope them to Ironclad). Still single-model — paper needs a 2nd/3rd family + (ideally) a
-reasoning model (qwen3-32b once vLLM 0.8.x is up).
+>100% was a Burning-Blood artifact, fixed). Both characters now complete on all four
+dimensions. Still single-model — paper needs a 2nd/3rd family + (ideally) a reasoning model
+(qwen3-32b once vLLM 0.8.x is up).
 
 ## ⚠️ 3rd audit (2026-06-11): enemy block was a no-op, HP-loss was blockable, and the turn eval had a replay loophole
 
