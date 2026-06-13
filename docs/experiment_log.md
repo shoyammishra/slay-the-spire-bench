@@ -1,5 +1,76 @@
 # Experiment Log
 
+## 2026-06-13 (CLUSTER) — PAPER-GRADE 4-DIMENSION RESULTS, Qwen2.5-7B, 5 seeds (CURRENT valid data)
+
+**First complete paper-grade matrix.** Qwen2.5-7B-Instruct, self-hosted (vLLM 0.6.6, A100
+80 GB, csis.cn2), `--seeds 42 1042 2042 3042 4042` (spaced 1000 apart → disjoint per-sample
+windows, real std), both prompt formats. Turn/combat/run = Ironclad n=20 (run n=20); synergy
+= n=20 for BOTH Ironclad and Silent. All four `results/qwen2.5-7b*_seeds42_1042_2042_3042_4042.json`
+scp'd to the laptop. This **supersedes all stale pilot turn/combat numbers and all earlier
+synergy data** (this is the first multi-seed, self-hosted, post-5-audit pass). parse_ok=1.0
+on every dimension/format → instrument clean.
+
+**Cluster jobs:** turn+combat (job 7539), synergy (both characters), run-level structured +
+raw (jobs 7542 fixed → resubmit, 7545). The lone failure (7542 run-level, 0 completed runs)
+was a stale vLLM holding :8000 — fixed in `cluster/lib.sh` (`f2c9a6b`: per-job port,
+`fuser -k` before launch, readiness probe matches SERVED_NAME, bind-failure fast-fail).
+
+### Ironclad — turn / combat / synergy / run (n=20, 5 seeds, mean ± std)
+
+| Dimension | Metric | structured | raw |
+|---|---|---|---|
+| Turn | avg_damage_ratio | 0.701 ± 0.078 | 0.665 ± 0.175 |
+| Turn | legal_rate | 0.78 ± 0.057 | 0.73 ± 0.179 |
+| Combat | win_rate | 1.00 ± 0.0 | 1.00 ± 0.0 |
+| Combat | avg_hp_ratio | 1.042 ± 0.025 | 1.065 ± 0.020 |
+| Combat | avg_parse_errors | 2.51 ± 0.26 | 2.59 ± 0.34 |
+| Synergy | archetype_acc | 0.37 ± 0.027 | 0.25 ± 0.0 |
+| Synergy | card_pick_acc | 0.47 ± 0.076 | 0.27 ± 0.067 |
+| Synergy | removal_acc | 0.24 ± 0.022 | 0.02 ± 0.027 |
+| Run | survival_rate | 0.03 ± 0.027 | 0.00 ± 0.0 |
+| Run | avg_floors_reached | 12.81 ± 1.19 | 13.36 ± 0.79 |
+| Run | avg_progress | 0.80 ± 0.075 | 0.835 ± 0.049 |
+| Run | avg_draft_coherence | 0.36 ± 0.034 | 0.33 ± 0.033 |
+
+(parse_ok = 1.0 on turn + synergy in both formats.)
+
+### Silent — synergy only (n=20, 5 seeds, mean ± std)
+
+| Metric | structured | raw |
+|---|---|---|
+| archetype_acc | 0.60 ± 0.0 | 0.42 ± 0.027 |
+| card_pick_acc | 0.53 ± 0.084 | 0.45 ± 0.05 |
+| removal_acc | 0.36 ± 0.022 | 0.18 ± 0.045 |
+
+(Silent turn/combat/run not run this pass — the sbatch jobs scope those to Ironclad.)
+
+**Key results:**
+- **Structured beats raw on every reasoning-heavy metric, both characters.** Synergy is the
+  sharpest: Ironclad card_pick 0.47→0.27, removal 0.24→**0.02**, archetype 0.37→0.25; Silent
+  archetype 0.60→0.42, removal 0.36→0.18. **This is the seed-matched format ablation landing
+  cleanly on a self-hosted model** (the novelty claim). Turn raw also has ~2× the variance of
+  structured (±0.175 vs ±0.078) — verbose prompts make the 7B less consistent.
+- **Combat / run are format-insensitive.** Both formats win 100% of the scripted combats with
+  hp_ratio ≈ 1.04–1.07 (on par with the greedy bot, NOT beating it — the prior >100% artifact
+  is fixed) and reach ~12.8–13.4 of 16 floors before dying at the Act-1 boss. These dimensions
+  are dominated by engine survival, not prompt comprehension, so format barely moves them.
+- **Run-level survival is near-floor (0.03 / 0.0).** Expected: the scripted greedy baseline
+  itself survives Act 1 only ~1% of the time under the post-audit engine (avg ~12.5 floors).
+  So survival_rate has a floor effect; **avg_floors_reached / avg_progress are the
+  discriminating run-level metrics** (Qwen 12.8–13.4 floors ≈ greedy ~12.5 → on par).
+- **Silent synergy > Ironclad synergy** (archetype 0.60 vs 0.37; removal 0.36 vs 0.24,
+  structured) — consistent with the earlier llama/scout finding that Silent's
+  Poison/Shiv/Block/Discard labels read more literally off the cards.
+- **raw archetype_acc has std = 0.0** for Ironclad (always 5/20) and near-0 for Silent — the
+  model gives essentially seed-invariant (and wrong) archetype labels in raw format. Likely a
+  real finding (raw collapses archetype reasoning to a fixed guess), not an instrument bug;
+  worth a per-sample look before the paper.
+
+**Greedy baseline anchor (for the paper):** scripted greedy bot survives Act 1 ~1/100,
+avg ~12.5 floors. Use this to frame run-level/combat as "on par with greedy," never "beats."
+
+---
+
 ## 2026-06-13 (CLUSTER) — first real self-hosted runs on BITS CSIS Slurm (Qwen2.5-7B)
 
 **Hardware:** A100 80 GB (csis.cn2), vLLM 0.6.6 + transformers 4.47.1 + torch 2.5.1+cu124,

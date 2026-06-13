@@ -12,7 +12,8 @@ GitHub: https://github.com/shoyammishra/slay-the-spire-bench (public)
 
 ## Active Context
 
-- **▶▶ CLUSTER SMOKE TEST PASSED + TURN/COMBAT RE-BASELINE RUNNING (2026-06-13).** Smoke (job 7536) completed clean end-to-end: vLLM 0.6.6 + transformers 4.47.1 + torch 2.5.1+cu124 served `Qwen/Qwen2.5-7B-Instruct` on csis.cn2 (A100 80 GB), full 4-dimension pass wrote `results/qwen2.5-7b_structured_seed42.*`. **Measured throughput:** ~82 tok/s generation, ~700–900 tok/s prompt, vLLM startup ~3.5 min; tiny smoke pass (n-turn 2/combat 1/synergy 4/run 1) = **1m35s** wall. Used this to calibrate `run_level.sbatch` (n=5 validation ≈18 min → gpu-short/1h; paper-grade n=20×5 seeds ≈4h block left ready to uncomment). **Turn+combat re-baseline (job 7539) now RUNNING** on gpu-1day/csis.cn2 (Qwen2.5-7B, n=20 turn+combat ×5 seeds ×2 formats). Early turn-level results sane: parse_ok=1.0 throughout (instrument clean), ~50/50 legal-optimal vs illegal-bust mix for the 7B, dmg_ratios quantized to 1.0/0.67/0.0 (expected for short low-energy opening turns). **Unblocking history:** (1) vLLM 0.22+ needs CUDA 13.x but cluster driver=12.8 → pinned `vllm==0.6.6`+`torch==2.5.1+cu124`; (2) vLLM 0.6.6 predates Qwen3 → smoke model `Qwen/Qwen2.5-7B-Instruct`; (3) Llama-3.1-8B gated → non-gated Qwen; (4) transformers 5.x removed `all_special_tokens_extended` → pinned `4.47.1`.
+- **✅✅ PAPER-GRADE 4-DIMENSION RESULTS COMPLETE — Qwen2.5-7B, 5 seeds, both formats (2026-06-13).** All four aggregates (`results/qwen2.5-7b{,_silent}_{structured,raw}_seeds42_1042_2042_3042_4042.json`) collected on the cluster and scp'd to the laptop. Ironclad turn/combat/synergy/run (all n=20) + Silent synergy (n=20), `--seeds 42 1042 2042 3042 4042` (spaced 1000 apart → real std), both formats, parse_ok=1.0 throughout. **First complete multi-seed self-hosted post-audit matrix — supersedes ALL prior turn/combat/synergy data and the never-valid run-level data.** Folded into `docs/experiment_log.md` + `docs/findings.md` + "Current Results" below. **Headlines:** (1) seed-matched **format ablation lands** — structured beats raw on every reasoning-heavy metric, both characters (synergy sharpest: IC card_pick 0.47→0.27, removal 0.24→**0.02**; Silent archetype 0.60→0.42); turn raw also ~2× variance. (2) **combat/run are format-insensitive** (gated by engine survival, not prompt comprehension). (3) **run survival is a floor effect** — greedy baseline survives Act 1 ~1% (~12.5 floors); Qwen 12.8–13.4 floors ≈ greedy → report avg_floors/progress, frame as "on par, NOT beating." (4) combat hp_ratio 1.04–1.07 = on par (old >100% was a fixed Burning-Blood artifact). The one cluster failure (job 7542 run-level, 0 runs) was a stale vLLM holding :8000 → fixed in `cluster/lib.sh` (`f2c9a6b`: per-job port + `fuser -k` pre-launch + SERVED_NAME-matched readiness probe + bind-failure fast-fail). **Next:** 2nd/3rd model family + a reasoning model (qwen3-32b once vLLM 0.8.x is up); optionally Silent turn/combat/run; `--acts 3` multi-act.
+- **▶▶ CLUSTER SMOKE TEST PASSED + TURN/COMBAT RE-BASELINE (2026-06-13).** Smoke (job 7536) completed clean end-to-end: vLLM 0.6.6 + transformers 4.47.1 + torch 2.5.1+cu124 served `Qwen/Qwen2.5-7B-Instruct` on csis.cn2 (A100 80 GB), full 4-dimension pass wrote `results/qwen2.5-7b_structured_seed42.*`. **Measured throughput:** ~82 tok/s generation, ~700–900 tok/s prompt, vLLM startup ~3.5 min; tiny smoke pass (n-turn 2/combat 1/synergy 4/run 1) = **1m35s** wall. Used this to calibrate `run_level.sbatch` (n=5 validation ≈18 min → gpu-short/1h; paper-grade n=20×5 seeds ≈4h block left ready to uncomment). **Turn+combat re-baseline (job 7539) now RUNNING** on gpu-1day/csis.cn2 (Qwen2.5-7B, n=20 turn+combat ×5 seeds ×2 formats). Early turn-level results sane: parse_ok=1.0 throughout (instrument clean), ~50/50 legal-optimal vs illegal-bust mix for the 7B, dmg_ratios quantized to 1.0/0.67/0.0 (expected for short low-energy opening turns). **Unblocking history:** (1) vLLM 0.22+ needs CUDA 13.x but cluster driver=12.8 → pinned `vllm==0.6.6`+`torch==2.5.1+cu124`; (2) vLLM 0.6.6 predates Qwen3 → smoke model `Qwen/Qwen2.5-7B-Instruct`; (3) Llama-3.1-8B gated → non-gated Qwen; (4) transformers 5.x removed `all_special_tokens_extended` → pinned `4.47.1`.
 - **⚙️ CLUSTER GOTCHAS LEARNED THIS SESSION (2026-06-13):** (1) **`lib.sh` default model was `Qwen/Qwen3-32B` which CANNOT run on the installed vLLM 0.6.6** — every staged job that didn't env-override the model crashed at vLLM startup (`model type qwen3 ... not recognized`). FIXED (`30551a9`): `lib.sh` now defaults `HF_REPO=Qwen/Qwen2.5-7B-Instruct`/`SERVED_NAME=qwen2.5-7b`; to serve qwen3-32b, upgrade vLLM to 0.8.x first then override `HF_REPO=Qwen/Qwen3-32B`. (2) **QOS caps wall-time below the partition's 24h** — `#SBATCH --time=24:00:00` in turn_combat/synergy sbatch is rejected with `PD ... QOSMaxWallDurationPerJobLimit`; submit with a CLI override `sbatch --time=03:00:00 ...` (≤3h works). TODO: get exact cap via `sacctmgr show qos format=Name,MaxWall` and bake real `--time=` into those files. (3) **gpu-1day was wide open** (4 idle nodes csis.cn2-4 + csis.mn1) — no queue wait. (4) **Result filenames are already character-namespaced** (`run_benchmark.py` ~L170: Ironclad untagged `qwen2.5-7b_<fmt>_seed<N>.json`, Silent gets `_silent`) so synergy's both-character loop and the `--only` merge do NOT collide — Ironclad turn/combat/synergy/run all accrete into one file; Silent synergy lands in its own. A feared cross-character collision was a FALSE ALARM; no code change needed. **Run order from here:** let 7539 finish → `tail -30 slay_turncombat_7539.out` to verify → `sbatch --time=03:00:00 cluster/synergy.sbatch` → then `sbatch --time=... cluster/run_level.sbatch`. After all pass on Qwen2.5-7B: upgrade vLLM 0.8.x for qwen3-32b (check CUDA 12.8 compat).
 - **⚠️ vLLM version ladder for this cluster (CUDA 12.8 driver):** `vllm==0.6.6` works (needs `transformers==4.47.1`; no Qwen3 support). `vllm==0.8.x` — needs testing for CUDA 12.8 compat, adds Qwen3ForCausalLM. `vllm==0.22+` — requires CUDA 13.x, won't work. For Llama-3.1-8B baseline (paper): need to accept license at huggingface.co/meta-llama/Llama-3.1-8B-Instruct and set `HF_TOKEN` env var before the Slurm job.
 - **▶▶ GPU ACCESS LANDED (2026-06-12) — the M3a blocker is GONE.** Professor gave credentials to the **BITS CSIS Slurm cluster** (login node `ssh <user>@<login-node-ip>`, campus-network/VPN only; details from the department's CSIS cluster SOP — NOT committed, it's an internal doc and this repo is public). Hardware: **2× NVIDIA A100 80 GB per node** (one A100 fits a 32B model); partitions `gpu-short`/`gpu-long`/`gpu-1day`(2 GPUs)/`gpu-3day`; 300 GB home + 1 TB `~/scratch` (auto-purged 30 days → put weights there via `HF_HOME`); miniconda at `/nfs_home/software/miniconda/`. **Cluster toolkit committed: `cluster/`** — `README.md` (connect→setup→run→retrieve), `setup.sh` (conda env + vLLM), `lib.sh` (shared vLLM serve/wait/stop helpers; defaults `Qwen/Qwen3-32B`→alias `qwen3-32b`, `TP_SIZE` for multi-GPU), `prefetch_model.sh` (login-node weight pull if compute nodes are offline), and 4 staged sbatch jobs in cheapest→most-expensive order: `smoke.sbatch`→`turn_combat.sbatch`→`synergy.sbatch`→`run_level.sbatch`. **Pattern = one Slurm job serves a model with vLLM then runs `run_benchmark.py --provider local --base-url http://localhost:8000/v1` against it.** User is on Windows + MobaXterm. **Next action (user-driven): SSH in, `git clone`, `bash cluster/setup.sh`, `sbatch cluster/smoke.sbatch`, read its `time` output, THEN size run-level.** Model ladder per roadmap: llama-3.1-8b (provider-robustness vs old Groq) → scout-17b → **qwen3-32b (revived reasoning model)** → 70B on 2 A100s if wanted. **Committed + on `main` (history rewritten — see next bullet).**
@@ -202,38 +203,38 @@ Output files per run (overwrites if same model+format+seed):
 - **qwen3-32b reasoning model (wired, then DROPPED)**: outputs `<think>...</think>` blocks. `complete_json` strips them; `max_tokens` raised to 3000 (Groq) / 8000 (OpenRouter). `OpenRouterLLM.complete` retries 429s + network drops with backoff and fails fast on 402. **Dropped from the study:** Groq free-tier TPM (6000) truncates it mid-think (parse-failure cascade, 0%), and OpenRouter free tier is too slow (~30–80 tok/s) and hit 402 Payment Required. A reasoning model needs a PAID tier to benchmark viably. Result files deleted.
 - **synergy-instrument bias (2026-06-10, `5db7063`)**: auditing the n=20 results found the synergy *instrument* was biased, independent of model behavior. (1) **Positional confound** — hand-written fixtures put the expert best-pick at offer index 0 in 35/40 cases (Silent 20/20); an always-"0" model scored 75% (IC) / 100% (Silent) card-pick. Fixed: `run_synergy_eval` deterministically rotates each offer list so the correct index cycles 0→1→2 (uniform, invisible to the stateless model; always-0 now ≈0.33). (2) **Mislabeled fixture** `ironclad#18` (Exhaust): offers `[Fiend Fire, Iron Wave, Defend]` had pick=2 (Defend) — Fiend-Fire pickers scored wrong; fixed to 0. (3) **Ambiguous offer** `ironclad#16`: Anger is on the Strength list next to Limit Break → replaced with Shrug It Off. (4) **Archetype substring match** scored multi-name answers / option-list echoes as correct → now requires exactly one named archetype = expert's. (5) Per-sample JSON now persists `expert_pick_idx`/`model_pick`/`model_removal` (the bias had been unmeasurable from saved results). 3 regression tests incl. executable fixture design-rules for all 40 fixtures. **All 8 combos re-run de-biased** — archetype/removal numbers held; card-pick survived (0.65–0.75, not chance), confirming name-vs-play dissociation is real.
 
-## Current Results — Synergy n=20, both characters (seed=42, 2026-06-10).
-⚠️ Turn/combat pilot numbers below are PRE-BUG-SWEEP and now STALE (the debuff-timing fix
-changed combat dynamics) — kept only as history; re-run needed. **Synergy is the current valid
-dimension.** Run-level still has NO valid data. Full detail: `docs/experiment_log.md`, `docs/findings.md`.
+## Current Results — Qwen2.5-7B, 4 dimensions, 5 seeds, both formats (cluster, 2026-06-13).
+✅ **CURRENT valid data.** Self-hosted (vLLM 0.6.6, A100 80 GB), `--seeds 42 1042 2042 3042 4042`
+(mean ± std), parse_ok=1.0 throughout. Ironclad turn/combat/synergy/run n=20; Silent synergy
+n=20 (Silent turn/combat/run not run — sbatch scopes them to Ironclad). **Supersedes all stale
+pilot turn/combat and earlier synergy data.** Full detail: `docs/experiment_log.md`, `docs/findings.md`.
 
-### Synergy n=20 (CURRENT, de-biased instrument) — archetype / card-pick / removal
-| Character | Model | structured | raw |
+### Ironclad — all four dimensions (n=20, 5 seeds, mean ± std)
+| Dim | Metric | structured | raw |
 |---|---|---|---|
-| Ironclad | llama-3.1-8b | 0.55 / 0.65 / 0.15 | 0.40 / 0.65 / 0.05 |
-| Ironclad | scout-17b | 0.70 / 0.75 / 0.25 | 0.45 / 0.70 / 0.15 |
-| Silent | llama-3.1-8b | 0.75 / 0.35 / 0.15 | 0.60 / 0.65 / 0.15 |
-| Silent | scout-17b | 0.75 / 0.70 / **0.60** | **0.80 / 0.75** / 0.20 |
+| Turn | dmg_ratio / legal | 0.701±0.078 / 0.78±0.057 | 0.665±0.175 / 0.73±0.179 |
+| Combat | win / hp_ratio / parse_err | 1.0 / 1.042±0.025 / 2.51 | 1.0 / 1.065±0.020 / 2.59 |
+| Synergy | archetype / pick / removal | 0.37±0.027 / 0.47±0.076 / 0.24±0.022 | 0.25±0.0 / 0.27±0.067 / 0.02±0.027 |
+| Run | survival / floors / progress | 0.03 / 12.81±1.19 / 0.80±0.075 | 0.0 / 13.36±0.79 / 0.835±0.049 |
 
-**Per-archetype archetype-ID (all 8 combos pooled):** Aggro 95%, Poison 95%, Shiv 90%, Block
-85%, Strength 40%, **Exhaust 5%, Discard 5%**.
+### Silent — synergy only (n=20, 5 seeds) — archetype / pick / removal
+| Format | archetype | card_pick | removal |
+|---|---|---|---|
+| structured | 0.60±0.0 | 0.53±0.084 | 0.36±0.022 |
+| raw | 0.42±0.027 | 0.45±0.05 | 0.18±0.045 |
 
-**Key synergy findings (n=20, de-biased):** (1) **Mechanic-defined archetypes are a
-cross-character blind spot — airtight:** Exhaust (IC) 5% AND Discard (Si) 5% pooled, vs 85–95%
-for surface-readable archetypes; both are the payoff-loop archetype, not a keyword. (2)
-**Name-vs-play dissociation is REAL not an artifact** — card-pick held at 0.65–0.75 after
-de-biasing (always-0 would now score ~0.33). (3) Silent archetype-ID ≥ Ironclad (0.60–0.80 vs
-0.40–0.70). (4) scout-17b Silent structured removal 0.60 standout; removal near-floor
-(0.05–0.25) elsewhere. (5) parse_ok=1.0 everywhere. See docs/findings.md.
+**Key findings:** (1) **Format ablation lands** — structured > raw on every reasoning-heavy
+metric, both characters (synergy sharpest: IC removal 0.24→0.02, archetype 0.37→0.25; Silent
+archetype 0.60→0.42); turn raw also ~2× variance. (2) **combat/run are format-insensitive**
+(gated by engine survival, not prompt comprehension). (3) **run survival is a floor effect** —
+greedy baseline survives Act 1 ~1% (~12.5 floors); Qwen 12.8–13.4 floors ≈ greedy → cite
+avg_floors/progress, frame "on par, NOT beating." (4) combat hp_ratio 1.04–1.07 = on par (old
+>100% was the fixed Burning-Blood artifact). (5) Silent synergy > Ironclad. (6) raw archetype_acc
+std≈0 (seed-invariant fixed guess — likely a real finding, verify per-sample). See docs/findings.md.
 
-### Turn/combat — STALE pilot (pre-sweep, seed=42, turn n=5 / combat n=3), history only
-⚠️ The Combat-HP >100% values below are now KNOWN to be an instrument artifact (Burning
-Blood +6 heal applied to the LLM's score but not the greedy baseline — fixed 2026-06-10
-2nd audit). Do not cite "LLM beats the bot on HP" anywhere.
-| Model | Turn dmg (S/R) | Turn legal (S/R) | Combat win (S/R) | Combat HP (S/R) |
-|---|---|---|---|---|
-| llama-3.1-8b | 36.7% / 69.6% | 60% / 100% | 100% / 100% | 112.3% / 113.8% |
-| scout-17b | 49.8% / 37.5% | 100% / 100% | 100% / 100% | 111.4% / 103.5% |
+### Earlier Groq llama/scout synergy n=20 (2026-06-10, history)
+Held for cross-model comparison; same instrument, de-biased. Exhaust(IC)/Discard(Si) pooled 5%
+were the cross-character blind spot. Full table in `docs/experiment_log.md`.
 
 ## Available Groq Models (as of 2026-06-07)
 - `llama-3.1-8b-instant` — small, fast (tested)

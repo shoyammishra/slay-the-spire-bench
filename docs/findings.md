@@ -1,5 +1,38 @@
 # Findings
 
+## ✅ Paper-grade Qwen2.5-7B, 4 dimensions, 5 seeds (2026-06-13) — CURRENT valid data
+
+First complete self-hosted, multi-seed, post-audit matrix (full tables in
+`docs/experiment_log.md`). Headline findings:
+
+1. **Seed-matched format ablation lands.** Structured beats raw on every reasoning-heavy
+   metric for BOTH characters — sharpest on synergy: Ironclad card_pick 0.47→0.27, removal
+   0.24→**0.02**, archetype 0.37→0.25; Silent archetype 0.60→0.42, removal 0.36→0.18. Turn
+   raw also carries ~2× the variance (±0.175 vs ±0.078). This is the core novelty claim
+   (same RNG seed, only the prompt rendering changes) confirmed on a self-hosted model, not
+   just the Groq llama/scout pilots.
+2. **Format is invisible to combat/run.** Both formats win 100% of scripted combats
+   (hp_ratio ≈ 1.04–1.07, on par with greedy — not beating it) and reach ~12.8–13.4/16
+   floors before dying at the Act-1 boss. These dimensions are gated by engine survival, not
+   prompt comprehension. → The format effect is **specific to the planning/labeling
+   dimensions**, which is exactly the multi-horizon decomposition story: format matters where
+   reasoning matters, not where raw survival dominates.
+3. **Run-level survival is a floor effect, report progress instead.** Greedy baseline itself
+   survives Act 1 only ~1% (avg ~12.5 floors). Qwen 12.8–13.4 floors ≈ greedy → on par.
+   Always cite avg_floors_reached / avg_progress, never survival_rate alone, and never
+   "beats the bot."
+4. **Silent synergy > Ironclad synergy** (archetype 0.60 vs 0.37 structured) — replicates the
+   earlier finding that Silent's mechanic labels (Poison/Shiv/Block/Discard) read more
+   literally off card text than Ironclad's abstractions.
+5. **raw archetype_acc is seed-invariant** (Ironclad std=0.0, always 5/20). Likely the model
+   collapses to a fixed wrong guess in raw format — a real finding to verify per-sample, not
+   an instrument bug. parse_ok=1.0 everywhere → instrument clean.
+
+**Carry-forward caveats:** combat hp_ratio just above 1.0 is "on par," not "beats" (the old
+>100% was a Burning-Blood artifact, fixed). Silent turn/combat/run not yet run (sbatch jobs
+scope them to Ironclad). Still single-model — paper needs a 2nd/3rd family + (ideally) a
+reasoning model (qwen3-32b once vLLM 0.8.x is up).
+
 ## ⚠️ 3rd audit (2026-06-11): enemy block was a no-op, HP-loss was blockable, and the turn eval had a replay loophole
 
 A third full-source audit (after the engine-fidelity batch landed) found 40 more bugs —
