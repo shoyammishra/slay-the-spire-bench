@@ -53,7 +53,12 @@ def build_llm(provider: str, model: str, base_url: str = None):
         # needed by default; LOCAL_API_KEY is honoured if the server sets one.
         url = base_url or os.environ.get("LOCAL_BASE_URL") or "http://localhost:8000/v1"
         key = os.environ.get("LOCAL_API_KEY")
-        return LocalLLM(model=model, base_url=url, api_key=key)
+        # A reasoning model (qwen3) emits a long <think> per call; at ~21 tok/s an
+        # 8000-token response needs ~380s, past the 300s default -> every long call
+        # times out, then re-sends the same prompt and times out again. Bump via
+        # $LOCAL_TIMEOUT (seconds) from the sbatch for self-hosted reasoning models.
+        timeout = float(os.environ.get("LOCAL_TIMEOUT", "300"))
+        return LocalLLM(model=model, base_url=url, api_key=key, timeout=timeout)
     else:
         sys.exit(f"Unknown provider: {provider}")
 

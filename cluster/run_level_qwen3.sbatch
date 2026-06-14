@@ -45,6 +45,12 @@ source cluster/lib.sh
 start_vllm
 wait_for_vllm
 
+# Qwen3 emits a long <think> per call; at ~21 tok/s an 8000-token response needs
+# ~380s, past LocalLLM's 300s default -> every long call times out and the retry
+# re-sends the same doomed prompt. Give generation room to finish (job 7574,
+# 2026-06-14: run-level hit "[network error] timed out" on this exact ceiling).
+export LOCAL_TIMEOUT=600
+
 # Single illustrative point: n=3, one seed, structured only.
 echo "=== qwen3 run-level (illustrative, n=3, seed=42, structured) ==="
 time python run_benchmark.py --provider local --base-url "${BASE_URL}" \
