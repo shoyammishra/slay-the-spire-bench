@@ -31,8 +31,11 @@
 #SBATCH --gres=gpu:a100-80gb:1
 #SBATCH --time=24:00:00
 #SBATCH --ntasks=1
+# Host RAM only — model weights live in GPU VRAM, so 24G is ample (and keeps us
+# under the assoc-wide GrpTRES mem=128G cap that queued job 7574 as AssocGrpMemLimit
+# while two other 64G jobs were running).
 #SBATCH --cpus-per-task=8
-#SBATCH --mem=64G
+#SBATCH --mem=24G
 #SBATCH --output=slay_run_qwen3_%j.out
 #SBATCH --error=slay_run_qwen3_%j.err
 
