@@ -20,8 +20,14 @@
 #
 # Partial results are saved on disk even if killed at the wall (harness
 # partial-saves on any error); re-submit to resume more runs into the same JSON.
+# QOS: this account's GPU QOS is `test-gpu` (MaxWall 7 days, gres/gpu=4). The
+# default `normal` QOS has no GPU wall budget for a 24h request, so a bare submit
+# is rejected with QOSMaxWallDurationPerJobLimit (job 7572, 2026-06-14). Pin the
+# GPU QOS explicitly. (Allowed QOS for this assoc: bigmem, cpu-short, normal,
+# test-gpu — only test-gpu grants both a long wall and a GPU.)
 #SBATCH --job-name=slay_run_qwen3
 #SBATCH --partition=gpu-3day
+#SBATCH --qos=test-gpu
 #SBATCH --gres=gpu:a100-80gb:1
 #SBATCH --time=24:00:00
 #SBATCH --ntasks=1
