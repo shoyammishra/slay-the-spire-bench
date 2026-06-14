@@ -7,10 +7,14 @@
 - 4-dimension benchmark: turn, combat, synergy, run
 - Mock provider for offline testing
 
-### M2 — Pilot runs (DONE 2026-06-07)
+### M2 — Pilot runs (DONE 2026-06-07) — ⛔ ALL NUMBERS NOW STALE
 - llama-3.1-8b-instant: structured + raw, seed=42
 - meta-llama/llama-4-scout-17b-16e-instruct: structured + raw, seed=42
 - Key bugs fixed: map dead-end, EventBus stacking, rate-limit crash
+- ⛔ **These pilot numbers (incl. the n=20 synergy) are INVALID for comparison:**
+  the harness changed substantially after them (2026-06-10..12 engine fix batches +
+  synergy fixture/instrument de-bias). They are NOT comparable to the post-audit
+  Qwen2.5-7B matrix and must be re-run locally before use. Kept as history only.
 
 ### M2.5 — A* acceptance harness extensions (DONE 2026-06-10, code-side)
 - Silent character: full card set (~73), powers, pool, 20 hand-crafted synergy fixtures
@@ -177,8 +181,8 @@ then frontier API access (M3b) for Claude/GPT**. Check items off as runs land.
 ### Models (capability ladder)
 | # | Model | Provider | Phase | Status | Notes |
 |---|---|---|---|---|---|
-| 1 | llama-3.1-8b(-instruct) | Groq → **local GPU** | M3a | synergy valid (n=20, seed-42 point est.); turn/combat stale; run none | small baseline; local re-run doubles as provider-robustness check |
-| 2 | meta-llama/llama-4-scout-17b | Groq → **local GPU** (if VRAM fits) | M3a | synergy valid (n=20, seed-42 point est.); turn/combat stale; run none | mid baseline |
+| 1 | llama-3.1-8b(-instruct) | **local GPU** | M3a | ⛔ old Groq numbers DELETED (2026-06-14) — predated the 2026-06-10..12 engine/instrument fix batches; not comparable to the post-audit matrix. **Re-running self-hosted** via `cluster/{turn_combat,synergy,run_level}_models.sbatch` (`HF_REPO=meta-llama/Llama-3.1-8B-Instruct SERVED_NAME=llama-3.1-8b`). | small baseline; restores a 2nd open-source FAMILY (Llama vs Qwen). vLLM 0.6.6 (`slaybench`); gated → `HF_TOKEN` |
+| 2 | google/gemma-3-27b-it | **local GPU** | M3a | not started — replaces scout-17b as the mid model. Run via the same `*_models.sbatch` (`HF_REPO=google/gemma-3-27b-it SERVED_NAME=gemma-3-27b`). | mid baseline + a 3rd open-source FAMILY (Google). Gemma-3 → vLLM 0.8.x (`slaybench08`); gated → `HF_TOKEN` |
 | 3 | **reasoning model** (qwen3-32b / DeepSeek-R1-distill) | **local GPU** | M3a | dropped on free tier — **REVIVED by GPU** | the truncation/throttling failure mode disappears when self-hosted |
 | 4 | **Claude (e.g. Haiku/Sonnet)** | professor's API path | M3b | not started | frontier family #1 |
 | 5 | **GPT (e.g. 4o-mini/4o)** | professor's API path | M3b | not started | frontier family #2 |

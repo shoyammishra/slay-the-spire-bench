@@ -243,9 +243,18 @@ fixtures "Block" every seed (std≈0 = the collapse signature), so its 5/20 acc 
 rate (5 of 20 fixtures are Block decks); structured spreads answers + scores higher → prompt
 effect, not instrument (parse_ok=1.0; fixtures cycle all archetypes). See docs/findings.md.
 
-### Earlier Groq llama/scout synergy n=20 (2026-06-10, history)
-Held for cross-model comparison; same instrument, de-biased. Exhaust(IC)/Discard(Si) pooled 5%
-were the cross-character blind spot. Full table in `docs/experiment_log.md`.
+### Earlier Groq llama/scout numbers — ⛔ DELETED 2026-06-14 (no longer valid)
+All llama-3.1-8b + llama-4-scout-17b Groq result files were deleted on 2026-06-14:
+they predate the 2026-06-10..12 engine/instrument fix batches (combat dynamics +
+synergy fixtures changed) so they are NOT comparable to the post-audit Qwen matrix.
+The extra open-source models are now **run self-hosted** under the post-audit harness
+via three new model-parametrized sbatch files — `cluster/turn_combat_models.sbatch`,
+`cluster/synergy_models.sbatch`, `cluster/run_level_models.sbatch` (each loops BOTH
+characters + BOTH formats, n=20, 5 seeds; override `HF_REPO`/`SERVED_NAME`/`CONDA_ENV`
+per model, both gated → `HF_TOKEN`). Two models: **Llama-3.1-8B** (vLLM 0.6.6 /
+`slaybench`) restores a 2nd open-source FAMILY (Llama vs Qwen); **Gemma-3-27B** (Gemma3
+→ vLLM 0.8.x / `slaybench08`) replaces scout-17b as the mid model + adds a 3rd family
+(Google). Re-running these is required by the novelty review (≥2 families).
 
 ## Available Groq Models (as of 2026-06-07)
 - `llama-3.1-8b-instant` — small, fast (tested)
