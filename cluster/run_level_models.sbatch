@@ -42,6 +42,11 @@ source cluster/lib.sh
 start_vllm
 wait_for_vllm
 
+# Gemma-3-27B is much slower per call than the 7B; a single generation can run past
+# LocalLLM's 300s default, after which every retry re-sends the same doomed prompt and
+# times out again. Give generation room. Harmless for the fast Llama-8B.
+export LOCAL_TIMEOUT="${LOCAL_TIMEOUT:-600}"
+
 for CHAR in ironclad silent; do
   for FMT in structured raw; do
     echo "=== run-level, model=${SERVED_NAME}, character=${CHAR}, format=${FMT} ==="

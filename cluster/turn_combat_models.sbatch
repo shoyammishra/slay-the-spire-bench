@@ -40,6 +40,12 @@ source cluster/lib.sh
 start_vllm
 wait_for_vllm
 
+# Gemma-3-27B is much slower per call than the 7B; a single generation can run past
+# LocalLLM's 300s default, after which every retry re-sends the same doomed prompt and
+# times out again ("[network error] retry N/5 ... timed out"). Give generation room.
+# Harmless for the fast Llama-8B. (Same fix as run_level_silent_qwen3.sbatch.)
+export LOCAL_TIMEOUT="${LOCAL_TIMEOUT:-600}"
+
 for CHAR in ironclad silent; do
   for FMT in structured raw; do
     echo "=== turn+combat, model=${SERVED_NAME}, character=${CHAR}, format=${FMT} ==="
