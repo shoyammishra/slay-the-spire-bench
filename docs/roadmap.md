@@ -182,7 +182,7 @@ then frontier API access (M3b) for Claude/GPT**. Check items off as runs land.
 | # | Model | Provider | Phase | Status | Notes |
 |---|---|---|---|---|---|
 | 1 | llama-3.1-8b(-instruct) | **local GPU** | M3a | ⛔ old Groq numbers DELETED (2026-06-14) — predated the 2026-06-10..12 engine/instrument fix batches; not comparable to the post-audit matrix. **Re-running self-hosted** via `cluster/{turn_combat,synergy,run_level}_models.sbatch` (`HF_REPO=meta-llama/Llama-3.1-8B-Instruct SERVED_NAME=llama-3.1-8b`). | small baseline; restores a 2nd open-source FAMILY (Llama vs Qwen). vLLM 0.6.6 (`slaybench`); gated → `HF_TOKEN` |
-| 2 | google/gemma-3-27b-it | **local GPU** | M3a | not started — replaces scout-17b as the mid model. Run via the same `*_models.sbatch` (`HF_REPO=google/gemma-3-27b-it SERVED_NAME=gemma-3-27b`). | mid baseline + a 3rd open-source FAMILY (Google). Gemma-3 → vLLM 0.8.x (`slaybench08`); gated → `HF_TOKEN` |
+| 2 | google/gemma-2-9b-it | **local GPU** | M3a | not started — replaces scout-17b as the mid model. Run via the same `*_models.sbatch` (`HF_REPO=google/gemma-2-9b-it SERVED_NAME=gemma-2-9b`). | mid baseline + a 3rd open-source FAMILY (Google). Gemma-2 → vLLM 0.6.6 (`slaybench`, same env as the 8B); gated → `HF_TOKEN` |
 | 3 | **reasoning model** (qwen3-32b / DeepSeek-R1-distill) | **local GPU** | M3a | dropped on free tier — **REVIVED by GPU** | the truncation/throttling failure mode disappears when self-hosted |
 | 4 | **Claude (e.g. Haiku/Sonnet)** | professor's API path | M3b | not started | frontier family #1 |
 | 5 | **GPT (e.g. 4o-mini/4o)** | professor's API path | M3b | not started | frontier family #2 |

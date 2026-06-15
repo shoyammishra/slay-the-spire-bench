@@ -1,6 +1,6 @@
 #!/bin/bash
 # cluster/turn_combat_models.sbatch — turn + combat re-baseline for the two extra
-# open-source models (Llama-3.1-8B, Gemma-3-27B), BOTH characters, BOTH formats,
+# open-source models (Llama-3.1-8B, Gemma-2-9B), BOTH characters, BOTH formats,
 # n=20 each, 5 seeds for mean+/-std. The Groq pilot numbers for these are STALE
 # (predate the 2026-06-10..12 engine/instrument fix batches); this re-runs them
 # self-hosted under the post-audit harness. Re-running llama also restores a 2nd
@@ -13,9 +13,9 @@
 #   # Llama-3.1-8B  (vLLM 0.6.6 / slaybench; GATED -> HF_TOKEN):
 #   HF_TOKEN=hf_xxx CONDA_ENV=slaybench HF_REPO=meta-llama/Llama-3.1-8B-Instruct \
 #     SERVED_NAME=llama-3.1-8b sbatch --export=ALL cluster/turn_combat_models.sbatch
-#   # Gemma-3-27B  (Gemma3ForConditionalGeneration -> vLLM 0.8.x / slaybench08; GATED):
-#   HF_TOKEN=hf_xxx CONDA_ENV=slaybench08 HF_REPO=google/gemma-3-27b-it \
-#     SERVED_NAME=gemma-3-27b sbatch --export=ALL cluster/turn_combat_models.sbatch
+#   # Gemma-2-9B  (Gemma2ForCausalLM -> vLLM 0.6.6 / slaybench; GATED):
+#   HF_TOKEN=hf_xxx CONDA_ENV=slaybench HF_REPO=google/gemma-2-9b-it \
+#     SERVED_NAME=gemma-2-9b sbatch --export=ALL cluster/turn_combat_models.sbatch
 #SBATCH --job-name=slay_turncombat_models
 #SBATCH --partition=gpu-1day
 #SBATCH --gres=gpu:a100-80gb:1
@@ -28,7 +28,7 @@
 
 cd "${SLURM_SUBMIT_DIR}"
 source /nfs_home/software/miniconda/etc/profile.d/conda.sh
-conda activate "${CONDA_ENV:-slaybench}"   # CONDA_ENV=slaybench08 for Gemma-3 (vLLM 0.8.x)
+conda activate "${CONDA_ENV:-slaybench}"   # both models run on vLLM 0.6.6 / slaybench
 export HF_HOME=~/scratch/hf_cache
 # Both models are GATED on HuggingFace -> HF_TOKEN must be exported at submit time.
 if [ -z "${HF_TOKEN:-}" ]; then
@@ -40,10 +40,9 @@ source cluster/lib.sh
 start_vllm
 wait_for_vllm
 
-# Gemma-3-27B is much slower per call than the 7B; a single generation can run past
-# LocalLLM's 300s default, after which every retry re-sends the same doomed prompt and
-# times out again ("[network error] retry N/5 ... timed out"). Give generation room.
-# Harmless for the fast Llama-8B. (Same fix as run_level_silent_qwen3.sbatch.)
+# Both the 8B and the 9B are fast on vLLM 0.6.6, so 300s would be fine; keep the 600s
+# ceiling anyway as cheap insurance against an occasional long generation. (Same knob
+# the reasoning-model jobs need, harmless here.)
 export LOCAL_TIMEOUT="${LOCAL_TIMEOUT:-600}"
 
 for CHAR in ironclad silent; do
