@@ -252,11 +252,14 @@ via three new model-parametrized sbatch files — `cluster/turn_combat_models.sb
 `cluster/synergy_models.sbatch`, `cluster/run_level_models.sbatch` (each loops BOTH
 characters + BOTH formats, n=20, 5 seeds; override `HF_REPO`/`SERVED_NAME`/`CONDA_ENV`
 per model, both gated → `HF_TOKEN`). Two models: **Llama-3.1-8B** (vLLM 0.6.6 /
-`slaybench`) restores a 2nd open-source FAMILY (Llama vs Qwen); **Gemma-2-9B** (Gemma2
-→ vLLM 0.6.6 / `slaybench`, same env as the 8B) replaces scout-17b as the mid model +
-adds a 3rd family (Google). Re-running these is required by the novelty review (≥2
-families). (Gemma-3-27B was the original pick but was swapped to Gemma-2-9B 2026-06-15
-— the 9B runs on the existing vLLM 0.6.6 env, no slaybench08/0.8.x dependency.)
+`slaybench`) restores a 2nd open-source FAMILY (Llama vs Qwen); **Gemma-3-12B** (Gemma3
+→ vLLM 0.8.x / `slaybench08`) replaces scout-17b as the mid model + adds a 3rd family
+(Google). Re-running these is required by the novelty review (≥2 families). **Model-pick
+history for the mid slot:** Gemma-3-27B (original) → Gemma-2-9B (2026-06-15, to drop the
+0.8.x dependency) → **Gemma-3-12B** (2026-06-16). Gemma-2-9B was reverted because every
+Gemma-2 caps at 8192 context, below the lib.sh default `--max-model-len 16384`, so vLLM
+hard-rejected it; Gemma-3-12B has 128k native context so 16384 works as-is, at the cost
+of needing the vLLM 0.8.x (`slaybench08`) env again.
 
 ## Available Groq Models (as of 2026-06-07)
 - `llama-3.1-8b-instant` — small, fast (tested)

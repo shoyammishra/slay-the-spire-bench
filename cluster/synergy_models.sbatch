@@ -1,6 +1,6 @@
 #!/bin/bash
 # cluster/synergy_models.sbatch — synergy for the two extra open-source models
-# (Llama-3.1-8B, Gemma-2-9B), BOTH characters, BOTH formats, 5 seeds for error
+# (Llama-3.1-8B, Gemma-3-12B), BOTH characters, BOTH formats, 5 seeds for error
 # bars (20 hand-crafted fixtures/character). One light call per sample, so cheap.
 # The Groq pilot synergy numbers for these are STALE (synergy fixtures changed in
 # the 2026-06-11 batch); this re-runs them self-hosted under the post-audit harness.
@@ -10,9 +10,10 @@
 #   # Llama-3.1-8B  (vLLM 0.6.6 / slaybench; GATED -> HF_TOKEN):
 #   HF_TOKEN=hf_xxx CONDA_ENV=slaybench HF_REPO=meta-llama/Llama-3.1-8B-Instruct \
 #     SERVED_NAME=llama-3.1-8b sbatch --export=ALL cluster/synergy_models.sbatch
-#   # Gemma-2-9B  (-> vLLM 0.6.6 / slaybench; GATED):
-#   HF_TOKEN=hf_xxx CONDA_ENV=slaybench HF_REPO=google/gemma-2-9b-it \
-#     SERVED_NAME=gemma-2-9b sbatch --export=ALL cluster/synergy_models.sbatch
+#   # Gemma-3-12B  (Gemma3ForCausalLM -> needs vLLM 0.8.x / slaybench08; GATED):
+#   #   128k native context, so the lib.sh default --max-model-len 16384 works as-is.
+#   HF_TOKEN=hf_xxx CONDA_ENV=slaybench08 HF_REPO=google/gemma-3-12b-it \
+#     SERVED_NAME=gemma-3-12b sbatch --export=ALL cluster/synergy_models.sbatch
 #SBATCH --job-name=slay_synergy_models
 #SBATCH --partition=gpu-short
 #SBATCH --gres=gpu:a100-80gb:1
@@ -25,7 +26,7 @@
 
 cd "${SLURM_SUBMIT_DIR}"
 source /nfs_home/software/miniconda/etc/profile.d/conda.sh
-conda activate "${CONDA_ENV:-slaybench}"   # both models run on vLLM 0.6.6 / slaybench
+conda activate "${CONDA_ENV:-slaybench}"   # Llama -> slaybench (0.6.6); Gemma-3 -> slaybench08 (0.8.x)
 export HF_HOME=~/scratch/hf_cache
 if [ -z "${HF_TOKEN:-}" ]; then
   echo "ERROR: HF_TOKEN is not set (both models are gated). See header for submit syntax."
@@ -36,7 +37,7 @@ source cluster/lib.sh
 start_vllm
 wait_for_vllm
 
-# Both the 8B and the 9B are fast on vLLM 0.6.6; keep the 600s ceiling as cheap
+# The 8B and the 12B (a non-reasoning model) are fast; keep the 600s ceiling as cheap
 # insurance against an occasional long generation. Harmless here.
 export LOCAL_TIMEOUT="${LOCAL_TIMEOUT:-600}"
 
