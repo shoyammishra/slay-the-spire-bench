@@ -251,15 +251,19 @@ The extra open-source models are now **run self-hosted** under the post-audit ha
 via three new model-parametrized sbatch files — `cluster/turn_combat_models.sbatch`,
 `cluster/synergy_models.sbatch`, `cluster/run_level_models.sbatch` (each loops BOTH
 characters + BOTH formats, n=20, 5 seeds; override `HF_REPO`/`SERVED_NAME`/`CONDA_ENV`
-per model, both gated → `HF_TOKEN`). Two models: **Llama-3.1-8B** (vLLM 0.6.6 /
-`slaybench`) restores a 2nd open-source FAMILY (Llama vs Qwen); **Gemma-3-12B** (Gemma3
-→ vLLM 0.8.x / `slaybench08`) replaces scout-17b as the mid model + adds a 3rd family
-(Google). Re-running these is required by the novelty review (≥2 families). **Model-pick
-history for the mid slot:** Gemma-3-27B (original) → Gemma-2-9B (2026-06-15, to drop the
-0.8.x dependency) → **Gemma-3-12B** (2026-06-16). Gemma-2-9B was reverted because every
-Gemma-2 caps at 8192 context, below the lib.sh default `--max-model-len 16384`, so vLLM
-hard-rejected it; Gemma-3-12B has 128k native context so 16384 works as-is, at the cost
-of needing the vLLM 0.8.x (`slaybench08`) env again.
+per model). Two models: **Llama-3.1-8B** (vLLM 0.6.6 / `slaybench`, GATED → `HF_TOKEN`)
+restores a 2nd open-source FAMILY (Llama vs Qwen); **Mistral-7B-Instruct-v0.3** (vLLM
+0.6.6 / `slaybench`, NOT gated) replaces scout-17b as the mid model + adds a 3rd family
+(Mistral AI). Re-running these is required by the novelty review (≥2 families). **Model-
+pick history for the mid slot:** Gemma-3-27B (original) → Gemma-2-9B (2026-06-15) →
+Gemma-3-12B (2026-06-16) → **Mistral-7B (2026-06-16)**. Both Gemmas failed on this
+cluster: (a) every **Gemma-2** caps at 8192 context, below the lib.sh default
+`--max-model-len 16384`, so vLLM hard-rejected it at startup; (b) **Gemma-3-12B** loaded
+fine (vLLM 0.8.x / slaybench08, 128k ctx) but the instruct model emits long verbose
+chain-of-thought, never stops before `max_tokens=8000` (~3 min/call at ~47 tok/s) and
+buries the JSON answer → `model_said=''`, parse_ok=False on every synergy sample (job
+7625, 2026-06-16). Mistral-7B follows the terse-JSON contract, runs on the existing
+`slaybench` env (no 0.8.x), is fast (~7B speed), and is not gated.
 
 ## Available Groq Models (as of 2026-06-07)
 - `llama-3.1-8b-instant` — small, fast (tested)

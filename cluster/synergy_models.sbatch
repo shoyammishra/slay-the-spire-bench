@@ -1,19 +1,18 @@
 #!/bin/bash
 # cluster/synergy_models.sbatch — synergy for the two extra open-source models
-# (Llama-3.1-8B, Gemma-3-12B), BOTH characters, BOTH formats, 5 seeds for error
+# (Llama-3.1-8B, Mistral-7B), BOTH characters, BOTH formats, 5 seeds for error
 # bars (20 hand-crafted fixtures/character). One light call per sample, so cheap.
 # The Groq pilot synergy numbers for these are STALE (synergy fixtures changed in
 # the 2026-06-11 batch); this re-runs them self-hosted under the post-audit harness.
 # Writes results/<served>_{,_silent}_<fmt>_seed*.json.
 #
 # Submit ONE model per job by overriding the model env vars:
-#   # Llama-3.1-8B  (vLLM 0.6.6 / slaybench; GATED -> HF_TOKEN):
+#   # Llama-3.1-8B  (vLLM 0.6.6 / slaybench; GATED -> HF_TOKEN required):
 #   HF_TOKEN=hf_xxx CONDA_ENV=slaybench HF_REPO=meta-llama/Llama-3.1-8B-Instruct \
 #     SERVED_NAME=llama-3.1-8b sbatch --export=ALL cluster/synergy_models.sbatch
-#   # Gemma-3-12B  (Gemma3ForCausalLM -> needs vLLM 0.8.x / slaybench08; GATED):
-#   #   128k native context, so the lib.sh default --max-model-len 16384 works as-is.
-#   HF_TOKEN=hf_xxx CONDA_ENV=slaybench08 HF_REPO=google/gemma-3-12b-it \
-#     SERVED_NAME=gemma-3-12b sbatch --export=ALL cluster/synergy_models.sbatch
+#   # Mistral-7B  (MistralForCausalLM -> vLLM 0.6.6 / slaybench; NOT gated, no HF_TOKEN):
+#   CONDA_ENV=slaybench HF_REPO=mistralai/Mistral-7B-Instruct-v0.3 \
+#     SERVED_NAME=mistral-7b sbatch --export=ALL cluster/synergy_models.sbatch
 #SBATCH --job-name=slay_synergy_models
 #SBATCH --partition=gpu-short
 #SBATCH --gres=gpu:a100-80gb:1
@@ -26,10 +25,11 @@
 
 cd "${SLURM_SUBMIT_DIR}"
 source /nfs_home/software/miniconda/etc/profile.d/conda.sh
-conda activate "${CONDA_ENV:-slaybench}"   # Llama -> slaybench (0.6.6); Gemma-3 -> slaybench08 (0.8.x)
+conda activate "${CONDA_ENV:-slaybench}"   # both models run on vLLM 0.6.6 / slaybench
 export HF_HOME=~/scratch/hf_cache
-if [ -z "${HF_TOKEN:-}" ]; then
-  echo "ERROR: HF_TOKEN is not set (both models are gated). See header for submit syntax."
+# Llama-3.1-8B is GATED -> needs HF_TOKEN; Mistral-7B is NOT gated.
+if [[ "${HF_REPO:-}" == meta-llama/* && -z "${HF_TOKEN:-}" ]]; then
+  echo "ERROR: HF_REPO is a gated meta-llama model but HF_TOKEN is not set. See header."
   exit 1
 fi
 
@@ -37,7 +37,7 @@ source cluster/lib.sh
 start_vllm
 wait_for_vllm
 
-# The 8B and the 12B (a non-reasoning model) are fast; keep the 600s ceiling as cheap
+# Both the 8B and the 7B are fast on vLLM 0.6.6; keep the 600s ceiling as cheap
 # insurance against an occasional long generation. Harmless here.
 export LOCAL_TIMEOUT="${LOCAL_TIMEOUT:-600}"
 
