@@ -1,9 +1,11 @@
 #!/bin/bash
 # cluster/turn_combat_models_silent.sbatch — turn + combat for the extra open-source
-# models (Llama-3.1-8B, Mistral-7B), SILENT ONLY, BOTH formats, n=20 each, 5 seeds for
-# mean+/-std. Use this when Ironclad turn/combat is already collected for a model and
-# only the Silent half is missing — avoids re-running the Ironclad loop.
-# Writes results/<served>_silent_<fmt>_seed*.json.
+# models (Llama-3.1-8B, Mistral-7B), SILENT ONLY, RAW format ONLY, n=20 each, 5 seeds for
+# mean+/-std. Use this when Ironclad turn/combat (both formats) AND Silent structured are
+# already collected for a model and only the Silent RAW half remains — avoids re-running
+# everything else. (Set up for DeepSeek-R1-Distill, where structured finished but the job
+# wall ran out before raw; resubmit on a fresh GPU allocation to finish just the raw cell.)
+# Writes results/<served>_silent_raw_seed*.json.
 #
 # Seeds spaced 1000 apart (see turn_combat.sbatch header for the why).
 #
@@ -43,13 +45,11 @@ wait_for_vllm
 # ceiling anyway as cheap insurance against an occasional long generation.
 export LOCAL_TIMEOUT="${LOCAL_TIMEOUT:-600}"
 
-for FMT in structured raw; do
-  echo "=== turn+combat, model=${SERVED_NAME}, character=silent, format=${FMT} ==="
-  python run_benchmark.py --provider local --base-url "${BASE_URL}" \
-      --model "${SERVED_NAME}" --character silent \
-      --only turn combat --n-turn 20 --n-combat 20 \
-      --seeds 42 1042 2042 3042 4042 \
-      --format "${FMT}"
-done
+echo "=== turn+combat, model=${SERVED_NAME}, character=silent, format=raw ==="
+python run_benchmark.py --provider local --base-url "${BASE_URL}" \
+    --model "${SERVED_NAME}" --character silent \
+    --only turn combat --n-turn 20 --n-combat 20 \
+    --seeds 42 1042 2042 3042 4042 \
+    --format raw
 
-echo "=== turn+combat (${SERVED_NAME}, silent only) done ==="
+echo "=== turn+combat (${SERVED_NAME}, silent raw only) done ==="
