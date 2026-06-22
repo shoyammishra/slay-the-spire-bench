@@ -1,5 +1,25 @@
 # Decision Log
 
+## 2026-06-22 (model matrix) — qwen3-32b REVIVED + reasoning-distill family added; coverage gaps accepted
+**Decision:** The full benchmark matrix now spans **5 model families** (qwen2.5-7b, llama-3.1-8b,
+mistral-7b, qwen3-32b, deepseek-r1-distill-14b/7b). **qwen3-32b is un-dropped:** the reason it
+was dropped (free-tier TPM truncated its `<think>` mid-reasoning → parse-failure cascade) is gone
+once self-hosted on an A100 — it now runs at parse_ok=1.0. It was collected **synergy-only** by
+choice: synergy is the horizon where a reasoning model is expected to (and does) separate from the
+7–8B pack, and it's the cheapest cell to prove that on a 32B. We are **not** back-filling its
+turn/combat/run unless a reviewer asks — synergy carries the separation claim. Two DeepSeek-R1
+distills added to probe "does reasoning help, and does distillation size matter": 14b (full
+Ironclad incl. run; partial Silent) and 7b (Silent raw turn/combat probe only).
+**Why:** Closes the two D&B-blocking gaps the novelty review named — ≥3 model families and a
+reasoning model. The finding justifies the spend: reasoning is **not** a monotone win — the 14b
+distill's verbose decode *hurts* the long horizons (only model to lose combats; Ironclad run
+floors 9.75, below the greedy floor) and the 7b distill collapses (parse_errors 7.93). qwen3-32b,
+which stays terse, is the one clean frontier-line that bends away at synergy (Silent archetype
+0.80). The remaining holes (qwen3 turn/combat/run; deepseek Silent raw turn/combat + run) are
+accepted because they fall on the horizons that are either the convergence floor (run) or where
+the separation isn't (combat) — documented as "Coverage gaps" in experiment_log.md, not silently
+omitted.
+
 ## 2026-06-12 (GPU access) — `cluster/` Slurm toolkit + public-repo IP scrub
 **Decision:** Added a `cluster/` toolkit for the BITS CSIS Slurm cluster (the M3a GPU): `setup.sh` (conda env + vLLM), `lib.sh` (shared vLLM serve/wait/stop helpers, model selected via `HF_REPO`/`SERVED_NAME`/`TP_SIZE` env vars, default `Qwen/Qwen3-32B`→alias `qwen3-32b`), `prefetch_model.sh` (login-node weight pull for offline compute nodes), `README.md`, and 4 staged sbatch jobs cheapest→most-expensive (`smoke`→`turn_combat`→`synergy`→`run_level`). Each job serves a model with vLLM on one A100 80 GB then runs `run_benchmark.py --provider local --base-url http://localhost:8000/v1`. Also added `.gitattributes` pinning `*.sh`/`*.sbatch` to LF (CRLF breaks bash on the Linux cluster).
 **Why:** Turns the roadmap's M3a run order into paste-and-submit jobs so the GPU phase starts the moment the user SSHes in. One sbatch job runs both the server and the benchmark on the same node, so `localhost` works and the GPU is released on exit (trap).

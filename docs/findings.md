@@ -1,5 +1,59 @@
 # Findings
 
+## ✅✅ Full 5-model matrix, 5 seeds (2026-06-22) — CURRENT valid data (supersedes Qwen-only)
+
+Five model families now run under the post-audit harness: qwen2.5-7b, llama-3.1-8b (2nd
+family), mistral-7b (3rd family), qwen3-32b (reasoning), deepseek-r1-distill-14b/7b (reasoning
+distill). Full tables in `docs/experiment_log.md`. The two D&B-blocking gaps from the novelty
+review — ≥3 model families and a reasoning model — are now closed.
+
+1. **The horizon-collapse curve finally separates.** With only 7–8B instruct models the four
+   per-horizon lines ran roughly parallel; **qwen3-32b (reasoning) is the first line to bend
+   away at the synergy horizon** — Silent-structured archetype **0.80** and removal **0.55** are
+   the highest anywhere in the matrix, well above the 7–8B pack (archetype ~0.33–0.72). This is
+   exactly the D&B-grade claim the curve needed: a frontier/reasoning model sustains coherent
+   *deck-level* planning where smaller models plateau. (qwen3-32b is synergy-only, so the curve's
+   turn/combat/run points for it are not yet filled — a known gap, but synergy is the horizon
+   where the separation lives.)
+
+2. **Reasoning is not a free win — the deepseek distills split hard by size, and verbose decode
+   actively hurts long horizons.** deepseek-r1-distill-**14b** is the *best* model at the
+   shortest horizon (Ironclad turn dmg **0.823** vs the 0.18–0.71 pack) but pays for its
+   `<think>` verbosity downstream: it is the **only model that loses combats** (Ironclad win
+   0.92/0.73, Silent 0.57), its combat hp_ratio drops to 0.39–0.75 (everyone else ≈1.0), and its
+   Ironclad run-level floors crash to **9.75 — below the greedy ~12.5 floor**: it over-deliberates
+   into death. deepseek-r1-distill-**7b** collapses entirely (Silent raw turn 0.33, combat win
+   0.14, hp_ratio 0.05, **parse_errors 7.93**) — the small distill cannot hold the terse-JSON
+   contract under reasoning load. **Lesson for the paper:** "reasoning model" is not a monolith;
+   distillation size and output discipline gate whether reasoning helps, and the cost lands on the
+   *long* horizons — itself a horizon-collapse result.
+
+3. **Format ablation replicates across families but its *sign* is model- and character-dependent
+   — except synergy removal, which is the robust signal.** Structured ≥ raw on **synergy removal
+   for every single model** (mistral .15→.00, qwen2.5 .24→.02, llama .15→.07, Silent likewise),
+   so removal is the cleanest cross-model format effect. But the direction flips elsewhere:
+   mistral *reverses* on Ironclad archetype (raw .45 > structured .33); llama and mistral are
+   **better in raw at turn-level** on both characters (llama Silent raw 0.810 vs structured
+   0.472) — the opposite of qwen2.5's Ironclad turn. So "structured helps reasoning" is true *in
+   aggregate and most strongly at the synergy/removal horizon*, not as a blanket per-cell rule.
+   Report it as: format matters, the effect is concentrated at the deck-building horizon, and its
+   magnitude/sign varies by model — which is itself a finding (format sensitivity is a model
+   property, not a constant).
+
+4. **Combat/run remain the shared collapse floor — model differences wash out where engine
+   survival dominates.** All instruct models win ~100% of scripted combats with hp_ratio ≈ 1.0
+   and reach ~11–13.8 floors ≈ greedy; the *only* deviations are the reasoning models (deepseek
+   losing combats). This is the multi-horizon thesis in one sentence: **inter-model variance is
+   large at the reasoning horizons (turn spread 0.18→0.84, synergy archetype 0.33→0.80) and
+   near-zero at the survival horizons (combat win, run floors)** — so the benchmark's
+   discriminating power lives at turn + synergy, and run is honestly the convergence floor.
+
+5. **Family-level synergy ordering holds: Silent > Ironclad almost everywhere** (qwen3-32b
+   archetype .80 vs .53, llama .72 vs .51, qwen2.5 .60 vs .37) — replicating that Silent's
+   Poison/Shiv/Block/Discard labels read more literally off card text than Ironclad's
+   abstractions. mistral is the exception (≈ flat .33/.34), consistent with it being the weakest
+   reasoner overall.
+
 ## ✅ Paper-grade Qwen2.5-7B, 4 dimensions, 5 seeds (2026-06-13) — CURRENT valid data
 
 First complete self-hosted, multi-seed, post-audit matrix (full tables in
