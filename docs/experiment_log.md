@@ -34,6 +34,18 @@ partial; see "Coverage gaps" below).
 | deepseek-r1-7b | — / .334 | — / .14 | — / .05 | — / — | — / — | — / — | — / — |
 | qwen3-32b | — / — | — / — | — / — | **.80** / .64 | .57 / .46 | **.55** / .32 | — / — |
 
+### ⏳ Gap-fill jobs in flight (submitted 2026-06-22) — scp + fold when done
+- **deepseek-r1-distill-14b Silent raw turn/combat** — on `gpu-3day` (`--qos=gpu-3day`,
+  `LOCAL_TIMEOUT=1200`, `turn_combat_models_silent.sbatch`). Fills the 14b Silent-raw
+  turn/combat `—` cells below → then 14b Silent raw = turn/combat/synergy complete (only Silent
+  run still open, a floor dim).
+- **deepseek-r1-distill-7b turn/combat** (both chars/formats, `gpu-1day`,
+  `turn_combat_models.sbatch`) + **synergy** (both chars/formats, `gpu-short`,
+  `synergy_models.sbatch`). **7b run-level intentionally skipped** (7b collapses — it's the
+  "small distill fails the JSON contract" point, not a competitive line; run is a floor effect).
+- When these complete: scp the `*_seeds42_1042_2042_3042_4042.json` aggregates and replace the
+  `—` cells in the tables above + refresh findings.
+
 ### Coverage gaps (what is NOT collected, so the matrix is read honestly)
 - **qwen3-32b: synergy only** (turn/combat/run all null). It's a synergy data point — but the
   decisive one: its Silent-structured archetype **0.80** and removal **0.55** are the highest
