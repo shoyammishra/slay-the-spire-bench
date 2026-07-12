@@ -22,6 +22,16 @@
 # For the 14b (worst cell = Silent raw), override:
 #   HF_REPO=deepseek-ai/DeepSeek-R1-Distill-Qwen-14B SERVED_NAME=deepseek-r1-distill-14b \
 #     PROBE_CHAR=silent sbatch --export=ALL cluster/parse_probe.sbatch
+#
+# ⚠️ SUBMIT GOTCHAS (learned 2026-07-12):
+#  - gpu-3day REQUIRES an explicit QOS pin or the submit is rejected with
+#    QOSMaxWallDurationPerJobLimit:
+#      sbatch --partition=gpu-3day --qos=test-gpu --time=06:00:00 cluster/parse_probe.sbatch
+#  - NODE CONTENTION: --gres does NOT guarantee a free GPU here; jobs have landed
+#    on `mix`-state nodes where another user pinned both A100s -> CUDA-OOM. Steer
+#    to an idle node:  sinfo -p gpu-3day -N -o "%n %t"  (pick t=idle), then add
+#      --nodelist=<idle-node>   (e.g. --nodelist=csis.cn3)
+#    The hardened lib.sh pre-flight VRAM check will fail fast if the GPU is busy.
 #SBATCH --job-name=slay_parse_probe
 #SBATCH --partition=gpu-1day
 #SBATCH --gres=gpu:a100-80gb:1

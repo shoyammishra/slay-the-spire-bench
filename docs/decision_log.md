@@ -39,6 +39,21 @@ into the matrix (post-instrumentation harness). Expected read: `parse_fail_trunc
 ≈ 1 ⇒ report DeepSeek failures as "budget-bound deliberation"; ≈ 0 ⇒ "output-discipline failure."
 Requires the cluster clone pulled past this commit.
 
+### Addendum 2026-07-12 — vLLM GPU-memory leak fix + cluster contention lessons (`lib.sh`, commit `9bcfae5`)
+Submitting the probe hit CUDA-OOM (7B model, "1.01 GiB free, Process 1301334 has 64.38 GiB in
+use"). Diagnosis + fixes: vLLM 0.6.6 spawns CUDA **worker children**; the old `stop_vllm` killed
+only the launcher PID, so hard-killed jobs (scancel/OOM/`wait_for_vllm` exit-1) leaked workers that
+pinned VRAM into the next job. `lib.sh` now: (1) `start_vllm` pre-flight VRAM check (nvidia-smi) —
+reaps `$USER`'s own strays if <20 GiB free, else **fails fast** with `nvidia-smi` + `sinfo` hint;
+(2) `stop_vllm` kills the whole process **group** (`kill -- -$PID`) + pkill sweep; (3) `setsid` so
+vLLM leads its own group. Cluster-ops only, no measured code touched.
+**Two operational lessons (also baked into `parse_probe.sbatch` header):** (a) **gpu-3day needs
+`--qos=test-gpu`** or the submit is rejected (`QOSMaxWallDurationPerJobLimit`). (b) **`--gres` does
+NOT guarantee a free GPU on this cluster** — a first probe attempt landed on a `mix`-state node
+where another user's `pose` job pinned both A100s at ~66 GiB/100% util. **Steer to an `idle` node**
+(`sinfo -p gpu-3day -N -o "%n %t"` → `--nodelist=<idle>`). The hardened pre-flight check confirmed
+it caught this correctly (failed fast, did NOT kill the stranger's process — only `$USER` strays).
+
 ## 2026-07-12 (P3 research decision) — Run-level discriminability: REFRAME as the shared collapse floor; hold `--acts 3` for a post-M3b appendix probe (Option C, conditional)
 
 **Problem.** Run-level (the longest horizon) does not discriminate between the current models.
