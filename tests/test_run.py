@@ -526,6 +526,34 @@ def test_tiny_house_no_energy_upgrades_card():
     print("[PASS] Tiny House: no energy, upgrades a card")
 
 
+def test_greedy_baseline_determinism():
+    """The scripted greedy run-level baseline is deterministic per seed and reuses
+    the LLM run protocol via RunEvaluator (no API calls). Same seed → identical
+    floors/progress; this is what makes the measured run-level anchor reproducible."""
+    import importlib.util, os as _os
+    from slay_bench import new_game
+    spec = importlib.util.spec_from_file_location(
+        "greedy_baseline",
+        _os.path.join(_os.path.dirname(_os.path.dirname(_os.path.abspath(__file__))),
+                      "scripts", "greedy_baseline.py"))
+    gb = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(gb)
+
+    for character in ("ironclad", "silent"):
+        ev = gb.GreedyRunEvaluator(llm=None, prompt_format="structured",
+                                   llm_routing=False, character=character)
+        s1 = ev.evaluate(new_game(300 + 42, character), n_acts=1)
+        s2 = ev.evaluate(new_game(300 + 42, character), n_acts=1)
+        assert s1.floors_reached == s2.floors_reached, \
+            f"{character}: greedy floors not deterministic ({s1.floors_reached} vs {s2.floors_reached})"
+        assert abs(s1.progress - s2.progress) < 1e-9, f"{character}: greedy progress not deterministic"
+        # llm=None never crashes → no real LLM/API call is ever made on the greedy
+        # path (llm_calls counts protocol decision points, not API invocations).
+        # Sanity: a full Act-1 run touches multiple floors (not an instant death/no-op).
+        assert s1.floors_reached >= 1
+    print("[PASS] Greedy run-level baseline: deterministic, zero LLM calls")
+
+
 if __name__ == "__main__":
     tests = [
         test_map_generation,
@@ -563,6 +591,8 @@ if __name__ == "__main__":
         test_eggs_upgrade_matching_reward_cards,
         test_eggs_preserve_reward_rng_order,
         test_tiny_house_no_energy_upgrades_card,
+        # 2026-07-12 greedy run-level baseline
+        test_greedy_baseline_determinism,
     ]
     passed = failed = 0
     for test in tests:

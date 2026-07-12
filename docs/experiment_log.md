@@ -1,5 +1,60 @@
 # Experiment Log
 
+## 2026-07-12 (LOCAL, no API) — GREEDY RUN-LEVEL BASELINE MEASURED (per character; replaces the unreproduced 0.78 anchor)
+
+**Why:** the horizon-collapse curve normalized run-level against a hard-coded
+`GREEDY_PROGRESS = 0.78` derived from an *unreproduced* session note ("greedy bot survives
+Act 1 ~1/100, avg ~12.5 floors") — no artifact, no seeds, no n — and applied that single
+Ironclad-flavoured value to BOTH characters even though Silent's greedy Act 1 is documented
+as harsher. Measured it properly (it is FREE: the greedy policy is deterministic engine code,
+zero API calls).
+
+**Method / config.** New committed script `scripts/greedy_baseline.py`. It subclasses
+`RunEvaluator` (`GreedyRunEvaluator`) and overrides ONLY the LLM decision hooks
+(`_llm_combat` → play-every-playable-card greedy AI mirroring `run_loop._resolve_combat`;
+`_llm_card_choice` → first non-curse offer; `_llm_boss_relic_choice` → 0), so
+`evaluate`/`_play_act` — map traversal, reward/offer counts, elite drops, potion drops, event
+auto-pick-0, greedy shop, rest handling — run BYTE-IDENTICAL to the LLM matrix protocol; only
+the decisions change from LLM to greedy. `llm_routing=False` (matches the matrix → path pick=0,
+rest=REST). Combat capped at `max_combat_turns=50` exactly as the LLM `_llm_combat` is (NOT
+run_loop's standalone 100), because this clones the LLM *run* protocol.
+- **Seeds:** the exact run-dimension per-sample seeds, derived from code
+  (`BenchmarkHarness.run_all`: `run_seeds = range(base+300, base+300+n_run)`), bases
+  `42 1042 2042 3042 4042`, `n_run=20` (the matrix's `--n-run 20`) → 20 runs × 5 bases = 100
+  runs/character. Aggregation reproduces `_aggregate_summaries`: average the 20 runs within each
+  base, then mean ± std of the 5 per-base averages.
+- Artifacts: `results/greedy_baseline_ironclad.json`, `results/greedy_baseline_silent.json`
+  (per-sample floors/progress/survived + per-base + overall). Gitignored → numbers recorded here.
+
+**Measured greedy baseline (Act 1, n=20/base × 5 bases):**
+
+| Character | avg_floors ± std | avg_progress ± std | survival ± std |
+|---|---|---|---|
+| Ironclad | 12.48 ± 0.19 | **0.780 ± 0.012** | 0.01 ± 0.022 (1/100) |
+| Silent   | 11.26 ± 0.99 | **0.7037 ± 0.062** | 0.00 ± 0.0 (0/100) |
+
+**Did the old "~12.5 / ~1%" note hold up?** For **Ironclad, essentially exactly** — 12.48
+floors, 0.780 progress, 1% survival: the session note was a good Ironclad anchor. For **Silent,
+NO** — the greedy floor is materially lower (11.26 floors, 0.704 progress, 0% survival). The
+shared 0.78 anchor was Ironclad-derived and understated the Silent run edge.
+
+**Validity.** `git log --oneline -- slay_bench/` confirms the last engine/harness change was
+`15d4ffb` (5th audit, 2026-06-12); the matrix ran 2026-06-22 and the only later commit touching
+`slay_bench/` (`7135bc6`) added `visualize.py` only — so this greedy measurement is on the SAME
+engine the matrix ran on. Determinism verified: a repeated run reproduced byte-identical JSONs.
+Boundary triage: Ironclad landing at 0.780 (the old note's value) is strong evidence the script's
+protocol matches `RunEvaluator`, not a coincidence at a boundary.
+
+**Consequence** (curve anchor now measured + per-character; full before/after per model in
+decision_log 2026-07-12 addendum): Ironclad normalized run values unchanged; the **Silent
+structured run edge lifts off zero** once anchored to Silent's own floor (qwen2.5-7b 0→0.125,
+mistral 0→0.078, llama 0→0.034), while Silent-raw mistral/qwen stay 0 (their progress 0.690/0.679
+is at/below the Silent greedy floor 0.704 — genuinely floored, not an artifact). So the Silent
+all-zero run edge was **partly an anchor artifact and partly real**. Regression test added
+(`test_greedy_baseline_determinism`) → 134 tests pass.
+
+---
+
 ## 2026-06-22, completed 2026-07-11 (CLUSTER) — FULL 5-MODEL MATRIX, 5 seeds (CURRENT valid data, supersedes the Qwen-only table)
 
 The four extra models are in: **llama-3.1-8b** (2nd family), **mistral-7b** (3rd family),
@@ -196,6 +251,11 @@ the Ironclad turn/combat/run sbatch jobs scope themselves to Ironclad). Silent i
 
 **Greedy baseline anchor (for the paper):** scripted greedy bot survives Act 1 ~1/100,
 avg ~12.5 floors. Use this to frame run-level/combat as "on par with greedy," never "beats."
+> ⚠️ **Superseded 2026-07-12 — now MEASURED per character** (see the 2026-07-12 entry at the top).
+> This note was an unreproduced Ironclad-flavoured estimate. Measured: **Ironclad 12.48 floors /
+> 0.780 progress / 1% survival** (the note held up for Ironclad), **Silent 11.26 floors / 0.704
+> progress / 0% survival** (Silent's greedy floor is lower — the shared 0.78 anchor understated
+> the Silent run edge). Framing ("on par with greedy, never beats") is unchanged and still correct.
 
 ---
 

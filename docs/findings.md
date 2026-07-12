@@ -84,10 +84,14 @@ First complete self-hosted, multi-seed, post-audit matrix (full tables in
    prompt comprehension. → The format effect is **specific to the planning/labeling
    dimensions**, which is exactly the multi-horizon decomposition story: format matters where
    reasoning matters, not where raw survival dominates.
-3. **Run-level survival is a floor effect, report progress instead.** Greedy baseline itself
-   survives Act 1 only ~1% (avg ~12.5 floors). Qwen 12.8–13.4 floors ≈ greedy → on par.
-   Always cite avg_floors_reached / avg_progress, never survival_rate alone, and never
-   "beats the bot."
+3. **Run-level survival is a floor effect, report progress instead.** Greedy baseline
+   **measured 2026-07-12** (per character, same seeds as the matrix; `scripts/greedy_baseline.py`
+   — free, deterministic, zero API): **Ironclad 12.48 floors / 0.780 progress / 1% survival;
+   Silent 11.26 floors / 0.704 progress / 0% survival** (Silent's greedy Act 1 is harsher — lower-
+   block starter). The old "~12.5 floors / ~1%" note held up for Ironclad; Silent is materially
+   lower (this is why the horizon-curve run anchor is now per-character — decision_log 2026-07-12).
+   Qwen 12.8–13.4 (IC) / 10.9–11.9 (Silent) floors ≈ each character's greedy → on par. Always cite
+   avg_floors_reached / avg_progress, never survival_rate alone, and never "beats the bot."
 4. **Silent synergy > Ironclad synergy** (archetype 0.60 vs 0.37 structured) — replicates the
    earlier finding that Silent's mechanic labels (Poison/Shiv/Block/Discard) read more
    literally off card text than Ironclad's abstractions.

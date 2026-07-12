@@ -39,6 +39,8 @@ Several benchmarks evaluate LLM planning ability, but each targets a single deci
 
 **Direct prior work on Slay the Spire and card games.** Slay the Spire has itself been used as an LLM testbed. Bateni and Whitehead (2024) ("Language-Driven Play", FDG 2024) evaluate LLMs as game-playing agents in a simplified STS engine (MiniSTS), studying whole-game play and card-synergy comprehension; notably, they find that replacing card names with random strings *improves* play, indicating LLMs reason from card descriptions rather than memorized names. The Orak benchmark (2025) includes STS among twelve games for whole-game evaluation and fine-tuning, and hybrid LLM-plus-rule architectures for STS combat have been proposed. In collectible card games, UrzaGPT (2025) fine-tunes LLMs for Magic: The Gathering card selection. slay-bench differs from all of these along the dimension developed next: rather than scoring whole-game play, it decomposes a single STS simulator into four separately-scored planning horizons. Our synergy results — where models name a deck's strategy poorly yet pick on-archetype cards well — are consistent with, and quantify across formats and models, the name-versus-logic dissociation that Bateni and Whitehead first observed via name randomization.
 
+Slay the Spire has also been adopted as a long-horizon planning testbed at the frontier-lab scale: Anthropic (2026) report using Slay the Spire to probe long-horizon planning when launching their Claude Fable 5 / Mythos 5 models. This is external validation for the domain choice — it answers the natural reviewer question "why this game?" by establishing STS as an accepted frontier-lab planning testbed rather than an idiosyncratic pick. It also positions slay-bench as a deliberate complement rather than a competitor: their agent is *scaffolded* (equipped with persistent memory and vision) and measures the **ceiling** of an engineered end-to-end agent, whereas our unscaffolded, memory-free harness holds each planning horizon fixed and measures the **floor** of raw per-horizon planning. Relatedly, Anthropic report reaching the game's final act roughly three times more often *with* memory than without — a signal consistent with our own run-level results (Section 5), where full-run survival is a severe bottleneck even for the strongest models we test. We treat this only as corroboration of a floor effect, not as a controlled comparison: their setup differs from ours in model scale, scaffolding, and evaluation protocol.
+
 ### What slay-bench contributes
 
 The central limitation of prior work is that **each benchmark tests planning at a single scale**. A model that passes PlanBench's short-horizon rearrangement tasks may fail at multi-turn resource allocation; a model that plans a travel itinerary statically may collapse under adversarial pressure. slay-bench addresses this by embedding four planning horizons within one domain:
@@ -52,11 +54,21 @@ The central limitation of prior work is that **each benchmark tests planning at 
 
 This design lets us ask not just *whether* a model plans, but *at what scale planning breaks down*. Our pilot results illustrate the value: models achieve ~100% combat win rate (near-optimal at the tactical horizon) yet score 37–75% on archetype identification and 12–25% on card removal (strategic horizon), suggesting a planning-horizon gap that flat single-scale benchmarks would miss entirely.
 
+The domain choice is not incidental. Slay the Spire has been used as a long-horizon planning testbed both in the research literature (Bateni and Whitehead, 2024; Orak, 2025) and at the frontier-lab scale (Anthropic, 2026), so measuring per-horizon planning within it builds on an established setting rather than an ad-hoc one. Where those efforts measure the ceiling of scaffolded, whole-game agents, slay-bench deliberately measures the *floor* of raw per-horizon planning by holding memory and tooling fixed across horizons.
+
 A second contribution is **optimality-relative scoring**. Where most game benchmarks report win/loss or Elo, our turn dimension scores damage against the *exhaustive optimum* (the provably best card sequence) and combat against a greedy baseline — measuring *how far from optimal* rather than merely whether the agent won.
 
 A third contribution is **prompt format as a controlled variable**. We run every model on identical RNG seeds in both structured JSON and raw English, allowing a clean ablation of representation effects independent of task difficulty. This is a *format* ablation (whole state representation), complementary to the *content* ablation (card names) of Bateni and Whitehead (2024). Our pilot indicates format effects are model- and horizon-dependent, with no single format dominating.
 
+We hold the harness memory-free by design: adding persistent memory or scaffolding — for example, as a lever to widen the separation between models at the longest horizons, echoing the memory effect Anthropic (2026) report — would break the per-horizon oracle determinism that makes each dimension independently scorable and would require a full re-run. We therefore leave scaffolded, memory-equipped variants to future work, and report the no-memory floor here.
+
 *A fuller novelty/positioning analysis — including an honest assessment of overlap with prior STS work, venue ladder, and synthetic-benchmark comparison — is maintained in `docs/novelty_and_related_work.md`. References to be completed with full citations before submission.*
+
+### Selected references (to be completed)
+
+*Full inline citations (PlanBench, NATURAL PLAN, TravelPlanner, GameBench, Orak, Bateni & Whitehead, etc.) are collected with URLs in `docs/novelty_and_related_work.md` §10 and will be formatted into BibTeX before submission. New entry for this draft:*
+
+- Anthropic (2026). *Claude Fable 5 and Mythos 5* (launch post). Uses Slay the Spire as a long-horizon planning testbed; reports reaching the final act ~3× more often with memory. https://www.anthropic.com/news/claude-fable-5-mythos-5
 
 ---
 

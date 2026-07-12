@@ -351,8 +351,10 @@ def save_all(summary: Dict[str, Any], stem: str, out_dir: Path) -> None:
 #   combat  = win_rate * min(1, hp_ratio)            (greedy bot ≈ 1.0; losers → 0)
 #   synergy = mean over {archetype, pick, removal} of
 #             clamp01((acc - chance) / (1 - chance)) (chance floor per metric → 0)
-#   run     = clamp01((progress - GREEDY_PROGRESS) / (1 - GREEDY_PROGRESS))
-#                                                    (greedy Act-1 survival → 0)
+#   run     = clamp01((progress - greedy_floor[char]) / (1 - greedy_floor[char]))
+#                                                    (per-character greedy Act-1
+#                                                     survival → 0; MEASURED, see
+#                                                     GREEDY_PROGRESS_BY_CHAR)
 #
 # Missing dimensions (qwen3-32b non-synergy; deepseek run) stay None and BREAK the line
 # — never interpolated, never invented.
@@ -367,8 +369,61 @@ SYNERGY_CHANCE = {
     "card_pick_acc": 1.0 / 3.0,  # 3 offers, correct index rotated uniformly
     "removal_acc": 0.10,     # removal target = 1 basic among ~10-card fixture deck
 }
-# Greedy bot survives ~12.5 / 16 nodes of Act 1 → progress ≈ 0.78 is the run floor.
-GREEDY_PROGRESS = 0.78
+
+# ── Run-level greedy floor: MEASURED, per character ──────────────────────────
+#
+# The run-level normalization needs the greedy Act-1 survival floor = the
+# progress a scripted greedy bot reaches (its avg_progress → normalized 0). This
+# was once a single hard-coded 0.78 (an unreproduced session note) applied to
+# BOTH characters. It is now MEASURED empirically per character on the same seeds
+# the matrix used, by `scripts/greedy_baseline.py` (deterministic engine code,
+# zero API calls) → `results/greedy_baseline_<character>.json`. Measured
+# 2026-07-12 (bases 42/1042/2042/3042/4042, n_run=20/base): Ironclad progress
+# 0.780 ± 0.012 (the old 0.78 note held up exactly); Silent progress 0.704 ± 0.062
+# (materially lower — Silent's lower-block starter makes greedy Act 1 harsher, so
+# the shared 0.78 anchor understated the Silent run edge). See docs/decision_log
+# + docs/experiment_log (2026-07-12). The constants below are the measured means,
+# used as a documented fallback; if the greedy_baseline JSONs are present in the
+# results dir they are read instead (single source of truth).
+GREEDY_PROGRESS_BY_CHAR = {
+    "ironclad": 0.78,    # measured 0.780 ± 0.012 (12.48 ± 0.19 floors, survival 1%)
+    "silent": 0.7037,    # measured 0.704 ± 0.062 (11.26 ± 0.99 floors, survival 0%)
+}
+# Fallback when a character has no measured anchor (should not happen for the
+# two shipped characters); the Ironclad value is the conservative choice.
+GREEDY_PROGRESS_DEFAULT = 0.78
+
+# Cache of anchors actually loaded (measured JSON > constant fallback), keyed by
+# character; populated lazily by _greedy_progress_anchor.
+_GREEDY_ANCHOR_CACHE: Dict[str, float] = {}
+
+
+def load_greedy_anchors(results_dir: Path) -> Dict[str, float]:
+    """Read measured greedy run-level anchors from
+    ``results/greedy_baseline_<character>.json`` when present, falling back to the
+    documented measured constants. Returns {character: progress_floor}. Populates
+    the module cache used by the run normalizer."""
+    anchors: Dict[str, float] = dict(GREEDY_PROGRESS_BY_CHAR)
+    for char in list(anchors) + ["ironclad", "silent"]:
+        path = results_dir / f"greedy_baseline_{char}.json"
+        if path.exists():
+            try:
+                data = json.loads(path.read_text(encoding="utf-8"))
+                prog = data.get("avg_progress_mean")
+                if prog is not None:
+                    anchors[char] = float(prog)
+            except (OSError, json.JSONDecodeError, TypeError, ValueError):
+                pass  # keep the constant fallback
+    _GREEDY_ANCHOR_CACHE.clear()
+    _GREEDY_ANCHOR_CACHE.update(anchors)
+    return anchors
+
+
+def _greedy_progress_anchor(character: str) -> float:
+    """Greedy run-level progress floor for a character (measured cache > constant)."""
+    if character in _GREEDY_ANCHOR_CACHE:
+        return _GREEDY_ANCHOR_CACHE[character]
+    return GREEDY_PROGRESS_BY_CHAR.get(character, GREEDY_PROGRESS_DEFAULT)
 
 
 def _clamp01(v: float) -> float:
@@ -411,19 +466,20 @@ def _norm_synergy(syn: Optional[dict]) -> Optional[float]:
     return sum(parts) / len(parts)
 
 
-def _norm_run(run: Optional[dict]) -> Optional[float]:
+def _norm_run(run: Optional[dict], character: str = "ironclad") -> Optional[float]:
     if not run or run.get("avg_progress_mean") is None:
         return None
     prog = run["avg_progress_mean"]
-    # Greedy Act-1 survival floor → 0, full act (progress 1.0) → 1.
-    return _clamp01((prog - GREEDY_PROGRESS) / (1.0 - GREEDY_PROGRESS))
+    # Per-character greedy Act-1 survival floor → 0, full act (progress 1.0) → 1.
+    anchor = _greedy_progress_anchor(character)
+    return _clamp01((prog - anchor) / (1.0 - anchor))
 
 
 _NORMALIZERS = {
-    "turn": lambda a: _norm_turn(a.get("turn")),
-    "combat": lambda a: _norm_combat(a.get("combat")),
-    "synergy": lambda a: _norm_synergy(a.get("synergy")),
-    "run": lambda a: _norm_run(a.get("run")),
+    "turn": lambda a, c: _norm_turn(a.get("turn")),
+    "combat": lambda a, c: _norm_combat(a.get("combat")),
+    "synergy": lambda a, c: _norm_synergy(a.get("synergy")),
+    "run": lambda a, c: _norm_run(a.get("run"), c),
 }
 
 
@@ -431,9 +487,11 @@ def normalized_horizon_vector(agg: Dict[str, Any]) -> List[Optional[float]]:
     """Return [turn, combat, synergy, run] normalized to the common 0–1 axis.
 
     Each entry is None where the dimension was not evaluated (missing cell) — callers
-    must break the line there, never interpolate.
+    must break the line there, never interpolate. The run-level normalization uses
+    the per-character measured greedy floor (agg["character"]).
     """
-    return [_NORMALIZERS[h](agg) for h in HORIZONS]
+    character = agg.get("character", "ironclad")
+    return [_NORMALIZERS[h](agg, character) for h in HORIZONS]
 
 
 def _discover_aggregates(results_dir: Path, fmt: str) -> List[Tuple[str, str, dict]]:
@@ -487,6 +545,12 @@ def horizon_collapse_curve(results_dir: Path,
     except ImportError:
         print("  [warn] matplotlib not installed — skipping horizon curve.")
         return
+
+    # Load the measured per-character greedy run-level anchors (falls back to the
+    # documented constants if the greedy_baseline JSONs are absent).
+    anchors = load_greedy_anchors(results_dir)
+    print(f"  greedy run-level floor anchors: "
+          + ", ".join(f"{c}={anchors[c]:.4f}" for c in sorted(anchors)))
 
     aggs = _discover_aggregates(results_dir, fmt)
     if not aggs:

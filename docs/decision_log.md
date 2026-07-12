@@ -1,5 +1,124 @@
 # Decision Log
 
+## 2026-07-12 (P3 research decision) — Run-level discriminability: REFRAME as the shared collapse floor; hold `--acts 3` for a post-M3b appendix probe (Option C, conditional)
+
+**Problem.** Run-level (the longest horizon) does not discriminate between the current models.
+All 7–8B instruct models floor at ~12.5 floors ≈ the greedy baseline, so the right edge of every
+horizon-collapse curve converges to a single point. Backlog P3 (handoff §6) asks whether to make
+the run harder (Option A: `--acts 3` multi-act) or reframe it (Option B), or a hybrid (Option C).
+
+**Context / evidence (the numbers this decision rests on).**
+- Run-level, both characters, mean floors (structured / raw), from the 24 aggregates:
+  qwen2.5-7b IC **12.81 / 13.36**, Silent **11.85 / 10.86**; llama-3.1-8b IC 13.37 / 13.76,
+  Silent 11.42 / 11.34; mistral-7b IC 12.72 / 12.83, Silent 11.63 / 11.04. Greedy baseline
+  survives Act 1 ~1% at avg **~12.5 floors**. Every instruct model ≈ greedy → floor effect.
+- The only run-level *deviations* are the reasoning models, and they deviate DOWNWARD:
+  deepseek-r1-14b IC run **9.75 < greedy ~12.5** (over-deliberates to death). This is not
+  discrimination in the useful direction — the frontier line does not bend *up* at run, it
+  collapses *below* the floor. So even our one non-instruct data point argues that a longer
+  run would deepen collapse, not create separation.
+- By contrast the benchmark's discriminating power is empirically at the SHORT/MID horizons:
+  turn spread across the matrix 0.18→0.84, synergy archetype 0.33→0.80 (qwen3-32b Silent .80 /
+  removal .55 = matrix max, the one frontier line that bends away). Combat win and run floors
+  are near-zero variance (findings.md item 4). The curve already tells its story at turn+synergy.
+- External corroboration for the floor being real, not an artifact: Anthropic's Fable 5 STS eval
+  (claude-fable-5-mythos-5 launch post) reports reaching the final act only ~3× more often *with*
+  memory — i.e. full-run survival is a severe bottleneck even for a scaffolded frontier model.
+  Our floor is consistent with theirs; making our unscaffolded run 3× longer would widen the gap
+  to that floor, not close it.
+
+**Options considered.**
+- **A — make run harder (`--acts 3`), whole matrix.** `--acts 3` triples the floors and thus
+  roughly triples the sequential, stateful, un-batchable calls/tokens per run sample.
+  *Cost (computed from the measured anchor: 1-act run-level n=20×5 seeds ≈ 4h per
+  model×format×character at ~82 tok/s, experiment_log.md L211):* ~3× ⇒ **~12h per
+  (model × format × character)** cell. A full core re-run (3 instruct families × 2 characters ×
+  2 formats = 12 cells) = **~144 GPU-hours** of purely sequential single-A100 time; even a
+  minimal IC-only probe (3 families × 1 character × 2 formats = 6 cells) = **~72 GPU-hours**.
+  On top of the wall-clock, `--acts 3` carries **unaudited-code risk**: Act-2/3 multi-act paths
+  (`_act_transition`, boss-relic picks, cross-act HP/deck carry) were built in M2.5 but never
+  exercised at paper scale — per handoff §5.2 an unexercised path feeding a headline number
+  needs an engine audit + smoke first, adding an audit pass + smoke-test to the cost before any
+  paper-grade run. Cluster access is semester-bound (§7), so ~72–144 sequential GPU-hours is a
+  material fraction of a scarce, expiring budget.
+- **B — reframe as the shared collapse floor.** Keep run-level single-act; report it honestly as
+  the convergence floor where model differences wash out (avg_floors/progress, "on par with
+  greedy, NOT beating," never survival_rate alone — §5.4). The interesting separation is stated
+  to land at synergy. Zero new compute, zero new code-path risk.
+- **C — hybrid: reframe now, probe one model with `--acts 3` as a validation/appendix.** Adopt B
+  for the current paper; run a single `--acts 3` cell as an appendix probe to show whether a
+  longer run separates or just deepens collapse.
+
+**Chosen option: B now, with C's probe DEFERRED and made conditional on M3b (a scoped hybrid).**
+For the current paper we reframe run-level as the shared collapse floor (Option B). We do **not**
+spend GPU-hours on `--acts 3` now. We register a **conditional appendix probe** (the C variant):
+run exactly **one** `--acts 3` cell — but only AFTER the M3b frontier runs land and only if they
+still floor at 1 act. If a frontier model floors at 1 act, a single 3-act probe on that model is
+the cheapest possible test of "does a longer horizon separate frontier from small models, or just
+kill everyone deeper?" — and it is an appendix data point, not a matrix commitment.
+
+**Why (3-sentence version).** Run-level's convergence is a *finding*, not a defect — inter-model
+variance is large at turn/synergy and vanishes at survival, which is precisely the multi-horizon
+thesis, and both our own downward-only reasoning-model deviation and Anthropic's Fable 5 memory
+result say a longer run would deepen the shared floor rather than create separation. Option A costs
+~72–144 sequential GPU-hours plus a mandatory Act-2/3 engine audit, against a semester-bound
+cluster budget, to (most likely) confirm a deeper floor — poor information-per-GPU-hour by the
+cheapest-first doctrine (§5.3). M3b may hand us run-level separation with 1 act for free (a frontier
+model whose line bends up), which would make Option A pointless; if M3b *also* floors, that only
+strengthens B — so the correct move is to reframe now and let the frontier data decide whether the
+one-cell probe is even worth running.
+
+**Trade-offs / what we give up.**
+- We accept that the horizon-collapse figure's right edge (run) is a convergence point, not a
+  spread. This is a weaker "leaderboard" story at run but a stronger *thesis* story (the collapse
+  is the point). The figure caption must render it honestly (see impact below).
+- We forgo, for now, any chance that `--acts 3` reveals separation among the *small* models. The
+  data makes this unlikely (they already ≈ greedy at 1 act and the one reasoning deviation is
+  downward), so the expected information is low — but it is a real, acknowledged gap.
+- A reviewer could ask "why not just make it harder?" We answer with the cost + the downward-only
+  deviation + the Fable-5 corroboration; the conditional probe is our concrete good-faith answer.
+
+**Known limitations.**
+- The ~72–144h estimate is a throughput-scaled extrapolation from a 1-act anchor (~82 tok/s,
+  n=20×5); actual 3-act cost could differ if per-call context grows super-linearly across acts
+  (longer decks/relic lists → longer prompts) — likely making A *more* expensive, not less.
+- "Separation lives at synergy" leans on qwen3-32b being synergy-only; the frontier turn/combat
+  points are not yet filled (accepted coverage gap, 2026-06-22 entry). If M3b frontier models
+  turn out to separate at combat or run too, the "run = pure floor" framing may need softening.
+
+**Expected failure modes.**
+- If B is written as spin rather than a finding, it fails §5.4. Guard: the figure and text must
+  show the convergence explicitly (all lines meeting at run), report avg_floors/progress with the
+  greedy floor drawn, and never resurrect the invalid pre-fix 13.4-floors/20–40% numbers.
+- If the deferred `--acts 3` probe is ever run without an Act-2/3 engine audit + smoke first, its
+  number is untrustworthy (§5.2/§5.3) — the audit is a hard precondition, not optional.
+
+**How / when to revisit (explicit trigger).** **Revisit when the M3b frontier (Claude/GPT) run-level
+results land (backlog P4).** Decision rule at that point: (i) if a frontier model separates at
+run-level with 1 act (line bends *up*, floors > greedy), Option A is unnecessary — keep B, done.
+(ii) If frontier models *also* floor at 1 act, B is confirmed and strengthened; THEN run the single
+conditional `--acts 3` appendix probe (on the best frontier model, IC, one format — ~12h + a
+prior Act-2/3 audit) purely to report whether a longer horizon separates or deepens collapse.
+Either branch is a small, well-scoped follow-up, not a matrix re-run.
+
+**Confidence: high** that reframing (B) is correct for the current paper; **medium** on whether the
+conditional `--acts 3` probe will ever be worth running (depends entirely on the M3b outcome).
+
+**Impact on the rest of the project.**
+- **Horizon-collapse figure caption (P1 done / P6):** state the right edge as an intended
+  convergence — "all models collapse to the greedy floor at the run horizon; discrimination lives
+  at turn+synergy." Do not present run as a leaderboard axis. (Consistent with the P1 combat-baseline
+  note already in the 2026-07-12 P1 decision.)
+- **Paper claims (P6):** Claim 1 (multi-horizon decomposition) is *strengthened* — the collapse
+  floor is evidence the horizons differ in discriminating power. Add the honesty framing from §5.4
+  and the Fable-5 corroboration (P2 lit note) as external support for run being a genuine bottleneck.
+- **Backlog:** P3 closes as "reframe (B); conditional `--acts 3` probe deferred to after P4." P4
+  (M3b) gains an explicit sub-task: on landing, evaluate the revisit rule above. P6 paper assembly
+  inherits the caption + claim guidance. Roadmap M3a step 6 (`--acts 3` "optional breadth ablation")
+  should be re-tagged from "optional" to "conditional appendix probe, gated on M3b + an Act-2/3
+  engine audit" — flagged for a follow-up edit, not edited here (draft.md is being edited
+  concurrently; roadmap edit deferred to avoid a collision, see report).
+
 ## 2026-06-22 (model matrix) — qwen3-32b REVIVED + reasoning-distill family added; coverage gaps accepted
 **Decision:** The full benchmark matrix now spans **5 model families** (qwen2.5-7b, llama-3.1-8b,
 mistral-7b, qwen3-32b, deepseek-r1-distill-14b/7b). **qwen3-32b is un-dropped:** the reason it
@@ -199,3 +318,30 @@ omitted.
 **Degenerate-input check (§5.2 / deliverable 4):** a model sitting exactly at each dimension's non-planning baseline maps to y = 0 on every horizon → a flat line along the floor. Confirmed by the formulas: turn damage_ratio 0 → 0; a combat model that only matches greedy-with-no-wins (win 0) → 0, and one that exactly ties the bot's *winning* baseline is by construction ≈1 (the bot is a planner, not a null model — the true "floor" for combat is losing, which → 0); synergy at chance → 0; run at greedy progress 0.78 → 0. The greedy baselines therefore map to the floor line as required. Empirically the closest-to-floor observed runs (mistral IC run 0.068; several Silent runs 0.000; raw qwen2.5 IC synergy 0.000) confirm the floor is reachable and rendered at y≈0.
 
 **When M3b frontier results arrive:** drop the new aggregate JSONs into `results/` (same `*_seeds…json` naming, with `character`/`prompt_format` keys) and re-run `python slay_bench/visualize.py --horizon-curve`; `_discover_aggregates` picks them up automatically and `_MODEL_COLORS` extends by index. Expect the frontier line to sit high across turn/synergy and bend away from the small-model pack at synergy (and possibly hold combat without the deepseek-style crash) — that is the separation the curve was built to show. If a frontier model also survives run above greedy, revisit the run floor constant (0.78) so the right edge stops being a shared 0.
+
+### Addendum 2026-07-12 — run-level anchor is now MEASURED and PER-CHARACTER (was hard-coded 0.78 for both)
+**What changed & why.** Review flagged a traceability gap: the run normalization above used `GREEDY_PROGRESS = 0.78` from an *unreproduced* session note, applied identically to both characters despite Silent's documented harsher greedy Act 1. Fixed: `scripts/greedy_baseline.py` (new, committed) measures the greedy floor empirically — FREE, deterministic engine code, zero API calls — by reusing `RunEvaluator` with only the LLM decision hooks overridden by the greedy policy (identical run protocol, same run-dimension seeds `range(base+300, base+300+20)` for bases 42/1042/2042/3042/4042, `n_run=20`, same per-base-then-across-base aggregation as the matrix). Full config + validity/determinism checks in experiment_log 2026-07-12.
+
+**Measured anchors** (replace the single 0.78): **Ironclad progress 0.780 ± 0.012** (12.48 floors, survival 1% — the old note held up exactly), **Silent progress 0.7037 ± 0.062** (11.26 floors, survival 0% — materially lower). `visualize.py` now: `GREEDY_PROGRESS_BY_CHAR = {ironclad: 0.78, silent: 0.7037}` as documented fallback constants, but `load_greedy_anchors()` reads `results/greedy_baseline_<char>.json` when present (single source of truth); `_norm_run` and `normalized_horizon_vector` are now character-aware (`run = clamp01((progress − greedy_floor[char])/(1 − greedy_floor[char]))`). Both PNGs regenerated.
+
+**Before → after normalized run value, per model per character** (Ironclad anchor unchanged → Ironclad column unchanged; only Silent moves):
+
+| Char | Fmt | Model | progress | run (old, 0.78) | run (new) |
+|---|---|---|---|---|---|
+| Ironclad | struct | qwen2.5-7b | 0.801 | 0.094 | 0.094 |
+| Ironclad | struct | llama-3.1-8b | 0.836 | 0.253 | 0.253 |
+| Ironclad | struct | mistral-7b | 0.795 | 0.068 | 0.068 |
+| Ironclad | struct | deepseek-14b | 0.609 | 0.000 | 0.000 |
+| Ironclad | raw | qwen2.5-7b | 0.835 | 0.250 | 0.250 |
+| Ironclad | raw | llama-3.1-8b | 0.860 | 0.364 | 0.364 |
+| Ironclad | raw | mistral-7b | 0.802 | 0.100 | 0.100 |
+| **Silent** | struct | qwen2.5-7b | 0.741 | 0.000 | **0.125** |
+| **Silent** | struct | mistral-7b | 0.727 | 0.000 | **0.078** |
+| **Silent** | struct | llama-3.1-8b | 0.714 | 0.000 | **0.034** |
+| **Silent** | raw | llama-3.1-8b | 0.709 | 0.000 | **0.017** |
+| Silent | raw | mistral-7b | 0.690 | 0.000 | 0.000 (progress < 0.704 floor) |
+| Silent | raw | qwen2.5-7b | 0.679 | 0.000 | 0.000 (progress < 0.704 floor) |
+
+**Did any qualitative conclusion change?** The Silent run edge was **NOT purely an anchor artifact — it was partly artifact, partly real.** Anchored to Silent's own greedy floor, the Silent-**structured** edge lifts off zero (qwen2.5-7b 0.125, mistral 0.078, llama 0.034) instead of the flat wall it showed under the Ironclad-derived 0.78. But Silent-**raw** mistral/qwen stay at 0 because their progress (0.690/0.679) is genuinely at/below the Silent greedy floor (0.704) — those are real floorings, not anchoring. So: the right edge no longer fully converges to a single 0 on the Silent panel; the "shared collapse floor / on par with greedy, never beating" framing (§5.4) still holds — the lifts are small (≤0.13) and several cells remain at the floor. Caveat (a) above is refined: the run edge converges *near* the floor, exactly-0 only where a model genuinely under-performs greedy. Ironclad panel is unchanged.
+
+**Provenance/validity.** Measured on the same engine the matrix ran on (`git log -- slay_bench/`: last engine change `15d4ffb` 2026-06-12 predates the 2026-06-22 matrix; only later `slay_bench/` commit added `visualize.py`). Determinism verified (repeat run byte-identical). 134/134 tests pass (added `test_greedy_baseline_determinism`).

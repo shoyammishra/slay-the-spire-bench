@@ -178,3 +178,4 @@ The single most important step is valid run-level data + n ≥ 20 + reasoning mo
 - UrzaGPT (MTG card selection) — https://arxiv.org/html/2508.08382v1
 - Rule Synergy Analysis using LLMs — https://arxiv.org/pdf/2508.19484
 - PLANET (planning benchmark collection) — https://arxiv.org/pdf/2504.14773
+- Anthropic (2026), Claude Fable 5 / Mythos 5 launch post — uses Slay the Spire as a long-horizon planning testbed (domain validation); reports reaching the final act ~3× more often with memory (corroborates our run-level floor effect) — https://www.anthropic.com/news/claude-fable-5-mythos-5

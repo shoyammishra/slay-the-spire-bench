@@ -243,8 +243,12 @@ logic is identical. For M3b it is credits again, so the order matters even more.
 5. **Reasoning model (qwen3-32b / R1-distill)** — repeat steps 2–4 on the GPU. Watch
    max_tokens (think blocks) and tok/s; this model dominates wall-clock, so run it
    after the protocol is proven on the small models.
-6. **Optional breadth ablations:** `--acts 3` multi-act run-level; `--llm-routing`
-   (decision-scope ablation); Silent run-level.
+6. **Optional breadth ablations:** `--llm-routing` (decision-scope ablation); Silent
+   run-level. ⚠️ `--acts 3` multi-act run-level RE-TAGGED 2026-07-12 (decision_log P3
+   entry): now a **conditional appendix probe** — run only if M3b frontier models ALSO
+   floor at 1 act, and only after an Act-2/3 engine audit + smoke (multi-act paths never
+   exercised at paper scale). Run-level is reframed as the shared collapse floor for the
+   current paper; do not spend GPU-hours on `--acts 3` before the M3b gate fires.
 7. **Fold M3a numbers** (mean±std) into findings.md → report.md/report.html → draft.md.
    **These tables define the locked protocol for M3b.**
 8. **M3b — Claude/GPT via the professor's access:** repeat steps 2–4 verbatim (same
