@@ -1,5 +1,49 @@
 # Experiment Log
 
+## 2026-07-13 (CLUSTER, gpu-3day) — PARSE PROBE: truncation-vs-malformed ANSWERED — budget-bound deliberation (ratio = 1.0 in all four cells)
+
+**Why:** decide whether the DeepSeek distills' JSON parse failures are token-budget truncation
+mid-`<think>` ("budget-bound deliberation") or malformed output ("output-discipline failure") —
+unanswerable from pre-instrumentation data (decision_log 2026-07-12 diagnostics entry).
+
+**Config.** `cluster/parse_probe.sbatch` (commit `1e8cd77`+), post-instrumentation harness,
+`--run-tag parse_probe` → **diagnostic cells, NEVER foldable into the matrix tables.** Turn
+n=20 + combat n=3, **seed 42 only**, max_tokens 8000. Four cells: deepseek-r1-distill-**7b
+Ironclad** (both formats) + deepseek-r1-distill-**14b Silent** (both formats). Submitted
+2026-07-12 late IST per the contention SOP (`--qos=test-gpu --nodelist=<idle node>`); ~54 min
+wall per 7b cell, ~1h44m per 14b cell. Artifacts:
+`results/deepseek-r1-distill-{7b,14b_silent}_{structured,raw}_seed42_parse_probe.{json,txt,png}`.
+
+| Cell | Turn parse_fail (of 20) | …truncated | Combat json_parse_err | trunc_err | illegal_act_err | win / hp |
+|---|---|---|---|---|---|---|
+| 7b IC structured | 10 | **10 (100%)** | 5.67 | **5.67** | 1.67 | .33 / .30 |
+| 7b IC raw | 7 | **7 (100%)** | 6.33 | **6.33** | 2.33 | .00 / .00 |
+| 14b Silent structured | 1 | **1 (100%)** | 2.33 | **2.33** | 0.33 | 1.00 / .50 |
+| 14b Silent raw | 5 | **5 (100%)** | 3.00 | **3.00** | 1.00 | .33 / .21 |
+
+**Verdict: `parse_fail_truncated / parse_fail_n` = 1.0 in ALL four cells, at BOTH horizons**
+(combat `truncation_errors == json_parse_errors` exactly). Zero malformed-but-complete
+completions anywhere. Per the registered decision rule ⇒ report DeepSeek parse failures as
+**"budget-bound deliberation"**: the model spends the entire 8000-token budget inside `<think>`
+and never emits the answer. Not a formatting/output-discipline failure.
+
+**Secondary observations.**
+- **Counter-split arithmetic verified**: `parse_errors == json_parse_errors +
+  illegal_action_errors` exactly in every cell (e.g. 7b raw 8.67 = 6.33 + 2.33). The matrix's
+  conflated metric decomposes ≈70–75% truncation + 25–30% valid-JSON-but-illegal — keep citing
+  it as **"invalid-action errors."**
+- **Probe replicates the matrix** (instrumentation moved nothing): 7b combat win .33/.00 and
+  parse_errors 7.3–8.7 ≈ matrix ~8; 14b Silent raw win .33 / hp .21 ≈ the matrix's worst cell
+  (.34 / .21).
+- **7b structured is WORSE than raw on turn parse** (10 vs 7 truncations; dmg .43 vs .56) —
+  consistent with the matrix's structured turn parse_ok floor (.38): the structured prompt
+  provokes longer deliberation in the 7b.
+- Saved JSONs carry summary counters only (per-sample finish_reason/raw_len records were not
+  persisted in the output file) — sufficient for the verdict; raw truncated completions are gone.
+
+**Caveats (travel with any citation):** seed 42 only, combat n=3, four cells; diagnostic
+(post-instrumentation) harness run under `--run-tag parse_probe`.
+
 ## 2026-07-12 (LOCAL, no API) — GREEDY RUN-LEVEL BASELINE MEASURED (per character; replaces the unreproduced 0.78 anchor)
 
 **Why:** the horizon-collapse curve normalized run-level against a hard-coded

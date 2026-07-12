@@ -54,6 +54,23 @@ where another user's `pose` job pinned both A100s at ~66 GiB/100% util. **Steer 
 (`sinfo -p gpu-3day -N -o "%n %t"` → `--nodelist=<idle>`). The hardened pre-flight check confirmed
 it caught this correctly (failed fast, did NOT kill the stranger's process — only `$USER` strays).
 
+### Addendum 2026-07-13 — PROBE RESULT: budget-bound deliberation (`ratio = 1.0` in all four cells)
+The probe ran clean (four cells: deepseek-7b IC + deepseek-14b Silent, both formats; turn n=20 +
+combat n=3, seed 42). **`parse_fail_truncated/parse_fail_n` = 1.0 everywhere** (7b: 10/10
+structured, 7/7 raw; 14b Silent: 1/1, 5/5) and combat `truncation_errors == json_parse_errors`
+exactly in every cell — zero malformed-but-complete completions. Per the registered decision rule
+above ⇒ **DeepSeek parse failures are reported as "budget-bound deliberation."** The counter-split
+arithmetic was verified in the field (`parse_errors == json + illegal` in all cells) and the probe
+replicated the matrix numbers (7b win .33/.00; 14b Silent raw win .33/hp .21 ≈ matrix .34/.21),
+confirming the instrumentation was additive in practice, not just by construction. The reporting
+rule stands: matrix combat metric = "invalid-action errors"; probe cells stay out of matrix
+tables. Folded into `experiment_log.md` (2026-07-13), `findings.md` (probe section + finding 2
+supersession), `draft.md` (results skeleton finding 3 + §5.4 limitations), `report_matrix.html`
+(metric rename + one-line mechanism note). One instrumentation gap noted for any future probe:
+the per-sample `fail_finish_reason`/`fail_raw_len` records are computed but not persisted in the
+output JSON — only the summary counters survive; sufficient here, but raw truncated completions
+are unrecoverable.
+
 ## 2026-07-12 (P3 research decision) — Run-level discriminability: REFRAME as the shared collapse floor; hold `--acts 3` for a post-M3b appendix probe (Option C, conditional)
 
 **Problem.** Run-level (the longest horizon) does not discriminate between the current models.

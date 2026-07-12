@@ -28,8 +28,10 @@ skipped run-level cells.
    hp_ratio drops to 0.21–0.75 (everyone else ≈1.0), and its Ironclad run-level floors crash to
    **9.75 — below the greedy ~12.5 floor**: it over-deliberates into death.
    deepseek-r1-distill-**7b** collapses in **every one of the four combos** (turn 0.26–0.43,
-   combat win 0.14–0.28, hp_ratio 0.05–0.15, **parse_errors ~8/combat**; turn parse_ok as low
-   as 0.38) — the small distill cannot hold the terse-JSON contract under reasoning load.
+   combat win 0.14–0.28, hp_ratio 0.05–0.15, **~8 invalid-action errors/combat**; turn parse_ok
+   as low as 0.38) — ⚠️ mechanism identified 2026-07-13 (parse-probe section below): NOT a
+   failure to hold the terse-JSON contract, but **budget-bound deliberation** — 100% of its true
+   JSON failures are token-budget truncations mid-`<think>`.
    **New anomaly from the gap-fill:** 7b's synergy **removal acc stays high (.41–.54; IC
    structured .54 is 2nd in the whole matrix, behind only qwen3-32b's .55)** while everything
    execution-shaped collapses around it — the single-shot judgment call survives when multi-step
@@ -66,6 +68,30 @@ skipped run-level cells.
    Poison/Shiv/Block/Discard labels read more literally off card text than Ironclad's
    abstractions. mistral is the exception (≈ flat .33/.34), consistent with it being the weakest
    reasoner overall.
+
+## 🔬 Parse-probe verdict (2026-07-13): DeepSeek parse failures are BUDGET-BOUND DELIBERATION, not output-discipline failure
+
+Diagnostic probe (`cluster/parse_probe.sbatch`, `--run-tag parse_probe` — **diagnostic cells,
+never folded into matrix tables**; turn n=20 + combat n=3, **seed 42 only**, max_tokens 8000).
+Four cells: deepseek-7b Ironclad + deepseek-14b Silent, both formats. Full table:
+`docs/experiment_log.md` 2026-07-13 entry.
+
+**The decisive number: `parse_fail_truncated / parse_fail_n` = 1.0 in every cell, at both
+horizons.** 7b IC: 10/10 structured, 7/7 raw; 14b Silent: 1/1 structured, 5/5 raw; combat
+`truncation_errors == json_parse_errors` exactly everywhere. Zero malformed-but-complete
+outputs. Every single true JSON failure = the model hit the 8000-token budget inside `<think>`
+and never emitted the answer. **Paper framing: "budget-bound deliberation"** — the DeepSeek
+collapse is a deliberation-*length* property, not a formatting one. This sharpens finding 2
+above: the distills don't *break* the JSON contract, they never *reach* it.
+
+Corollaries: (a) the matrix's conflated combat counter decomposes ≈70–75% truncation +
+25–30% valid-JSON-but-illegal actions — keep citing it as **"invalid-action errors"**
+(reporting rule, decision_log 2026-07-12); (b) the probe replicates the matrix numbers
+(7b win .33/.00, ~7–9 errors/combat; 14b Silent raw win .33 / hp .21 ≈ the matrix's worst
+cell .34/.21) — the instrumentation decomposed the counts without moving them; (c) 7b
+**structured is worse than raw on turn parse** (10 vs 7 truncations) — the structured prompt
+provokes *longer* deliberation in the small distill, consistent with its .38 parse_ok floor.
+Caveats travel with the number: single seed, combat n=3, post-instrumentation harness.
 
 ## ✅ Paper-grade Qwen2.5-7B, 4 dimensions, 5 seeds (2026-06-13) — CURRENT valid data
 

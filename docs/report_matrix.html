@@ -282,7 +282,7 @@ Silent 11.26). "—" = intentionally uncollected cell (see §6). Green = matrix-
   yet the only mid-size model that <i>loses</i> combats (down to win 0.34, hp 0.21 on Silent-raw) and the
   only model to fall <b>below</b> the greedy run floor (9.8 vs 12.48 floors): its verbose deliberation
   literally over-thinks itself to death as the horizon lengthens. Its 7B sibling collapses at every
-  execution horizon (combat win 0.14–0.28, ~8 parse errors per combat) — yet its single-shot removal
+  execution horizon (combat win 0.14–0.28, ~8 invalid-action errors per combat; a follow-up instrumented probe attributes 100% of the true JSON-failure share to token-budget truncation mid-reasoning — budget-bound deliberation, not a formatting failure) — yet its single-shot removal
   <i>judgment</i> survives (0.42–0.54, second-best in the matrix). And qwen3-32b, the one larger reasoning
   model, posts the matrix maxima exactly where the others plateau: synergy (archetype 0.80, removal 0.55,
   Silent). Together: <b>"reasoning model" is not a monolith — scale and output discipline decide whether
