@@ -191,25 +191,32 @@ fixtures classify confidently as labeled; no string-matching near-misses in remo
 wrong answers are genuinely wrong cards, mostly "Defend"); Ironclad turn-level oracle values
 are unaffected by the cap bug (5-card opening hand → byte-identical before/after the rewrite).
 
-## ⭐ Mechanic-defined archetypes are a cross-character blind spot (n=20 de-biased, 2026-06-10)
+## ⭐ Mechanic-defined archetypes are a cross-character blind spot (RECOMPUTED on the full matrix 2026-07-12; original 2026-06-10)
 
-The strongest synergy signal, confirmed across BOTH characters at n=20 on a **de-biased
-instrument** (see synergy-instrument fix below): models fail to identify the one archetype
-defined by a *payoff mechanic* rather than a surface card-name pattern. Pooled per-archetype
-archetype-ID accuracy over all 8 model×format×character combos:
+**2026-07-12 update — numbers below recomputed from the CURRENT matrix** (all 120 per-seed
+result files = 6 model configs × 2 characters × 2 formats × 5 seeds, 2,400 synergy samples;
+one-off pool over each sample's `expert_archetype`/`archetype_correct`, `None` excluded).
+The original 2026-06-10 pooled table (Aggro 95 / Poison 95 / Shiv 90 / Block 85 / Strength 40 /
+Exhaust 5 / Discard 5) was computed on the Groq llama+scout era whose result files were later
+deleted (2026-06-14) — do not cite it. The qualitative shape SURVIVES on current data; the
+magnitudes changed (current models are weaker on Aggro/Shiv):
 
-| Archetype | Acc | | Archetype | Acc |
+| Archetype | Acc (matrix) | | Archetype | Acc (matrix) |
 |---|---|---|---|---|
-| Aggro (IC)  | 95% | | Strength (IC) | 40% |
-| Poison (Si) | 95% | | **Exhaust (IC)** | **5%** |
-| Shiv (Si)   | 90% | | **Discard (Si)** | **5%** |
-| Block (both)| 85% | | | |
+| Block (both) | 0.81 (464/573) | | Shiv (Si) | 0.44 (126/288) |
+| Poison (Si)  | 0.81 (233/288) | | Strength (IC) | 0.31 (91/291) |
+| Aggro (IC)   | 0.60 (175/291) | | **Discard (Si)** | **0.14 (42/295)** |
+| | | | **Exhaust (IC)** | **0.017 (5/288)** |
 
-- **Ironclad Exhaust → 1/20 (5%)** (labeled "Aggro", sometimes "Strength") even with
-  Corruption / Feel No Pain / Dark Embrace / Fiend Fire signatures present.
-- **Silent Discard → 1/20 (5%)** (always "Block" or "Shiv"). Same shape, one character over.
-- Surface-readable archetypes (Aggro/Poison/Shiv/Block) all 85–95%. Strength (40%) is the
-  intermediate case — frequently "Aggro" because Strength decks are Strike-heavy.
+Both blind-spot archetypes score **below the 0.25 four-way chance floor** → systematic
+mislabeling, not guessing. Card-pick on those same Exhaust+Discard decks: **0.43 (252/583)
+vs 0.33 chance** — the name-vs-play dissociation holds on current data.
+
+*(Historical 2026-06-10-era detail — deleted Groq data, superseded by the matrix table above;
+kept for the qualitative failure modes, which still hold: Exhaust decks get labeled
+"Aggro"/"Strength" even with Corruption / Feel No Pain / Dark Embrace / Fiend Fire present;
+Discard decks get labeled "Block"/"Shiv"; Strength is frequently "Aggro" because Strength
+decks are Strike-heavy.)*
 
 **Why it matters for the paper:** a clean, mechanistic, reproducible failure mode that the
 multi-horizon decomposition isolates — the model picks good cards locally (dissociation below)
@@ -217,14 +224,14 @@ but cannot name the *strategy* when the strategy is a payoff loop rather than a 
 characters give it cross-domain support within one engine, and the two blind-spot archetypes
 are the structurally analogous ones (exhaust-payoff ↔ discard-payoff).
 
-**Name-vs-play dissociation is REAL, not an artifact.** Card-pick held at 0.65–0.75 after the
-instrument was de-biased (a model that always answered offer-index-0 would now score ~0.33).
-So models judge local card quality well even on decks they cannot label. (Lone weak spot:
-Silent llama structured 0.35 — genuine, not the old positional bias.)
+**Name-vs-play dissociation is REAL, not an artifact.** Current-matrix numbers: card-pick on
+the blind-spot (Exhaust+Discard) decks is 0.43 vs the 0.33 rotated-offer chance floor, while
+archetype-ID on the same decks is 0.02–0.14. Models judge local card quality above chance even
+on decks they systematically mislabel. *(Historical 2026-06-10-era version of this paragraph
+cited 0.65–0.75 card-pick and scout-17b removal 0.60 — deleted Groq data, do not cite.)*
 
-**Secondary (n=20):** Silent archetype-ID ≥ Ironclad (0.60–0.80 vs 0.40–0.70), plausibly
-because Silent labels read literally off the cards. scout-17b Silent structured removal 0.60
-is the standout; removal near-floor (0.05–0.25) everywhere else. Full table: docs/experiment_log.md.
+**Secondary:** Silent archetype-ID ≥ Ironclad holds in the matrix (see the 5-model section at
+the top of this file). Full tables: docs/experiment_log.md.
 
 ## ⛔ Existing run-level numbers are INVALID — do not report (2026-06-07)
 
