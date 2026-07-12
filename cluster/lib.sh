@@ -45,8 +45,36 @@ start_vllm() {
   # Free a stale holder of the port (leftover vLLM from a prior job on this node)
   # so our server can actually bind it instead of dying with [Errno 98].
   fuser -k "${VLLM_PORT}/tcp" 2>/dev/null && sleep 2
+  # Guard against a GPU that is NOT actually free — a previous job on this node
+  # may have leaked vLLM worker processes that still pin tens of GiB of VRAM
+  # (vLLM 0.6.6 spawns CUDA child workers that a bare `kill $launcher_pid` does
+  # NOT reap; a scancel/OOM/node-reboot leaves them holding memory). Starting on
+  # top of them dies with "CUDA out of memory" even for a 7B model. Reap our own
+  # strays here and fail fast with a clear message if the GPU is still occupied.
+  if command -v nvidia-smi >/dev/null 2>&1; then
+    local free_mib
+    free_mib=$(nvidia-smi --query-gpu=memory.free --format=csv,noheader,nounits 2>/dev/null | head -1 | tr -d ' ')
+    if [ -n "${free_mib}" ] && [ "${free_mib}" -lt 20000 ]; then
+      echo "[lib] WARNING: only ${free_mib} MiB GPU free at startup — reaping stray vLLM workers owned by ${USER}..."
+      pkill -9 -u "${USER}" -f 'vllm|spawn_main|VllmWorker' 2>/dev/null
+      sleep 5
+      free_mib=$(nvidia-smi --query-gpu=memory.free --format=csv,noheader,nounits 2>/dev/null | head -1 | tr -d ' ')
+      if [ -n "${free_mib}" ] && [ "${free_mib}" -lt 20000 ]; then
+        echo "[lib] ERROR: GPU still only ${free_mib} MiB free after reaping our strays."
+        echo "[lib] Another user (or an unkillable process) is holding this GPU. Current usage:"
+        nvidia-smi
+        echo "[lib] Cancel + resubmit so Slurm places this job on an idle GPU node"
+        echo "[lib]   (sinfo -p ${SLURM_JOB_PARTITION:-gpu-1day} -o '%n %G %t' to find one with t=idle)."
+        exit 1
+      fi
+      echo "[lib] GPU now ${free_mib} MiB free after reaping — proceeding."
+    fi
+  fi
   echo "[lib] serving ${HF_REPO} as '${SERVED_NAME}' on :${VLLM_PORT} (tensor-parallel=${TP_SIZE})"
-  vllm serve "${HF_REPO}" \
+  # setsid: run vLLM as its OWN process-group leader so stop_vllm can signal the
+  # whole group (launcher + CUDA worker children) with `kill -- -$VLLM_PID`.
+  # Without this the workers survive and leak GPU memory into the next job.
+  setsid vllm serve "${HF_REPO}" \
       --served-model-name "${SERVED_NAME}" \
       --port "${VLLM_PORT}" \
       --tensor-parallel-size "${TP_SIZE}" \
@@ -91,7 +119,13 @@ wait_for_vllm() {
 stop_vllm() {
   if [ -n "${VLLM_PID}" ] && kill -0 "${VLLM_PID}" 2>/dev/null; then
     echo "[lib] stopping vLLM (pid=${VLLM_PID})"
-    kill "${VLLM_PID}" 2>/dev/null
+    # Kill the whole process GROUP, not just the launcher: vLLM 0.6.6 spawns CUDA
+    # worker children that a bare `kill $launcher` leaves behind pinning VRAM
+    # (the leak that lands the NEXT job in CUDA-OOM). Negative PID = the group.
+    kill -TERM "-${VLLM_PID}" 2>/dev/null || kill -TERM "${VLLM_PID}" 2>/dev/null
+    sleep 3
+    # Belt-and-braces: reap any of our vLLM workers still alive after SIGTERM.
+    pkill -9 -u "${USER}" -f 'vllm|spawn_main|VllmWorker' 2>/dev/null
     wait "${VLLM_PID}" 2>/dev/null
   fi
 }
