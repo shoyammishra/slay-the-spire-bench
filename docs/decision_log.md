@@ -1,5 +1,40 @@
 # Decision Log
 
+## 2026-07-13 — M3b frontier-run token-budget protocol: matched-8k first, escalate only on measured truncation
+
+**Problem.** The parse probe established that the DeepSeek distills' collapse is *budget-bound
+deliberation* (100% of JSON failures = truncation at max_tokens=8000 mid-`<think>`). Frontier
+reasoning models (Claude/GPT, backlog P4/M3b) could in principle hit the same wall — in which
+case M3b would measure budget compliance, not the raw planning ability the frontier-bend claim
+needs. Conversely, simply raising the frontier budget breaks budget-matching against the 8k
+small-model matrix.
+
+**Decision (registered before any M3b spend).**
+1. **Smoke test reads the truncation diagnostics first.** Every M3b smoke MUST check
+   `turn.parse_fail_truncated`/`parse_fail_n` and `combat.avg_truncation_errors` (instrumented
+   2026-07-12) before sizing full cells. No full cell launches on an unverified budget.
+2. **Matched budget is the default condition:** run frontier models at the same effective
+   8k completion budget as the matrix. If smoke truncation ≈ 0 (expected — frontier reasoning
+   models terminate deliberation; the distills' pathology is that they can't), the cells are
+   directly budget-comparable and no protocol fork is needed.
+3. **Escalation is conditional and additive:** only if smoke truncation > 0, add a
+   raised-budget condition and report BOTH — "planning ability at adequate budget" and
+   "budget discipline at matched budget" as separate numbers, never blended. Under matched
+   budget, truncation is a real result (budget-bound deliberation is an established failure
+   mode, per the probe), but it does not answer the frontier-bend question — the raised
+   condition does.
+4. **Provider-class note:** reasoning APIs decouple the budgets — Claude extended thinking
+   takes a separate thinking budget with answer tokens on top; OpenAI reasoning models count
+   reasoning inside `max_completion_tokens`. "Matched 8k" must be defined per provider when
+   the class is written (document the mapping in the provider code + experiment_log), since
+   an exact token-for-token match across APIs with hidden/billed-separately reasoning tokens
+   is not possible — match the *answer-generation* ceiling and disclose the thinking budget.
+
+**Trade-offs.** Matched-first costs one smoke round before full cells (cheap); the alternative
+(raise budgets preemptively) would silently forfeit budget comparability and invite a reviewer
+question we can't answer. **Revisit trigger:** if BOTH conditions in (3) are needed for any
+model, the paper's §5.4 must state which condition each headline number comes from.
+
 ## 2026-07-12 — Parse-failure diagnostics: instrument truncation-vs-malformed + additively split the conflated combat `parse_errors` counter
 
 **Problem.** Two related instrument gaps found while answering "are the DeepSeek `<think>` parse
@@ -69,7 +104,34 @@ supersession), `draft.md` (results skeleton finding 3 + §5.4 limitations), `rep
 (metric rename + one-line mechanism note). One instrumentation gap noted for any future probe:
 the per-sample `fail_finish_reason`/`fail_raw_len` records are computed but not persisted in the
 output JSON — only the summary counters survive; sufficient here, but raw truncated completions
-are unrecoverable.
+are unrecoverable. *(⚠️ Superseded same day — gap CLOSED, see the next addendum.)*
+
+### Addendum 2026-07-13 (later) — GAP CLOSED: per-sample diagnostics now persisted (additive)
+The persistence gap above is fixed. `BenchmarkResult.summary()` now writes per-sample records
+into the result JSON, following the synergy `samples` pattern:
+- **`turn.samples[]`** — one record per turn sample: `seed` (the sample's generation seed, new
+  `TurnScore.sample_seed`), `parse_ok`, `legal`, `damage_ratio`, `llm_sequence`,
+  `optimal_sequence`, plus the full failure split `fail_json_parse` / `fail_finish_reason` /
+  `fail_truncated_think` / `fail_raw_len`, and a new **`fail_raw_excerpt`**.
+- **`combat.samples[]`** — one record per combat: `seed`, `won`, `turns`, `hp_ratio`,
+  `cards_played`, `parse_errors` (historical conflated total, unchanged semantics) and the
+  three-way split `json_parse_errors` / `illegal_action_errors` / `truncation_errors`.
+- **Raw-excerpt size bound:** on a true JSON-parse failure only, `fail_raw_excerpt` stores the
+  first 200 + last 200 chars of the raw completion (`_bounded_excerpt`, middle elided with a
+  char count). Rationale: head shows how the deliberation started, tail shows whether it was cut
+  mid-thought — the probe's evidentiary need — while a full 8k-token `<think>` dump per failed
+  sample (~30 KB × up to 20 samples × 5 seed files) is file bloat with no added diagnostic
+  power. Worst case adds ≈8 KB per per-seed JSON. "Raw truncated completions are unrecoverable"
+  is now only true for the middle of the dump.
+- **Scope notes:** combat per-CALL excerpts were NOT added — combat interleaves many calls per
+  sample and capturing per-call raws needs restructuring the evaluator loop's error handling;
+  the per-combat counter split covers the probe's read. Run-level `samples` also not added
+  (RunScore already carries the split counters; run is the floor dimension, no probe planned).
+- Additive only: no prompt bytes changed (diff verified), no key renamed/removed;
+  `_aggregate_summaries` ignores unknown keys (`.get()`-based), old JSONs read back cleanly.
+  Tests **138/138** (+`test_per_sample_diagnostics_persisted`: induced MockLLM truncation →
+  serialized summary carries seed/finish_reason/raw_len/bounded excerpt; old-style dicts still
+  aggregate). Mock pipeline green ×4.
 
 ## 2026-07-12 (P3 research decision) — Run-level discriminability: REFRAME as the shared collapse floor; hold `--acts 3` for a post-M3b appendix probe (Option C, conditional)
 

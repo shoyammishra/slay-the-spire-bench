@@ -336,6 +336,11 @@ class TurnScore:
     fail_finish_reason: Optional[str] = None   # "length" = hit max_tokens
     fail_truncated_think: bool = False         # <think> opened, never closed
     fail_raw_len: int = 0
+    # Per-sample persistence (2026-07-13, additive): the probe showed summary
+    # counters alone leave failures unauditable after the fact.
+    sample_seed: Optional[int] = None          # the seed this sample was generated from
+    fail_raw_excerpt: str = ""                 # bounded head+tail of the raw completion
+                                               # on JSON-parse failure ("" otherwise)
 
     @property
     def damage_ratio(self) -> float:
@@ -359,6 +364,7 @@ class CombatScore:
     json_parse_errors: int = 0        # no JSON object could be extracted at all
     illegal_action_errors: int = 0    # valid JSON, but bad index / unplayable / unknown action
     truncation_errors: int = 0        # subset of json_parse_errors: hit max_tokens / unclosed <think>
+    sample_seed: Optional[int] = None  # per-sample persistence (2026-07-13, additive)
 
     @property
     def hp_ratio(self) -> float:
@@ -429,6 +435,22 @@ def _safe_int(v, default: int = 0) -> int:
             return int(float(v))
         except (TypeError, ValueError):
             return default
+
+
+def _bounded_excerpt(raw: str, head: int = 200, tail: int = 200) -> str:
+    """Size-bounded head+tail excerpt of a raw completion for persistence.
+
+    2026-07-13: the parse probe showed raw truncated completions were
+    unrecoverable from saved results — only summary counters survived. Full
+    raw dumps are deliberately NOT stored (a truncated 8k-token <think> dump
+    per failed sample would bloat every result JSON); head+tail is enough to
+    audit *what* the model was doing when it hit the budget (head = how the
+    deliberation started, tail = whether it was cut mid-thought)."""
+    if not raw:
+        return ""
+    if len(raw) <= head + tail:
+        return raw
+    return f"{raw[:head]} …[{len(raw) - head - tail} chars omitted]… {raw[-tail:]}"
 
 
 def _simulate_play_sequence(state_snapshot, sequence: List[int]) -> Tuple[int, bool]:
@@ -571,6 +593,7 @@ class TurnEvaluator:
         fail_finish_reason = resp.get("finish_reason") if fail_json_parse else None
         fail_truncated_think = bool(resp.get("truncated_think")) if fail_json_parse else False
         fail_raw_len = resp.get("raw_len", 0) if fail_json_parse else 0
+        fail_raw_excerpt = _bounded_excerpt(resp.get("raw", "")) if fail_json_parse else ""
 
         # Score LLM sequence
         llm_dmg, llm_legal = _simulate_play_sequence(snapshot, llm_sequence)
@@ -599,6 +622,7 @@ class TurnEvaluator:
             fail_finish_reason=fail_finish_reason,
             fail_truncated_think=fail_truncated_think,
             fail_raw_len=fail_raw_len,
+            fail_raw_excerpt=fail_raw_excerpt,
         )
 
 
@@ -1569,6 +1593,24 @@ class BenchmarkResult:
                                         if s.fail_json_parse
                                         and (s.fail_finish_reason == "length"
                                              or s.fail_truncated_think)),
+            # Per-sample records (2026-07-13, additive — synergy "samples"
+            # pattern): the parse probe left no per-sample evidence on disk.
+            "samples": [
+                {
+                    "seed": s.sample_seed,
+                    "parse_ok": s.parse_ok,
+                    "legal": s.legal,
+                    "damage_ratio": round(s.damage_ratio, 4),
+                    "llm_sequence": s.llm_sequence,
+                    "optimal_sequence": s.optimal_sequence,
+                    "fail_json_parse": s.fail_json_parse,
+                    "fail_finish_reason": s.fail_finish_reason,
+                    "fail_truncated_think": s.fail_truncated_think,
+                    "fail_raw_len": s.fail_raw_len,
+                    "fail_raw_excerpt": s.fail_raw_excerpt,
+                }
+                for s in self.turn_scores
+            ],
         } if self.turn_scores else None
 
         combat = {
@@ -1581,6 +1623,22 @@ class BenchmarkResult:
             "avg_json_parse_errors": avg([s.json_parse_errors for s in self.combat_scores]),
             "avg_illegal_action_errors": avg([s.illegal_action_errors for s in self.combat_scores]),
             "avg_truncation_errors": avg([s.truncation_errors for s in self.combat_scores]),
+            # Per-combat records (2026-07-13, additive): the three-way error
+            # split per sample, not just the dimension averages above.
+            "samples": [
+                {
+                    "seed": s.sample_seed,
+                    "won": s.won,
+                    "turns": s.turns,
+                    "hp_ratio": round(s.hp_ratio, 4),
+                    "cards_played": s.cards_played,
+                    "parse_errors": s.parse_errors,
+                    "json_parse_errors": s.json_parse_errors,
+                    "illegal_action_errors": s.illegal_action_errors,
+                    "truncation_errors": s.truncation_errors,
+                }
+                for s in self.combat_scores
+            ],
         } if self.combat_scores else None
 
         synergy = {
@@ -1684,6 +1742,7 @@ class BenchmarkHarness:
             enemy = Cultist(state.rng.hp_rng)
             start_combat(state, [enemy])
             score = evaluator.evaluate(state)
+            score.sample_seed = seed  # persisted per-sample (2026-07-13)
             scores.append(score)
             print(f"    dmg_ratio={score.damage_ratio:.2f}  parse_ok={score.parse_ok}  legal={score.legal}", flush=True)
         return scores
@@ -1704,6 +1763,7 @@ class BenchmarkHarness:
             state = new_game(seed, self.character)
             enemy = enemy_cls(state.rng.hp_rng)
             score = evaluator.evaluate(state, [enemy])
+            score.sample_seed = seed  # persisted per-sample (2026-07-13)
             scores.append(score)
             print(f"    won={score.won}  hp_ratio={score.hp_ratio:.2f}  turns={score.turns}", flush=True)
         return scores

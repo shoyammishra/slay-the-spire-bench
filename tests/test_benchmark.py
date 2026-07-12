@@ -970,6 +970,73 @@ def test_turn_parse_fail_truncation_diagnostics():
     print("[PASS] turn parse-fail diagnostics: truncation recorded, schema miss excluded")
 
 
+def test_per_sample_diagnostics_persisted():
+    """2026-07-13: per-sample parse-failure diagnostics must survive into the
+    SERIALIZED result JSON. The parse probe (2026-07-13) had to be read from
+    summary counters alone — per-sample fail_finish_reason/raw_len were
+    computed but discarded, and raw truncated completions were unrecoverable.
+    Turn + combat summary blocks now carry a 'samples' list (synergy pattern):
+    sample seed, parse/legal outcome, the fail_* split, and a size-BOUNDED
+    raw-completion excerpt on failure (never the full dump)."""
+    # Turn: induced truncation failure (unclosed <think>, finish_reason=length).
+    long_think = "<think>" + "overthinking step " * 60   # well past the 400-char bound
+    mock = MockLLM([long_think], finish_reasons=["length"])
+    harness = BenchmarkHarness(mock, model_name="mock", prompt_format="structured")
+    result = BenchmarkResult("mock", "structured", 42)
+    result.turn_scores = harness.run_turn_eval([42])
+
+    # Combat: alternating truncation-failure / end_turn calls.
+    combat_mock = MockLLM([
+        "<think>never closes",
+        '{"action": "end_turn", "reasoning": "r"}',
+    ], finish_reasons=["length", "stop"])
+    harness2 = BenchmarkHarness(combat_mock, model_name="mock", prompt_format="structured")
+    result.combat_scores = harness2.run_combat_eval([142])
+
+    # Round-trip through JSON = exactly what lands on disk.
+    blob = json.loads(json.dumps(result.summary()))
+
+    ts = blob["turn"]["samples"]
+    assert len(ts) == 1, ts
+    s = ts[0]
+    assert s["seed"] == 42, s
+    assert s["parse_ok"] is False and s["fail_json_parse"] is True, s
+    assert s["fail_finish_reason"] == "length", s
+    assert s["fail_truncated_think"] is True, s
+    assert s["fail_raw_len"] == len(long_think), s
+    assert s["fail_raw_excerpt"].startswith("<think>"), s
+    assert "chars omitted" in s["fail_raw_excerpt"], s   # bounded, not a full dump
+    assert len(s["fail_raw_excerpt"]) < len(long_think), s
+    # Summary counters must agree with the per-sample records.
+    assert blob["turn"]["parse_fail_n"] == 1 and blob["turn"]["parse_fail_truncated"] == 1
+
+    cs = blob["combat"]["samples"]
+    assert len(cs) == 1, cs
+    c = cs[0]
+    assert c["seed"] == 142, c
+    assert c["json_parse_errors"] >= 1, c
+    assert c["truncation_errors"] == c["json_parse_errors"], c   # all failures were truncations
+    assert c["parse_errors"] == c["json_parse_errors"] + c["illegal_action_errors"], c
+
+    # A successful parse persists a clean record (no excerpt, no fail flags).
+    ok_mock = MockLLM(['{"plays": [], "reasoning": "pass"}'])
+    ok_harness = BenchmarkHarness(ok_mock, model_name="mock", prompt_format="structured")
+    r2 = BenchmarkResult("mock", "structured", 42)
+    r2.turn_scores = ok_harness.run_turn_eval([7])
+    s2 = json.loads(json.dumps(r2.summary()))["turn"]["samples"][0]
+    assert s2["seed"] == 7 and s2["parse_ok"] is True, s2
+    assert s2["fail_json_parse"] is False and s2["fail_raw_excerpt"] == "", s2
+
+    # Old on-disk JSONs (no 'samples' key) must still aggregate cleanly.
+    from run_benchmark import _aggregate_summaries
+    old_style = {"turn": {"n": 20, "avg_damage_ratio": 0.5, "legal_rate": 1.0,
+                          "parse_ok_rate": 1.0, "parse_fail_n": 0, "parse_fail_truncated": 0},
+                 "combat": None, "synergy": None, "run": None}
+    agg = _aggregate_summaries([old_style], "m", "structured", "ironclad", [42])
+    assert agg["turn"]["avg_damage_ratio_mean"] == 0.5, agg["turn"]
+    print("[PASS] per-sample turn/combat diagnostics persisted in serialized summary")
+
+
 if __name__ == "__main__":
     tests = [
         test_structured_prompt,
@@ -1024,6 +1091,8 @@ if __name__ == "__main__":
         test_complete_json_failure_diagnostics,
         test_combat_parse_error_split,
         test_turn_parse_fail_truncation_diagnostics,
+        # 2026-07-13 per-sample diagnostics persistence
+        test_per_sample_diagnostics_persisted,
     ]
     passed = failed = 0
     for test in tests:
