@@ -1,5 +1,44 @@
 # Decision Log
 
+## 2026-07-12 — Parse-failure diagnostics: instrument truncation-vs-malformed + additively split the conflated combat `parse_errors` counter
+
+**Problem.** Two related instrument gaps found while answering "are the DeepSeek `<think>` parse
+failures our fault or the model's?": (1) `complete_json` discards the raw completion and the API's
+`finish_reason` on failure, so truncation ("thought past max_tokens, answer never emitted") is
+indistinguishable from malformed output — unanswerable from any saved artifact; (2) the combat
+`parse_errors` counter **conflates** true JSON-parse failures with *valid-JSON-but-illegal actions*
+(out-of-range index, unplayable card, unknown action) in both `CombatEvaluator` and the run-level
+`_llm_combat` — so "deepseek-7b ~8 parse_errors/combat" is really "invalid-action errors."
+
+**Decision (all additive — comparability preserved by construction):**
+- `LLMInterface.last_finish_reason` set by all providers (Groq/OpenRouter/Local read the API's
+  `finish_reason`; Mock scriptable via `finish_reasons=[...]`). `complete_json` failure dicts now
+  carry `raw_len`, `finish_reason`, `truncated_think` (`<think>` opened, never closed).
+- `CombatScore`/`RunScore` gain `json_parse_errors` + `illegal_action_errors` +
+  `truncation_errors` (subset of json, = finish_reason "length" or unclosed think).
+  **`parse_errors` keeps its historical conflated semantics** (`== json + illegal`) so the
+  2026-06-22 matrix aggregates remain directly comparable; the new fields default 0 and old
+  result JSONs read back cleanly (`_agg_dim` is `.get()`-based).
+- `TurnScore` gains `fail_json_parse` / `fail_finish_reason` / `fail_truncated_think` /
+  `fail_raw_len` (set only for true JSON failures, NOT schema misses like valid JSON without
+  `"plays"`). Summaries add turn `parse_fail_n`/`parse_fail_truncated` and combat
+  `avg_json_parse_errors`/`avg_illegal_action_errors`/`avg_truncation_errors`; `_aggregate_summaries`
+  keys extended to match (the key-mismatch trap from the 2026-06-10 audit item 20).
+- **No prompt bytes changed** (verified: diff contains no prompt-string edits) → all existing
+  data stays valid; 137/137 tests (+3 regression: failure-dict diagnostics, combat split sums,
+  turn truncation recording + schema-miss exclusion).
+
+**Reporting rule (effective immediately, §5.4):** call the historical combat metric
+**"invalid-action errors"** when citing the matrix (it includes legality failures with perfectly
+parsed JSON); reserve "parse errors" for `json_parse_errors` once probe/new data exists.
+
+**Registered probe (`cluster/parse_probe.sbatch`, not yet run):** deepseek-r1-distill-7b (default;
+14b/Silent via env override), IC, both formats, turn n=20 + combat n=3, seed 42,
+`--run-tag parse_probe` so matrix files are never overwritten — a diagnostic cell, NOT foldable
+into the matrix (post-instrumentation harness). Expected read: `parse_fail_truncated/parse_fail_n`
+≈ 1 ⇒ report DeepSeek failures as "budget-bound deliberation"; ≈ 0 ⇒ "output-discipline failure."
+Requires the cluster clone pulled past this commit.
+
 ## 2026-07-12 (P3 research decision) — Run-level discriminability: REFRAME as the shared collapse floor; hold `--acts 3` for a post-M3b appendix probe (Option C, conditional)
 
 **Problem.** Run-level (the longest horizon) does not discriminate between the current models.

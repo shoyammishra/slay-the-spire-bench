@@ -894,6 +894,82 @@ def test_act_transition_counts_llm_call_only_when_made():
     print("[PASS] _act_transition counts no llm_call when none is made")
 
 
+def test_complete_json_failure_diagnostics():
+    """2026-07-12: parse-failure dicts must carry finish_reason / raw_len /
+    truncated_think so truncation ("thought past max_tokens") can be
+    distinguished from malformed-but-complete output."""
+    # Truncated reasoning dump: <think> never closed, finish_reason=length.
+    trunc = "<think>step 1... step 2... step 3"
+    mock = MockLLM([trunc], finish_reasons=["length"])
+    res = mock.complete_json("s", "u")
+    assert res.get("error") == "parse_failure", res
+    assert res["finish_reason"] == "length", res
+    assert res["truncated_think"] is True, res
+    assert res["raw_len"] == len(trunc), res
+    # Malformed-but-complete output: closed <think>, finish_reason=stop.
+    done = "<think>done</think> the answer is forty-two, no JSON here"
+    mock2 = MockLLM([done], finish_reasons=["stop"])
+    res2 = mock2.complete_json("s", "u")
+    assert res2.get("error") == "parse_failure", res2
+    assert res2["finish_reason"] == "stop", res2
+    assert res2["truncated_think"] is False, res2
+    print("[PASS] complete_json failure diagnostics distinguish truncation vs malformed")
+
+
+def test_combat_parse_error_split():
+    """2026-07-12: CombatScore.parse_errors is additively split into
+    json_parse_errors (no JSON at all) + illegal_action_errors (valid JSON,
+    bad index / unplayable / unknown action); parse_errors itself keeps the
+    historical conflated total so matrix aggregates stay comparable."""
+    mock = MockLLM([
+        "<think>never closes",                                                # json parse fail (truncated)
+        '{"action": "play", "card_index": 99, "target_index": 0, "reasoning": "r"}',  # illegal index
+        '{"action": "end_turn", "reasoning": "r"}',
+    ], finish_reasons=["length", "stop", "stop"])
+    evaluator = CombatEvaluator(mock, max_turns=3)
+    state = new_ironclad_game(30)
+    enemy = Cultist(state.rng.hp_rng)
+    score = evaluator.evaluate(state, [enemy])
+    assert score.json_parse_errors == 1, score
+    assert score.illegal_action_errors == 1, score
+    assert score.truncation_errors == 1, score
+    assert score.parse_errors == score.json_parse_errors + score.illegal_action_errors, score
+    # The split must reach the multi-seed aggregate without silent None means.
+    from run_benchmark import _aggregate_summaries
+    r = BenchmarkResult("m", "structured", 42)
+    r.combat_scores = [score]
+    agg = _aggregate_summaries([r.summary()], "m", "structured", "ironclad", [42])
+    assert agg["combat"]["avg_json_parse_errors_mean"] == 1.0, agg["combat"]
+    assert agg["combat"]["avg_illegal_action_errors_mean"] == 1.0, agg["combat"]
+    assert agg["combat"]["avg_truncation_errors_mean"] == 1.0, agg["combat"]
+    print("[PASS] combat parse_errors split: json=1 illegal=1 truncation=1, total unchanged")
+
+
+def test_turn_parse_fail_truncation_diagnostics():
+    """2026-07-12: turn-level JSON-parse failures record finish_reason /
+    unclosed-<think> / raw length, and the summary splits truncations out."""
+    mock = MockLLM(["<think>overthinking with no end"], finish_reasons=["length"])
+    evaluator = TurnEvaluator(mock, prompt_format="structured")
+    state = new_ironclad_game(22)
+    enemy = Cultist(state.rng.hp_rng)
+    start_combat(state, [enemy])
+    score = evaluator.evaluate(state)
+    assert not score.parse_ok
+    assert score.fail_json_parse is True, score
+    assert score.fail_truncated_think is True, score
+    assert score.fail_finish_reason == "length", score
+    assert score.fail_raw_len > 0, score
+    r = BenchmarkResult("m", "structured", 42)
+    r.turn_scores = [score]
+    t = r.summary()["turn"]
+    assert t["parse_fail_n"] == 1 and t["parse_fail_truncated"] == 1, t
+    # A schema miss (valid JSON, no "plays") is NOT a JSON-parse failure.
+    mock2 = MockLLM(['{"cards": [0]}'])
+    score2 = TurnEvaluator(mock2, prompt_format="structured").evaluate(state)
+    assert not score2.parse_ok and score2.fail_json_parse is False, score2
+    print("[PASS] turn parse-fail diagnostics: truncation recorded, schema miss excluded")
+
+
 if __name__ == "__main__":
     tests = [
         test_structured_prompt,
@@ -944,6 +1020,10 @@ if __name__ == "__main__":
         test_run_all_keeps_partial_on_dimension_error,
         test_complete_json_first_object_and_fast_on_garbage,
         test_act_transition_counts_llm_call_only_when_made,
+        # 2026-07-12 parse-failure diagnostics
+        test_complete_json_failure_diagnostics,
+        test_combat_parse_error_split,
+        test_turn_parse_fail_truncation_diagnostics,
     ]
     passed = failed = 0
     for test in tests:

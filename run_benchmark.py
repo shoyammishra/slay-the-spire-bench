@@ -264,8 +264,11 @@ def _aggregate_summaries(summaries: list, model: str, fmt: str,
 
     # Metric keys MUST match BenchmarkResult.summary() exactly, or every
     # aggregated mean silently comes out None.
-    turn = _agg_dim("turn", ["avg_damage_ratio", "legal_rate", "parse_ok_rate"])
-    combat = _agg_dim("combat", ["win_rate", "avg_hp_ratio", "avg_parse_errors"])
+    turn = _agg_dim("turn", ["avg_damage_ratio", "legal_rate", "parse_ok_rate",
+                             "parse_fail_n", "parse_fail_truncated"])
+    combat = _agg_dim("combat", ["win_rate", "avg_hp_ratio", "avg_parse_errors",
+                                 "avg_json_parse_errors", "avg_illegal_action_errors",
+                                 "avg_truncation_errors"])
     synergy = _agg_dim("synergy", [
         "archetype_acc", "card_pick_acc", "removal_acc", "parse_ok_rate",
         "archetype_n_scored", "archetype_n_ambiguous",

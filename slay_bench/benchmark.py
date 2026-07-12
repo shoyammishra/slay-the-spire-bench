@@ -37,6 +37,12 @@ class RateLimitExhausted(RuntimeError):
 class LLMInterface(ABC):
     """Abstract LLM client. Implement `complete()` for any provider."""
 
+    # Set by complete() implementations that can see the API's finish_reason
+    # ("stop" | "length" | ...). "length" = the completion hit max_tokens, i.e.
+    # a truncation — the signal that distinguishes "thought past the budget"
+    # from "emitted malformed JSON" when a parse failure occurs.
+    last_finish_reason: Optional[str] = None
+
     @abstractmethod
     def complete(self, system: str, user: str, **kwargs) -> str:
         """Return the model's text response."""
@@ -70,7 +76,16 @@ class LLMInterface(ABC):
                 return obj
             except json.JSONDecodeError:
                 continue
-        return {"error": "parse_failure", "raw": raw}
+        # Failure diagnostics (2026-07-12): raw_len + finish_reason + an
+        # unclosed-<think> flag let evaluators distinguish truncation ("thought
+        # past max_tokens, answer never emitted") from malformed output.
+        return {
+            "error": "parse_failure",
+            "raw": raw,
+            "raw_len": len(raw),
+            "finish_reason": self.last_finish_reason,
+            "truncated_think": ("<think>" in raw and "</think>" not in raw),
+        }
 
 
 class GroqLLM(LLMInterface):
@@ -126,6 +141,7 @@ class GroqLLM(LLMInterface):
                     temperature=kwargs.get("temperature", 0.0),
                     max_tokens=kwargs.get("max_tokens", 3000),
                 )
+                self.last_finish_reason = getattr(resp.choices[0], "finish_reason", None)
                 return resp.choices[0].message.content
             except Exception as e:  # noqa: BLE001 — retry only on rate limits
                 last_err = e
@@ -172,6 +188,7 @@ class OpenRouterLLM(LLMInterface):
                 )
                 with urllib.request.urlopen(req, timeout=120) as r:
                     data = json.loads(r.read())
+                self.last_finish_reason = data["choices"][0].get("finish_reason")
                 return data["choices"][0]["message"]["content"]
             except urllib.error.HTTPError as e:
                 last_err = e
@@ -246,6 +263,7 @@ class LocalLLM(LLMInterface):
                 )
                 with urllib.request.urlopen(req, timeout=self.timeout) as r:
                     data = json.loads(r.read())
+                self.last_finish_reason = data["choices"][0].get("finish_reason")
                 return data["choices"][0]["message"]["content"]
             except urllib.error.HTTPError as e:
                 last_err = e
@@ -276,8 +294,10 @@ class LocalLLM(LLMInterface):
 class MockLLM(LLMInterface):
     """Deterministic mock for unit tests — returns scripted responses."""
 
-    def __init__(self, responses: Optional[List[str]] = None):
+    def __init__(self, responses: Optional[List[str]] = None,
+                 finish_reasons: Optional[List[str]] = None):
         self._responses = list(responses or [])
+        self._finish_reasons = list(finish_reasons or [])
         self._idx = 0
         self._calls: List[Tuple[str, str]] = []
         self._call_kwargs: List[dict] = []
@@ -285,6 +305,12 @@ class MockLLM(LLMInterface):
     def complete(self, system: str, user: str, **kwargs) -> str:
         self._calls.append((system, user))
         self._call_kwargs.append(dict(kwargs))
+        if self._finish_reasons:
+            self.last_finish_reason = self._finish_reasons[
+                (self._idx if self._responses else len(self._calls) - 1)
+                % len(self._finish_reasons)]
+        else:
+            self.last_finish_reason = "stop"
         if self._responses:
             resp = self._responses[self._idx % len(self._responses)]
             self._idx += 1
@@ -304,6 +330,12 @@ class TurnScore:
     llm_sequence: List[int]
     parse_ok: bool
     legal: bool                   # all plays were legal
+    # Parse-failure diagnostics (2026-07-12; only set when the JSON itself
+    # failed to parse — not when valid JSON merely lacked "plays"):
+    fail_json_parse: bool = False              # True = complete_json found no JSON at all
+    fail_finish_reason: Optional[str] = None   # "length" = hit max_tokens
+    fail_truncated_think: bool = False         # <think> opened, never closed
+    fail_raw_len: int = 0
 
     @property
     def damage_ratio(self) -> float:
@@ -321,6 +353,12 @@ class CombatScore:
     optimal_hp_remaining: Optional[int]   # from exhaustive solve (may be None)
     cards_played: int
     parse_errors: int
+    # Additive split of parse_errors (2026-07-12). parse_errors itself keeps
+    # its historical (conflated) semantics so the 2026-06-22 matrix aggregates
+    # stay comparable: parse_errors == json_parse_errors + illegal_action_errors.
+    json_parse_errors: int = 0        # no JSON object could be extracted at all
+    illegal_action_errors: int = 0    # valid JSON, but bad index / unplayable / unknown action
+    truncation_errors: int = 0        # subset of json_parse_errors: hit max_tokens / unclosed <think>
 
     @property
     def hp_ratio(self) -> float:
@@ -363,6 +401,10 @@ class RunScore:
     route_optimality: float = 0.0     # placeholder: 1.0 if no unnecessary elites taken
     parse_errors: int = 0
     llm_calls: int = 0
+    # Additive split of parse_errors (2026-07-12) — same semantics as CombatScore
+    json_parse_errors: int = 0
+    illegal_action_errors: int = 0
+    truncation_errors: int = 0
 
     @property
     def hp_fraction(self) -> float:
@@ -524,6 +566,12 @@ class TurnEvaluator:
             llm_sequence = []
             parse_ok = False
 
+        # Diagnostics only for true JSON-parse failures (not schema misses)
+        fail_json_parse = "error" in resp
+        fail_finish_reason = resp.get("finish_reason") if fail_json_parse else None
+        fail_truncated_think = bool(resp.get("truncated_think")) if fail_json_parse else False
+        fail_raw_len = resp.get("raw_len", 0) if fail_json_parse else 0
+
         # Score LLM sequence
         llm_dmg, llm_legal = _simulate_play_sequence(snapshot, llm_sequence)
 
@@ -547,6 +595,10 @@ class TurnEvaluator:
             llm_sequence=llm_sequence,
             parse_ok=parse_ok,
             legal=llm_legal,
+            fail_json_parse=fail_json_parse,
+            fail_finish_reason=fail_finish_reason,
+            fail_truncated_think=fail_truncated_think,
+            fail_raw_len=fail_raw_len,
         )
 
 
@@ -572,6 +624,9 @@ class CombatEvaluator:
         # Greedy baseline on the identical post-start state (own RNG copy)
         optimal_hp = _greedy_combat_hp(state, self.max_turns)
         parse_errors = 0
+        json_parse_errors = 0
+        illegal_action_errors = 0
+        truncation_errors = 0
         cards_played = 0
         turns = 0
 
@@ -601,6 +656,9 @@ class CombatEvaluator:
 
                 if "error" in resp:
                     parse_errors += 1
+                    json_parse_errors += 1
+                    if resp.get("finish_reason") == "length" or resp.get("truncated_think"):
+                        truncation_errors += 1
                     end_player_turn(state)
                     turn_done = True
                     continue
@@ -617,6 +675,7 @@ class CombatEvaluator:
                     hand = state.combat.hand
                     if not (0 <= idx < len(hand)):
                         parse_errors += 1
+                        illegal_action_errors += 1
                         end_player_turn(state)
                         turn_done = True
                         continue
@@ -629,10 +688,12 @@ class CombatEvaluator:
                         cards_played += 1
                     else:
                         parse_errors += 1
+                        illegal_action_errors += 1
                         end_player_turn(state)
                         turn_done = True
                 else:
                     parse_errors += 1
+                    illegal_action_errors += 1
                     end_player_turn(state)
                     turn_done = True
 
@@ -657,6 +718,9 @@ class CombatEvaluator:
             optimal_hp_remaining=optimal_hp,
             cards_played=cards_played,
             parse_errors=parse_errors,
+            json_parse_errors=json_parse_errors,
+            illegal_action_errors=illegal_action_errors,
+            truncation_errors=truncation_errors,
         )
 
 
@@ -1220,6 +1284,9 @@ class RunEvaluator:
                 if "error" in resp or resp.get("action") == "end_turn":
                     if "error" in resp:
                         counters["parse_errors"] = counters.get("parse_errors", 0) + 1
+                        counters["json_parse_errors"] = counters.get("json_parse_errors", 0) + 1
+                        if resp.get("finish_reason") == "length" or resp.get("truncated_think"):
+                            counters["truncation_errors"] = counters.get("truncation_errors", 0) + 1
                     end_player_turn(state)
                     turn_done = True
                 elif resp.get("action") == "play":
@@ -1233,10 +1300,12 @@ class RunEvaluator:
                         play_card(state, hand[idx], target)
                     else:
                         counters["parse_errors"] = counters.get("parse_errors", 0) + 1
+                        counters["illegal_action_errors"] = counters.get("illegal_action_errors", 0) + 1
                         end_player_turn(state)
                         turn_done = True
                 else:
                     counters["parse_errors"] = counters.get("parse_errors", 0) + 1
+                    counters["illegal_action_errors"] = counters.get("illegal_action_errors", 0) + 1
                     end_player_turn(state)
                     turn_done = True
 
@@ -1464,6 +1533,9 @@ class RunEvaluator:
             draft_coherence=_draft_coherence(state.player.deck, archetype, self.character),
             parse_errors=counters["parse_errors"],
             llm_calls=counters["llm_calls"],
+            json_parse_errors=counters.get("json_parse_errors", 0),
+            illegal_action_errors=counters.get("illegal_action_errors", 0),
+            truncation_errors=counters.get("truncation_errors", 0),
         )
 
 
@@ -1490,6 +1562,13 @@ class BenchmarkResult:
             "avg_damage_ratio": avg([s.damage_ratio for s in self.turn_scores]),
             "parse_ok_rate": avg([float(s.parse_ok) for s in self.turn_scores]),
             "legal_rate": avg([float(s.legal) for s in self.turn_scores]),
+            # Diagnostics (2026-07-12): of the JSON-parse failures, how many
+            # were truncations (hit max_tokens / unclosed <think>)?
+            "parse_fail_n": sum(1 for s in self.turn_scores if s.fail_json_parse),
+            "parse_fail_truncated": sum(1 for s in self.turn_scores
+                                        if s.fail_json_parse
+                                        and (s.fail_finish_reason == "length"
+                                             or s.fail_truncated_think)),
         } if self.turn_scores else None
 
         combat = {
@@ -1497,6 +1576,11 @@ class BenchmarkResult:
             "win_rate": avg([float(s.won) for s in self.combat_scores]),
             "avg_hp_ratio": avg([s.hp_ratio for s in self.combat_scores]),
             "avg_parse_errors": avg([s.parse_errors for s in self.combat_scores]),
+            # Additive split (2026-07-12): avg_parse_errors keeps historical
+            # conflated semantics (= json + illegal); these break it down.
+            "avg_json_parse_errors": avg([s.json_parse_errors for s in self.combat_scores]),
+            "avg_illegal_action_errors": avg([s.illegal_action_errors for s in self.combat_scores]),
+            "avg_truncation_errors": avg([s.truncation_errors for s in self.combat_scores]),
         } if self.combat_scores else None
 
         synergy = {
