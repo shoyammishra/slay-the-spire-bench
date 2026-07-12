@@ -2,7 +2,7 @@
 from __future__ import annotations
 import json
 from pathlib import Path
-from typing import Dict, Any
+from typing import Dict, Any, List, Optional, Tuple
 
 
 # ── Text report ───────────────────────────────────────────────────────────────
@@ -335,3 +335,268 @@ def save_all(summary: Dict[str, Any], stem: str, out_dir: Path) -> None:
     print(f"  Report : {txt_path}")
     print(f"  Chart  : {bars_path}")
     print(f"  Radar  : {radar_path}")
+
+
+# ── Horizon-collapse curve + cross-horizon normalization ──────────────────────
+#
+# The four benchmark dimensions live in different units (turn = damage_ratio vs an
+# exhaustive optimum; combat = win_rate / hp_ratio vs a greedy bot; synergy = three
+# accuracies vs chance; run = progress vs greedy survival). To draw one line per model
+# over the planning-horizon x-axis (turn → combat → synergy → run) they must first be
+# rescaled onto a common "vs-baseline" 0–1 axis where 0 = the non-planning floor for
+# that dimension and 1 = perfect play. The exact formulas + rationale + limitations are
+# documented in docs/decision_log.md (2026-07-12 entry). Summary:
+#
+#   turn    = avg_damage_ratio                       (already 0–1 vs exhaustive oracle)
+#   combat  = win_rate * min(1, hp_ratio)            (greedy bot ≈ 1.0; losers → 0)
+#   synergy = mean over {archetype, pick, removal} of
+#             clamp01((acc - chance) / (1 - chance)) (chance floor per metric → 0)
+#   run     = clamp01((progress - GREEDY_PROGRESS) / (1 - GREEDY_PROGRESS))
+#                                                    (greedy Act-1 survival → 0)
+#
+# Missing dimensions (qwen3-32b non-synergy; deepseek run) stay None and BREAK the line
+# — never interpolated, never invented.
+
+HORIZONS: List[str] = ["turn", "combat", "synergy", "run"]
+HORIZON_LABELS = ["Turn\n(1 turn)", "Combat\n(1 fight)",
+                  "Synergy\n(deck)", "Run\n(full act)"]
+
+# Chance / baseline floors used by the normalization (documented in decision_log).
+SYNERGY_CHANCE = {
+    "archetype_acc": 0.25,   # 4 archetypes, uniform
+    "card_pick_acc": 1.0 / 3.0,  # 3 offers, correct index rotated uniformly
+    "removal_acc": 0.10,     # removal target = 1 basic among ~10-card fixture deck
+}
+# Greedy bot survives ~12.5 / 16 nodes of Act 1 → progress ≈ 0.78 is the run floor.
+GREEDY_PROGRESS = 0.78
+
+
+def _clamp01(v: float) -> float:
+    return max(0.0, min(1.0, v))
+
+
+def _norm_turn(turn: Optional[dict]) -> Optional[float]:
+    if not turn or turn.get("avg_damage_ratio_mean") is None:
+        return None
+    # Already 0–1 vs the exhaustive optimum. Floor 0 = illegal/no damage, 1 = oracle.
+    return _clamp01(turn["avg_damage_ratio_mean"])
+
+
+def _norm_combat(combat: Optional[dict]) -> Optional[float]:
+    if not combat or combat.get("win_rate_mean") is None:
+        return None
+    win = combat["win_rate_mean"]
+    hp = combat.get("avg_hp_ratio_mean")
+    # Center on the greedy bot: hp_ratio ≥ 1 (match or beat the bot's HP) counts full;
+    # taking more damage than the bot scales the win down. A model that loses fights
+    # drops toward 0. The greedy bot itself → win 1 · hp_ratio 1 ≈ 1.0 (Act 1 is
+    # winnable by greedy play, so this dimension's baseline sits near the ceiling —
+    # the collapse signal is dropping BELOW it, which only the reasoning models do).
+    hp_factor = 1.0 if hp is None else _clamp01(hp)
+    return _clamp01(win * hp_factor)
+
+
+def _norm_synergy(syn: Optional[dict]) -> Optional[float]:
+    if not syn:
+        return None
+    parts = []
+    for key, chance in SYNERGY_CHANCE.items():
+        acc = syn.get(f"{key}_mean")
+        if acc is None:
+            continue
+        # Rescale so chance → 0, perfect (1.0) → 1. Below chance clamps to 0.
+        parts.append(_clamp01((acc - chance) / (1.0 - chance)))
+    if not parts:
+        return None
+    return sum(parts) / len(parts)
+
+
+def _norm_run(run: Optional[dict]) -> Optional[float]:
+    if not run or run.get("avg_progress_mean") is None:
+        return None
+    prog = run["avg_progress_mean"]
+    # Greedy Act-1 survival floor → 0, full act (progress 1.0) → 1.
+    return _clamp01((prog - GREEDY_PROGRESS) / (1.0 - GREEDY_PROGRESS))
+
+
+_NORMALIZERS = {
+    "turn": lambda a: _norm_turn(a.get("turn")),
+    "combat": lambda a: _norm_combat(a.get("combat")),
+    "synergy": lambda a: _norm_synergy(a.get("synergy")),
+    "run": lambda a: _norm_run(a.get("run")),
+}
+
+
+def normalized_horizon_vector(agg: Dict[str, Any]) -> List[Optional[float]]:
+    """Return [turn, combat, synergy, run] normalized to the common 0–1 axis.
+
+    Each entry is None where the dimension was not evaluated (missing cell) — callers
+    must break the line there, never interpolate.
+    """
+    return [_NORMALIZERS[h](agg) for h in HORIZONS]
+
+
+def _discover_aggregates(results_dir: Path, fmt: str) -> List[Tuple[str, str, dict]]:
+    """Find multi-seed aggregate JSONs for one prompt format.
+
+    Returns a list of (model, character, agg_dict), sorted for stable colouring.
+    Only files whose prompt_format matches `fmt` are returned.
+    """
+    out = []
+    for path in sorted(results_dir.glob("*_seeds42_1042_2042_3042_4042.json")):
+        try:
+            agg = json.loads(path.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError):
+            continue
+        if agg.get("prompt_format") != fmt:
+            continue
+        model = agg.get("model", path.stem)
+        character = agg.get("character", "ironclad")
+        out.append((model, character, agg))
+    # stable, readable order: by model name then character
+    out.sort(key=lambda t: (t[0], t[1]))
+    return out
+
+
+# distinct, colour-blind-ish palette for up to 6 model lines on the dark theme
+_MODEL_COLORS = [
+    "#4ade80",  # green   — qwen2.5-7b
+    "#60a5fa",  # blue    — llama-3.1-8b
+    "#f472b6",  # pink    — mistral-7b
+    "#facc15",  # yellow  — qwen3-32b (reasoning, the line that bends away)
+    "#fb923c",  # orange  — deepseek-14b
+    "#a78bfa",  # purple  — deepseek-7b
+]
+
+
+def horizon_collapse_curve(results_dir: Path,
+                           out_path: Path,
+                           fmt: str = "structured") -> None:
+    """Render the horizon-collapse curve for one prompt format.
+
+    Two panels (Ironclad / Silent). x-axis = planning horizon (turn→combat→synergy→run),
+    y-axis = normalized "vs-baseline" score (0 = non-planning floor, 1 = perfect). One
+    line per model; gaps (unevaluated dimensions) break the line rather than interpolate.
+    Reads only the on-disk multi-seed aggregates — no engine/harness state touched.
+    """
+    try:
+        import matplotlib
+        matplotlib.use("Agg")
+        import matplotlib.pyplot as plt
+        import numpy as np
+    except ImportError:
+        print("  [warn] matplotlib not installed — skipping horizon curve.")
+        return
+
+    aggs = _discover_aggregates(results_dir, fmt)
+    if not aggs:
+        print(f"  [warn] no {fmt} aggregates found in {results_dir}")
+        return
+
+    # group by character
+    by_char: Dict[str, List[Tuple[str, dict]]] = {"ironclad": [], "silent": []}
+    for model, char, agg in aggs:
+        by_char.setdefault(char, []).append((model, agg))
+
+    # deterministic colour per model across both panels
+    all_models = sorted({m for m, _, _ in aggs})
+    color_of = {m: _MODEL_COLORS[i % len(_MODEL_COLORS)]
+                for i, m in enumerate(all_models)}
+
+    COLOR_BG = "#16213e"
+    COLOR_AXIS = "#e2e8f0"
+
+    chars = [c for c in ("ironclad", "silent") if by_char.get(c)]
+    fig, axes = plt.subplots(1, len(chars), figsize=(6.4 * len(chars), 5.4),
+                             squeeze=False)
+    axes = axes[0]
+    fig.patch.set_facecolor("#1a1a2e")
+    fig.suptitle(
+        f"Horizon-Collapse Curve  —  {fmt} prompts\n"
+        "normalized planning score (0 = non-planning floor, 1 = perfect) "
+        "vs planning horizon",
+        color="white", fontsize=12, fontweight="bold", y=0.99)
+
+    x = list(range(len(HORIZONS)))
+    printed = {}  # for the caller's sanity-check log
+    for ax, char in zip(axes, chars):
+        ax.set_facecolor(COLOR_BG)
+        ax.set_title(char.capitalize(), color=COLOR_AXIS, fontsize=11,
+                     fontweight="bold", pad=8)
+        # baseline floor line at y=0
+        ax.axhline(0.0, color="#64748b", linewidth=1.0, linestyle="--", zorder=1)
+        ax.text(len(HORIZONS) - 1, 0.012, "non-planning floor",
+                color="#94a3b8", fontsize=7, ha="right", va="bottom")
+
+        for model, agg in sorted(by_char[char], key=lambda t: t[0]):
+            vec = normalized_horizon_vector(agg)
+            printed[(char, model)] = vec
+            col = color_of[model]
+            # plot as one line, but break across None gaps using NaN
+            ys = [np.nan if v is None else v for v in vec]
+            ax.plot(x, ys, color=col, linewidth=2.0, marker="o", markersize=6,
+                    label=model, zorder=3)
+            # mark evaluated-but-isolated points (e.g. qwen3-32b: synergy only)
+            for xi, v in zip(x, vec):
+                if v is not None:
+                    ax.plot(xi, v, marker="o", markersize=6, color=col, zorder=4)
+
+        ax.set_xticks(x)
+        ax.set_xticklabels(HORIZON_LABELS, color=COLOR_AXIS, fontsize=8)
+        ax.set_ylim(-0.03, 1.05)
+        ax.set_ylabel("normalized score (vs baseline)", color=COLOR_AXIS, fontsize=8)
+        ax.tick_params(colors=COLOR_AXIS, labelsize=8)
+        ax.yaxis.grid(True, color="#334155", zorder=0)
+        for spine in ax.spines.values():
+            spine.set_edgecolor("#334155")
+
+    # single shared legend
+    handles, labels = axes[0].get_legend_handles_labels()
+    # dedupe while preserving order
+    seen = set()
+    hl = [(h, l) for h, l in zip(handles, labels) if not (l in seen or seen.add(l))]
+    if hl:
+        fig.legend([h for h, _ in hl], [l for _, l in hl],
+                   loc="lower center", ncol=min(6, len(hl)),
+                   facecolor=COLOR_BG, edgecolor="#334155",
+                   labelcolor=COLOR_AXIS, fontsize=8, bbox_to_anchor=(0.5, -0.02))
+
+    plt.tight_layout(rect=[0, 0.06, 1, 0.93])
+    out_path.parent.mkdir(parents=True, exist_ok=True)
+    fig.savefig(out_path, dpi=150, bbox_inches="tight", facecolor=fig.get_facecolor())
+    plt.close(fig)
+    print(f"  Horizon curve ({fmt}) : {out_path}")
+
+    # emit the normalized matrix for sanity-checking against the CLAUDE.md tables
+    for (char, model), vec in sorted(printed.items()):
+        cells = " ".join(f"{h}={'--' if v is None else f'{v:.3f}'}"
+                         for h, v in zip(HORIZONS, vec))
+        print(f"    [{fmt}/{char:8s}] {model:24s} {cells}")
+
+
+def render_horizon_curves(results_dir: Path) -> None:
+    """Render both the structured (primary) and raw (companion) horizon curves."""
+    horizon_collapse_curve(results_dir, results_dir / "horizon_collapse_structured.png",
+                           fmt="structured")
+    horizon_collapse_curve(results_dir, results_dir / "horizon_collapse_raw.png",
+                           fmt="raw")
+
+
+# ── CLI entry ─────────────────────────────────────────────────────────────────
+
+if __name__ == "__main__":
+    import argparse
+
+    parser = argparse.ArgumentParser(
+        description="slay-bench visualization utilities")
+    parser.add_argument("--horizon-curve", action="store_true",
+                        help="render the horizon-collapse curve(s) from the on-disk "
+                             "multi-seed aggregates in results/")
+    parser.add_argument("--results-dir", default="results",
+                        help="directory holding the *_seeds…json aggregates")
+    args = parser.parse_args()
+
+    if args.horizon_curve:
+        render_horizon_curves(Path(args.results_dir))
+    else:
+        parser.print_help()

@@ -1,15 +1,18 @@
 # Experiment Log
 
-## 2026-06-22 (CLUSTER) — FULL 5-MODEL MATRIX, 5 seeds (CURRENT valid data, supersedes the Qwen-only table)
+## 2026-06-22, completed 2026-07-11 (CLUSTER) — FULL 5-MODEL MATRIX, 5 seeds (CURRENT valid data, supersedes the Qwen-only table)
 
 The four extra models are in: **llama-3.1-8b** (2nd family), **mistral-7b** (3rd family),
 **qwen3-32b** (revived reasoning model, synergy-only), **deepseek-r1-distill-14b** and
 **deepseek-r1-distill-7b** (reasoning-distill family). All self-hosted (A100 80 GB), same
-harness, `--seeds 42 1042 2042 3042 4042` (mean ± std), all aggregates scp'd to the laptop
+harness, `--seeds 42 1042 2042 3042 4042` (mean ± std), all 24 aggregates scp'd to the laptop
 (`results/<model>*_seeds42_1042_2042_3042_4042.json`). Qwen2.5-7B numbers unchanged (re-pulled,
 identical to the 2026-06-13 pass). **Coverage is now ≥3 model families + a reasoning model — the
-two biggest D&B gaps from the novelty review are closed** (only run-level on the new models is
-partial; see "Coverage gaps" below).
+two biggest D&B gaps from the novelty review are closed.** **2026-07-11: the DeepSeek gap-fill
+jobs landed** (14b Silent-raw turn/combat; 7b turn/combat + synergy, all four combos) — every
+number below was re-read from the on-disk aggregates on 2026-07-12 and the tables are now the
+complete, authoritative matrix (remaining `—` cells are *intentionally not collected*, not
+pending; see "Coverage gaps").
 
 ### Ironclad — all models, n=20, 5 seeds (mean; structured / raw)
 
@@ -19,9 +22,13 @@ partial; see "Coverage gaps" below).
 | llama-3.1-8b | .487 / .711 | 1.00 / 1.00 | 1.04 / 1.04 | .51 / .41 | .69 / .61 | .15 / .07 | 13.37 / 13.76 | .836 / .86 |
 | mistral-7b | .177 / .416 | 1.00 / 1.00 | 1.04 / 1.01 | .33 / .45 | .58 / .36 | .15 / .00 | 12.72 / 12.83 | .795 / .802 |
 | deepseek-r1-14b | **.823** / .754 | .92 / .73 | .75 / .55 | .48 / .50 | .53 / .57 | .18 / **.30** | 9.75 / — | .609 / — |
+| deepseek-r1-7b | .343 / .427 | .27 / .19 | .11 / .08 | .38 / .43 | .63 / .62 | **.54** / .42 | — / — | — / — |
 | qwen3-32b | — / — | — / — | — / — | .53 / .50 | .59 / .58 | .29 / .22 | — / — | — / — |
 
-(qwen3-32b ran synergy only — turn/combat/run not collected. deepseek-r1-14b raw run-level not collected.)
+(qwen3-32b ran synergy only — turn/combat/run not collected. deepseek-r1-14b raw run-level and
+deepseek-r1-7b run-level not collected — intentional, see Coverage gaps. ⚠️ deepseek-7b synergy
+parse_ok is degraded — 0.92 structured / 0.70 raw, so only ~18.4 / ~14.0 of 20 fixtures scored
+per seed; its synergy accs are conditioned on the parseable subset.)
 
 ### Silent — all models, n=20, 5 seeds (mean; structured / raw)
 
@@ -30,31 +37,35 @@ partial; see "Coverage gaps" below).
 | qwen2.5-7b | .663 / .681 | 1.00 / 1.00 | 1.02 / 1.01 | .60 / .42 | .53 / .45 | .36 / .18 | 11.85 / 10.86 |
 | llama-3.1-8b | .472 / .810 | 1.00 / 1.00 | 1.01 / 1.01 | .72 / .61 | .49 / .57 | .18 / .16 | 11.42 / 11.34 |
 | mistral-7b | .200 / .394 | 1.00 / 1.00 | 1.02 / 0.90 | .34 / .43 | .56 / .20 | .04 / .00 | 11.63 / 11.04 |
-| deepseek-r1-14b | .839 / — | .57 / — | .39 / — | .60 / **.66** | .68 / .61 | .15 / .41 | — / — |
-| deepseek-r1-7b | — / .334 | — / .14 | — / .05 | — / — | — / — | — / — | — / — |
+| deepseek-r1-14b | .839 / .721 | .57 / .34 | .39 / .21 | .60 / **.66** | .68 / .61 | .15 / .41 | — / — |
+| deepseek-r1-7b | .261 / .334 | .28 / .14 | .15 / .05 | .42 / .31 | .50 / .45 | .45 / .41 | — / — |
 | qwen3-32b | — / — | — / — | — / — | **.80** / .64 | .57 / .46 | **.55** / .32 | — / — |
 
-### ⏳ Gap-fill jobs in flight (submitted 2026-06-22) — scp + fold when done
-- **deepseek-r1-distill-14b Silent raw turn/combat** — on `gpu-3day` (`--qos=gpu-3day`,
-  `LOCAL_TIMEOUT=1200`, `turn_combat_models_silent.sbatch`). Fills the 14b Silent-raw
-  turn/combat `—` cells below → then 14b Silent raw = turn/combat/synergy complete (only Silent
-  run still open, a floor dim).
-- **deepseek-r1-distill-7b turn/combat** (both chars/formats, `gpu-1day`,
-  `turn_combat_models.sbatch`) + **synergy** (both chars/formats, `gpu-short`,
-  `synergy_models.sbatch`). **7b run-level intentionally skipped** (7b collapses — it's the
-  "small distill fails the JSON contract" point, not a competitive line; run is a floor effect).
-- When these complete: scp the `*_seeds42_1042_2042_3042_4042.json` aggregates and replace the
-  `—` cells in the tables above + refresh findings.
+(⚠️ deepseek-7b Silent synergy parse_ok 0.91 structured / 0.69 raw → ~18.2 / ~13.8 of 20 scored
+per seed. deepseek-14b Silent-raw turn parse_ok 0.78; its combat parse_errors 4.97/combat.)
+
+### ✅ Gap-fill jobs LANDED (submitted 2026-06-22, retrieved 2026-07-11, folded 2026-07-12)
+- **deepseek-r1-distill-14b Silent raw turn/combat** (`gpu-3day`, `turn_combat_models_silent.sbatch`):
+  turn dmg **.721** (legal .75, parse_ok .78), combat win **.34**, hp_ratio **.21**, parse_errors
+  4.97 — the 14b's worst combat line; Silent raw is where its `<think>` verbosity costs the most.
+  14b Silent is now turn/combat/synergy complete in both formats; only Silent run remains open
+  (a floor dim, intentionally skipped).
+- **deepseek-r1-distill-7b turn/combat + synergy, all four combos** (`gpu-1day` + `gpu-short`):
+  the collapse generalizes matrix-wide — turn dmg .26–.43, combat win .14–.28, hp_ratio .05–.15,
+  combat parse_errors 7.9–8.3 in every combo. **7b run-level intentionally skipped** (it's the
+  "small distill fails the JSON contract" data point, not a competitive line; run is a floor
+  effect anyway). One surprise in the wreckage: **7b synergy removal is strong** (.41–.54;
+  IC structured **.54** is the 2nd-best removal in the whole matrix, behind only qwen3-32b
+  Silent .55) — but read with the parse_ok caveat above (only the parseable ~70–92% scored).
 
 ### Coverage gaps (what is NOT collected, so the matrix is read honestly)
 - **qwen3-32b: synergy only** (turn/combat/run all null). It's a synergy data point — but the
   decisive one: its Silent-structured archetype **0.80** and removal **0.55** are the highest
   in the entire matrix, and it's the only reasoning model that *stays terse* (parse_ok=1.0).
-- **deepseek-r1-14b: Ironclad complete incl. run; Silent has structured turn/combat/synergy +
-  raw synergy only** (no Silent raw turn/combat — that was the cell `turn_combat_models_silent.sbatch`
-  was set to raw-only to finish; the 3-day wall ran out first), no Silent run.
-- **deepseek-r1-7b: Silent raw turn/combat only** — a deliberate "does the small distill hold?"
-  probe; it does not (see findings).
+- **deepseek-r1-14b: Ironclad complete incl. run; Silent complete on turn/combat/synergy both
+  formats** (gap-fill 2026-07-11); no Silent run (floor dim, skipped).
+- **deepseek-r1-7b: turn/combat + synergy complete, all four combos** (gap-fill 2026-07-11);
+  run-level intentionally skipped (collapse line — see findings).
 - New models' run-level is sparse (only deepseek-14b Ironclad, llama, mistral have it) but
   run-level is a floor effect anyway → not a blocker for the headline claims.
 
@@ -63,17 +74,24 @@ partial; see "Coverage gaps" below).
    (Silent archetype 0.80, removal 0.55) — the *only* model that pulls clearly away from the
    7–8B pack at the deck-building horizon. This is the frontier-model line the curve needed.
 2. **Reasoning ≠ free win — the distill *family* splits hard by size.** deepseek-r1-**14b** is
-   strong at short horizons (best Ironclad turn dmg 0.823) but its verbose `<think>` decode
-   *hurts* longer horizons: combat win drops to 0.92/0.73 (first model below 1.0), Silent combat
-   to 0.57, and Ironclad run floors crash to **9.75 — below the greedy ~12.5 floor** (it overthinks
-   itself to death). deepseek-r1-**7b** collapses outright (Silent raw turn 0.33, combat win 0.14,
-   hp_ratio 0.05, parse_errors 7.93) — the small distill can't keep the JSON contract.
+   strong at short horizons (best turn dmg both characters: IC 0.823, Silent 0.839) but its
+   verbose `<think>` decode *hurts* longer horizons: combat win drops to 0.92/0.73 on Ironclad
+   (first model below 1.0), Silent combat to 0.57 structured / **0.34 raw** (hp_ratio 0.21),
+   and Ironclad run floors crash to **9.75 — below the greedy ~12.5 floor** (it overthinks
+   itself to death). deepseek-r1-**7b** collapses outright in *every* combo (turn 0.26–0.43,
+   combat win 0.14–0.28, parse_errors ~8/combat) — the small distill can't keep the JSON
+   contract. Anomaly worth a sentence in the paper: 7b's synergy **removal** stays high
+   (.41–.54, 2nd-best in the matrix on IC structured) — the judgment task survives the
+   execution collapse (with the parse_ok-conditioning caveat).
 3. **Format ablation replicates across families but is character/model-dependent in sign.**
-   Structured wins synergy for qwen2.5/llama/deepseek; mistral *reverses* on Ironclad archetype
+   Structured wins synergy for qwen2.5/llama; mistral *reverses* on Ironclad archetype
    (raw .45 > structured .33). Turn: llama & mistral are *better in raw* on both characters
-   (llama Silent raw .810 vs structured .472) — opposite of qwen2.5 Ironclad. The robust,
-   cross-model format signal is **synergy removal** (structured ≥ raw for every model: e.g.
-   mistral .15→.00, qwen2.5 .24→.02).
+   (llama Silent raw .810 vs structured .472) — opposite of qwen2.5 Ironclad. The most robust
+   cross-model format signal is **synergy removal** (structured ≥ raw for qwen2.5, llama,
+   mistral, qwen3-32b AND deepseek-7b: e.g. mistral .15→.00, qwen2.5 .24→.02) — with **one
+   documented exception: deepseek-14b reverses removal in BOTH characters** (IC .18
+   structured / **.30** raw; Silent .15 / **.41**), so state it as "structured ≥ raw for 5 of
+   6 models; the sole reversal is the verbose-`<think>` 14b distill."
 4. **Combat/run stay format- and largely model-insensitive on outcome** (almost everyone wins
    1.0, hp_ratio ≈ 1.0, floors ≈ greedy ~12.5) — except the reasoning models, which are the only
    ones that *lose* combats. Confirms the multi-horizon thesis: model differences surface at the

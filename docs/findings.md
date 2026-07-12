@@ -1,11 +1,14 @@
 # Findings
 
-## ✅✅ Full 5-model matrix, 5 seeds (2026-06-22) — CURRENT valid data (supersedes Qwen-only)
+## ✅✅ Full 5-model matrix, 5 seeds (2026-06-22; DeepSeek gap-fill folded 2026-07-11) — CURRENT valid data (supersedes Qwen-only)
 
 Five model families now run under the post-audit harness: qwen2.5-7b, llama-3.1-8b (2nd
 family), mistral-7b (3rd family), qwen3-32b (reasoning), deepseek-r1-distill-14b/7b (reasoning
 distill). Full tables in `docs/experiment_log.md`. The two D&B-blocking gaps from the novelty
-review — ≥3 model families and a reasoning model — are now closed.
+review — ≥3 model families and a reasoning model — are now closed. **2026-07-11 gap-fill:**
+deepseek-14b Silent-raw turn/combat and deepseek-7b turn/combat + synergy (all four combos)
+landed and are folded in below — the DeepSeek picture is now complete except intentionally
+skipped run-level cells.
 
 1. **The horizon-collapse curve finally separates.** With only 7–8B instruct models the four
    per-horizon lines ran roughly parallel; **qwen3-32b (reasoning) is the first line to bend
@@ -18,27 +21,37 @@ review — ≥3 model families and a reasoning model — are now closed.
 
 2. **Reasoning is not a free win — the deepseek distills split hard by size, and verbose decode
    actively hurts long horizons.** deepseek-r1-distill-**14b** is the *best* model at the
-   shortest horizon (Ironclad turn dmg **0.823** vs the 0.18–0.71 pack) but pays for its
-   `<think>` verbosity downstream: it is the **only model that loses combats** (Ironclad win
-   0.92/0.73, Silent 0.57), its combat hp_ratio drops to 0.39–0.75 (everyone else ≈1.0), and its
-   Ironclad run-level floors crash to **9.75 — below the greedy ~12.5 floor**: it over-deliberates
-   into death. deepseek-r1-distill-**7b** collapses entirely (Silent raw turn 0.33, combat win
-   0.14, hp_ratio 0.05, **parse_errors 7.93**) — the small distill cannot hold the terse-JSON
-   contract under reasoning load. **Lesson for the paper:** "reasoning model" is not a monolith;
-   distillation size and output discipline gate whether reasoning helps, and the cost lands on the
-   *long* horizons — itself a horizon-collapse result.
+   shortest horizon on BOTH characters (turn dmg IC **0.823**, Silent **0.839** vs the 0.18–0.71
+   pack) but pays for its `<think>` verbosity downstream: it is the **only mid-size model that
+   loses combats** (Ironclad win 0.92/0.73; Silent 0.57 structured, **0.34 raw** with hp_ratio
+   0.21 and ~5 parse_errors/combat — the 2026-07-11 gap-fill's sharpest new cell), its combat
+   hp_ratio drops to 0.21–0.75 (everyone else ≈1.0), and its Ironclad run-level floors crash to
+   **9.75 — below the greedy ~12.5 floor**: it over-deliberates into death.
+   deepseek-r1-distill-**7b** collapses in **every one of the four combos** (turn 0.26–0.43,
+   combat win 0.14–0.28, hp_ratio 0.05–0.15, **parse_errors ~8/combat**; turn parse_ok as low
+   as 0.38) — the small distill cannot hold the terse-JSON contract under reasoning load.
+   **New anomaly from the gap-fill:** 7b's synergy **removal acc stays high (.41–.54; IC
+   structured .54 is 2nd in the whole matrix, behind only qwen3-32b's .55)** while everything
+   execution-shaped collapses around it — the single-shot judgment call survives when multi-step
+   execution dies. Caveat: 7b synergy parse_ok is 0.69–0.92, so those accs are conditioned on
+   the parseable ~14–18 of 20 fixtures. **Lesson for the paper:** "reasoning model" is not a
+   monolith; distillation size and output discipline gate whether reasoning helps, and the cost
+   lands on the *long* horizons — itself a horizon-collapse result.
 
 3. **Format ablation replicates across families but its *sign* is model- and character-dependent
-   — except synergy removal, which is the robust signal.** Structured ≥ raw on **synergy removal
-   for every single model** (mistral .15→.00, qwen2.5 .24→.02, llama .15→.07, Silent likewise),
-   so removal is the cleanest cross-model format effect. But the direction flips elsewhere:
-   mistral *reverses* on Ironclad archetype (raw .45 > structured .33); llama and mistral are
-   **better in raw at turn-level** on both characters (llama Silent raw 0.810 vs structured
-   0.472) — the opposite of qwen2.5's Ironclad turn. So "structured helps reasoning" is true *in
-   aggregate and most strongly at the synergy/removal horizon*, not as a blanket per-cell rule.
-   Report it as: format matters, the effect is concentrated at the deck-building horizon, and its
-   magnitude/sign varies by model — which is itself a finding (format sensitivity is a model
-   property, not a constant).
+   — synergy removal is the most robust signal, with exactly one exception.** Structured ≥ raw on
+   **synergy removal for 5 of 6 models** (mistral .15→.00, qwen2.5 .24→.02, llama .15→.07,
+   qwen3-32b .29→.22 & .55→.32, deepseek-7b .54→.42 & .45→.41; Silent likewise), so removal is
+   the cleanest cross-model format effect. **The sole reversal is deepseek-14b — raw beats
+   structured on removal in BOTH characters** (IC .18/.30, Silent .15/.41), consistent with the
+   verbose-`<think>` model treating the terse structured contract worse than free prose. The
+   direction also flips elsewhere: mistral *reverses* on Ironclad archetype (raw .45 > structured
+   .33); llama and mistral are **better in raw at turn-level** on both characters (llama Silent
+   raw 0.810 vs structured 0.472) — the opposite of qwen2.5's Ironclad turn. So "structured helps
+   reasoning" is true *in aggregate and most strongly at the synergy/removal horizon*, not as a
+   blanket per-cell rule. Report it as: format matters, the effect is concentrated at the
+   deck-building horizon, and its magnitude/sign varies by model — which is itself a finding
+   (format sensitivity is a model property, not a constant).
 
 4. **Combat/run remain the shared collapse floor — model differences wash out where engine
    survival dominates.** All instruct models win ~100% of scripted combats with hp_ratio ≈ 1.0
