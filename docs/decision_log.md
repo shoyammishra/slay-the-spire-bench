@@ -1,5 +1,49 @@
 # Decision Log
 
+## 2026-07-14 — External expert review adopted as evaluation baseline; backlog re-prioritized (stats pass promoted, P6 scope extended)
+
+**Context.** The user provided a NeurIPS-grade external review of the current project
+state (full text + project-side assessment preserved in `docs/review_2026-07-14.md`)
+and directed that it be adopted as the evaluation baseline for all future paper-side
+decisions. Verdict: 6.6/10 weak reject at D&B today; top rejection reasons = missing
+frontier models (sev 10), single-environment generalization (10), external validation /
+benchmark correlations (9/8), statistical rigor, claims-vs-evidence scoping. The
+review's gap ranking independently converged with our own venue ladder — treated as
+validation of the existing plan plus four concrete deltas.
+
+**Decisions.**
+1. **M3b stays #1, gains scope:** when frontier results land, correlate per-model
+   collapse points against *published* external agent-benchmark scores (GAIA /
+   SWE-Bench / WebArena etc.) — no external benchmarks run by us; n≈8–10 models
+   reported as directional only. Answers the "why should anyone care" / Reviewer-D
+   criticism at near-zero cost.
+2. **NEW P4b — statistical rigor pass, promoted ahead of paper assembly:** bootstrap
+   CIs, effect sizes, **paired seed-matched tests for the format ablation** (the
+   design was built for this; the test has never been run), variance decomposition.
+   Zero GPU — pure analysis on the 24 aggregates + persisted per-sample records.
+   Unblocked now; must be trivially re-runnable when M3b rows land.
+3. **P6 scope extended:** explicit oracle-quality limitations taxonomy (turn exact →
+   combat greedy → synergy expert → run baseline); three named rebuttal arguments we
+   already hold evidence for — (a) difficulty≠horizon via the dissociation pattern
+   (deepseek-7b execution collapse vs matrix-2nd synergy removal; qwen3-32b bends only
+   at synergy), (b) run-level collapse ≠ context accumulation (memoryless harness,
+   bounded prompts), (c) budget-bound deliberation as a mechanistic account for one
+   family; plus a claim-scoping pass ("in this benchmark" until M3b/second-domain
+   evidence) and the explicit memory/tools scope-out defense (floor vs ceiling).
+4. **Second environment: explicitly deferred**, acknowledged in the paper as the known
+   generalization gap; revisit after M3b. TMLR (review: 65–80%) is the honest fallback.
+
+**Not adopted (recorded to avoid re-litigation):** memory + tools ablations (break
+per-horizon oracle determinism / measure scaffolding ceiling, not planning floor —
+documented design scope-out, must be stated in the paper); "dataset weak" (fixture
+protocol is small-by-design and part of the method); citation projections (noise).
+
+**Trade-offs.** Promoting the stats pass ahead of assembly delays prose but every
+number it produces feeds the assembly anyway; the correlation study is deliberately
+cheap-and-directional rather than a run-it-ourselves validation (cost would be an
+entire second project). Revisit trigger: if M3b frontier models also floor at run
+level, the second-environment question becomes the binding constraint for D&B.
+
 ## 2026-07-14 — Act 2/3 audit fix batch: encounter-pool reclassification, draw=loss symmetry, fail-loud spawning
 
 **Context.** Full adversarial audit of `enemies_act2.py` + multi-act plumbing
