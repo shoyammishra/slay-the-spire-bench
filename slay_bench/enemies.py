@@ -191,7 +191,7 @@ class RedLouse(Enemy):
         else:
             _enemy_attack(state, self, self.current_move)
 
-    def on_damage_taken(self, state, amount):
+    def on_damage_taken(self, state, amount, from_attack=True):
         if not self._curl_triggered and PowerId.CURL_UP in self.powers:
             self.add_block(self.powers[PowerId.CURL_UP])
             self._curl_triggered = True
@@ -224,7 +224,7 @@ class GreenLouse(Enemy):
         else:
             _enemy_attack(state, self, self.current_move)
 
-    def on_damage_taken(self, state, amount):
+    def on_damage_taken(self, state, amount, from_attack=True):
         if not self._curl_triggered and PowerId.CURL_UP in self.powers:
             self.add_block(self.powers[PowerId.CURL_UP])
             self._curl_triggered = True
@@ -659,18 +659,18 @@ class Hexaghost(Enemy):
         if m.name == "Activate":
             pass
         elif m.name in ("Divider", "Inferno"):
+            # Divider does NOT add Burns in the real fight (Activate/Inferno
+            # handle Burns); the old 6-Burn block here was wrong (bug_audit M3).
             _enemy_attack(state, self, m)
-            if m.name == "Divider":
-                from .cards import Burn
-                for _ in range(6):
-                    state.combat.draw_pile.insert(0, Burn())
         elif m.name == "Inflame":
             self.powers[PowerId.STRENGTH] = self.powers.get(PowerId.STRENGTH, 0) + 2
             self.add_block(12)
         else:  # Sear
+            # Sear adds 1 Burn to the DISCARD pile (was draw-pile top =
+            # guaranteed next draw, strictly worse than the real game).
             _enemy_attack(state, self, m)
             from .cards import Burn
-            state.combat.draw_pile.insert(0, Burn())
+            state.combat.discard_pile.append(Burn())
 
 
 # ── Enemy factory ─────────────────────────────────────────────────────────────

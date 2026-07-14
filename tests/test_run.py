@@ -554,6 +554,58 @@ def test_greedy_baseline_determinism():
     print("[PASS] Greedy run-level baseline: deterministic, zero LLM calls")
 
 
+# ── 2026-07-14 Act 2/3 audit regression tests ─────────────────────────────────
+
+def test_encounter_tables_resolve():
+    """C1(a)/M1: every enemy id in all 9 encounter tables resolves in the
+    registry, and every pool/encounter is non-empty. This invariant alone would
+    have caught the 'DonuAndDeca' phantom id (Act-3 boss spawned ZERO enemies →
+    instant free win on 1/3 of boss rolls)."""
+    from slay_bench.run_loop import (
+        ACT1_MONSTER_ENCOUNTERS, ACT1_ELITE_ENCOUNTERS, ACT1_BOSS_ENCOUNTERS,
+        ACT2_MONSTER_ENCOUNTERS, ACT2_ELITE_ENCOUNTERS, ACT2_BOSS_ENCOUNTERS,
+        ACT3_MONSTER_ENCOUNTERS, ACT3_ELITE_ENCOUNTERS, ACT3_BOSS_ENCOUNTERS)
+    from slay_bench.enemies import ENEMY_REGISTRY
+    tables = {
+        "ACT1_MONSTER": ACT1_MONSTER_ENCOUNTERS, "ACT1_ELITE": ACT1_ELITE_ENCOUNTERS,
+        "ACT1_BOSS": ACT1_BOSS_ENCOUNTERS, "ACT2_MONSTER": ACT2_MONSTER_ENCOUNTERS,
+        "ACT2_ELITE": ACT2_ELITE_ENCOUNTERS, "ACT2_BOSS": ACT2_BOSS_ENCOUNTERS,
+        "ACT3_MONSTER": ACT3_MONSTER_ENCOUNTERS, "ACT3_ELITE": ACT3_ELITE_ENCOUNTERS,
+        "ACT3_BOSS": ACT3_BOSS_ENCOUNTERS,
+    }
+    for name, table in tables.items():
+        assert table, f"{name} pool is empty"
+        for enc in table:
+            assert enc, f"{name} contains an empty encounter"
+            for eid in enc:
+                assert eid in ENEMY_REGISTRY, f"{name}: unknown enemy id {eid!r}"
+    print("[PASS] All 9 encounter tables resolve in the enemy registry")
+
+
+def test_spawn_enemies_fails_loud():
+    """C1(b,c): spawn_enemies raises on an unknown id (the silent skip masked C1
+    for months); ['Donu','Deca'] spawns both bodies; start_combat refuses an
+    empty enemy list (defense in depth against auto-wins)."""
+    from slay_bench import start_combat
+    from slay_bench.run_loop import spawn_enemies
+    state = new_ironclad_game(42)
+    try:
+        spawn_enemies(state, ["DonuAndDeca"])
+        assert False, "spawn_enemies must raise on an unknown enemy id"
+    except ValueError:
+        pass
+    pair = spawn_enemies(state, ["Donu", "Deca"], boss=True)
+    assert len(pair) == 2, f"Donu+Deca must spawn 2 enemies, got {len(pair)}"
+    assert {e.id for e in pair} == {"Donu", "Deca"}
+    assert sorted(e.is_deca for e in pair) == [False, True]
+    try:
+        start_combat(state, [])
+        assert False, "start_combat must raise on an empty enemy list"
+    except ValueError:
+        pass
+    print("[PASS] spawn_enemies + start_combat fail loud on bad input")
+
+
 if __name__ == "__main__":
     tests = [
         test_map_generation,
@@ -593,6 +645,9 @@ if __name__ == "__main__":
         test_tiny_house_no_energy_upgrades_card,
         # 2026-07-12 greedy run-level baseline
         test_greedy_baseline_determinism,
+        # 2026-07-14 Act 2/3 audit
+        test_encounter_tables_resolve,
+        test_spawn_enemies_fails_loud,
     ]
     passed = failed = 0
     for test in tests:

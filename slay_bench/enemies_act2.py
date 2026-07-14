@@ -15,7 +15,9 @@ class Chosen(Enemy):
     def __init__(self, hp_rng):
         hp = hp_rng.next_int(14) + 95  # 95-108
         super().__init__("Chosen", "Chosen", hp, hp)
-        self.powers[PowerId.ARTIFACT] = 1
+        # Real Chosen has NO Artifact — the invented stack silently ate the
+        # player's first debuff (Bash Vuln, Neutralize Weak, poison openers),
+        # punishing debuff archetypes, Silent most (bug_audit M5). Removed.
         self.move_history = []
 
     def select_move(self, state):
@@ -76,6 +78,7 @@ class Byrd(Enemy):
         super().__init__("Byrd", "Byrd", hp, hp)
         self.move_history = []
         self._flying = True
+        self._flight_hits = 3  # grounded after 3 damaging attack hits (Flight)
 
     def select_move(self, state):
         pattern = ["Peck", "Peck", "Peck", "Swoop", "Peck", "Peck", "Headbutt"]
@@ -92,6 +95,18 @@ class Byrd(Enemy):
     def execute_move(self, state):
         self.move_history.append(self.current_move.name)
         _enemy_attack(state, self, self.current_move)
+
+    def on_damage_taken(self, state, amount, from_attack=True):
+        # Flight: each damaging ATTACK hit reduces the flight counter; at 0 the
+        # Byrd is grounded (attack damage no longer halved). Non-attack damage
+        # (Combust/Juggernaut) does NOT reduce Flight, matching the real game.
+        # Real Byrds regain Flight later — the grounded-stays-grounded
+        # simplification is fine for our short fights (Headbutt is its grounded
+        # move; documented-design).
+        if from_attack and self._flying:
+            self._flight_hits -= 1
+            if self._flight_hits <= 0:
+                self._flying = False
 
 
 class CenturionAndMystic(Enemy):
@@ -155,46 +170,49 @@ class TorchHead(Enemy):
 
 class Transient(Enemy):
     def __init__(self, hp_rng):
-        hp = hp_rng.next_int(20) + 999  # effectively immortal until 5 turns
+        hp = hp_rng.next_int(20) + 999  # high HP; Fading escapes at end of turn 5
         super().__init__("Transient", "Transient", hp, hp)
-        self.powers[PowerId.INTANGIBLE] = 1
+        # Real Transient has NO Intangible (it has Fading + Shifting). The old
+        # permanent Intangible + set-hp=0-on-turn-5 made the fight decision-free
+        # and scored the ~150-damage HP tax as a WIN. Now legitimately blockable
+        # and killable. Shifting stays unimplemented (documented-design).
         self._turns = 0
 
     def select_move(self, state):
         self._turns += 1
-        # Transient stays Intangible the whole fight; enemy INTANGIBLE now ticks
-        # down each round, so re-apply it here (runs after the round-end tick).
-        self.powers[PowerId.INTANGIBLE] = 1
-        if self._turns >= 3:
-            self.current_move = Move("Swift Strike", IntentType.ATTACK, damage=10, hits=self._turns)
-        else:
-            self.current_move = Move("Swift Strike", IntentType.ATTACK, damage=10, hits=self._turns)
+        # Attack curve: single hit 30 + 10 per prior turn (real Attack Debilitate
+        # curve), not the old 10×turn-count multi-hit.
+        dmg = 30 + 10 * (self._turns - 1)
+        self.current_move = Move("Attack", IntentType.ATTACK, damage=dmg, hits=1)
         return self.current_move
 
     def execute_move(self, state):
         _enemy_attack(state, self, self.current_move)
         if self._turns >= 5:
-            self.hp = 0  # escapes
+            self.hp = 0  # Fading: flees at the end of its 5th turn (ends fight)
 
 
 class BookOfStabbing(Enemy):
     def __init__(self, hp_rng):
         hp = hp_rng.next_int(16) + 160  # 160-175
         super().__init__("BookOfStabbing", "Book of Stabbing", hp, hp)
-        self._stabs = 1
+        # Multi-Stab hits = 2 + number of prior Multi-Stabs (real scaling). The
+        # counter increments when Multi-Stab is USED, not on every other move.
+        self._stabs = 2
         self.move_history = []
 
     def select_move(self, state):
         if len(self.move_history) % 3 == 2:
             self.current_move = Move("Multi-Stab", IntentType.ATTACK, damage=6, hits=self._stabs)
         else:
-            self.current_move = Move("Stab", IntentType.ATTACK, damage=6, hits=1)
+            # Single Stab is 21 damage in the real fight (was 6).
+            self.current_move = Move("Stab", IntentType.ATTACK, damage=21, hits=1)
         return self.current_move
 
     def execute_move(self, state):
         self.move_history.append(self.current_move.name)
         _enemy_attack(state, self, self.current_move)
-        if self.current_move.name != "Multi-Stab":
+        if self.current_move.name == "Multi-Stab":
             self._stabs += 1
 
 
@@ -203,6 +221,7 @@ class WrithingMass(Enemy):
         hp = hp_rng.next_int(15) + 160  # 160-174
         super().__init__("WrithingMass", "Writhing Mass", hp, hp)
         self.powers[PowerId.MALLEABLE] = 3
+        self._malleable_base = 3  # _tick_enemy_powers resets Malleable to this
         self.move_history = []
 
     def select_move(self, state):
@@ -210,7 +229,9 @@ class WrithingMass(Enemy):
         if roll < 15:
             self.current_move = Move("Flail", IntentType.ATTACK, damage=16)
         elif roll < 35:
-            self.current_move = Move("Wither", IntentType.ATTACK_DEBUFF, damage=12)
+            # Real Wither: 10 damage + 2 Weak + 2 Vulnerable (was 12 dmg, Weak 2
+            # only; the audit's Frail recollection was wiki-corrected 2026-07-14).
+            self.current_move = Move("Wither", IntentType.ATTACK_DEBUFF, damage=10)
         elif roll < 60:
             self.current_move = Move("Strong Strike", IntentType.ATTACK, damage=38)
         else:
@@ -221,11 +242,16 @@ class WrithingMass(Enemy):
         m = self.current_move
         self.move_history.append(m.name)
         if m.name == "Wither":
+            # Real Wither: 10 damage + 2 Weak + 2 VULNERABLE (wiki-checked
+            # 2026-07-14; the audit's L8 recollection said Frail — corrected).
             _enemy_attack(state, self, m)
             from .cards import _apply_power
             _apply_power(state, state.player, PowerId.WEAK, 2)
+            _apply_power(state, state.player, PowerId.VULNERABLE, 2)
         elif m.name == "Implant":
-            from .cards import Slimed, _apply_power
+            # Implant → NO_DRAW-1 is the documented stand-in for the real
+            # Parasite curse (see documented-design register).
+            from .cards import _apply_power
             _apply_power(state, state.player, PowerId.NO_DRAW, 1)
         else:
             _enemy_attack(state, self, m)
@@ -332,7 +358,7 @@ class Taskmaster(Enemy):
         self.move_history.append("Scouring Whip")
         _enemy_attack(state, self, self.current_move)
         from .cards import Wound
-        state.combat.draw_pile.insert(0, Wound())
+        state.combat.discard_pile.append(Wound())  # was draw-pile top (M3)
 
 
 # ── Act 2 Bosses ──────────────────────────────────────────────────────────────
@@ -345,10 +371,14 @@ class TheCollector(Enemy):
         self._spawned = False
 
     def _spawn_torches(self, state):
-        for _ in range(2):
-            if len(state.combat.enemies) < 4:
-                torch = TorchHead(state.rng.hp_rng)
-                state.combat.enemies.append(torch)
+        # Real Collector refills only DEAD torches (max 2 alive). The old
+        # len(enemies) < 4 gate counted the Collector itself, letting a 3rd
+        # torch spawn while 2 were alive (bug_audit L5).
+        alive_torches = sum(1 for e in state.combat.enemies
+                            if e.id == "TorchHead" and e.hp > 0)
+        for _ in range(max(0, 2 - alive_torches)):
+            torch = TorchHead(state.rng.hp_rng)
+            state.combat.enemies.append(torch)
 
     def select_move(self, state):
         pattern = ["Spawn", "Buff", "Mega Slash", "Buff", "Mega Slash"]
@@ -381,13 +411,20 @@ class BronzeAutomaton(Enemy):
         super().__init__("BronzeAutomaton", "Bronze Automaton", hp, hp)
         self.move_history = []
         self.powers[PowerId.ARTIFACT] = 3
+        self._spawned_orbs = False
 
     def select_move(self, state):
         pattern = ["Spawn", "Flail", "Flail", "Hyper Beam", "Stunned", "Stunned"]
         idx = len(self.move_history) % len(pattern)
         name = pattern[idx]
         if name == "Spawn":
-            self.current_move = Move("Spawn Orbs", IntentType.BUFF)
+            # Orbs spawn ONCE in the real fight. On repeat "Spawn" slots (moves
+            # 6, 12, …) Boost instead (+3 Strength, +9 block) — the old code had
+            # no cap, spawning 2 fresh orbs every 6 turns unbounded (bug_audit H2).
+            if not self._spawned_orbs:
+                self.current_move = Move("Spawn Orbs", IntentType.BUFF)
+            else:
+                self.current_move = Move("Boost", IntentType.BUFF)
         elif name == "Hyper Beam":
             self.current_move = Move("Hyper Beam", IntentType.ATTACK, damage=45)
         elif name == "Stunned":
@@ -400,10 +437,14 @@ class BronzeAutomaton(Enemy):
         m = self.current_move
         self.move_history.append(m.name)
         if m.name == "Spawn Orbs":
-            # Spawn 2 Orb Walkers
+            # Spawn 2 Orb Walkers, once per combat.
             for _ in range(2):
                 orb = _OrbWalker(state.rng.hp_rng)
                 state.combat.enemies.append(orb)
+            self._spawned_orbs = True
+        elif m.name == "Boost":
+            self.powers[PowerId.STRENGTH] = self.powers.get(PowerId.STRENGTH, 0) + 3
+            self.add_block(9)
         elif m.name == "Hyper Beam":
             _enemy_attack(state, self, m)
         elif m.name != "Stunned":
@@ -412,7 +453,7 @@ class BronzeAutomaton(Enemy):
 
 class _OrbWalker(Enemy):
     def __init__(self, hp_rng):
-        hp = hp_rng.next_int(5) + 80  # 80-84
+        hp = hp_rng.next_int(7) + 52  # 52-58 (real Bronze Orb band; was 80-84)
         super().__init__("OrbWalker", "Orb Walker", hp, hp)
 
     def select_move(self, state):
@@ -524,20 +565,19 @@ class GiantHead(Enemy):
 
     def select_move(self, state):
         if len(self.move_history) < 3:
-            self.current_move = Move("Count", IntentType.BUFF)
+            # Real Count is a 13-damage attack (was a no-damage +1 Str buff).
+            self.current_move = Move("Count", IntentType.ATTACK, damage=13)
         else:
             self._slow_count += 1
-            dmg = 13 + self._slow_count * 2
+            # It Is Time: 30, +5 per use, capped at 40 (was 13 + 2/use).
+            dmg = min(40, 30 + 5 * (self._slow_count - 1))
             self.current_move = Move("It Is Time", IntentType.ATTACK, damage=dmg)
         return self.current_move
 
     def execute_move(self, state):
         m = self.current_move
         self.move_history.append(m.name)
-        if m.name == "Count":
-            self.powers[PowerId.STRENGTH] = self.powers.get(PowerId.STRENGTH, 0) + 1
-        else:
-            _enemy_attack(state, self, m)
+        _enemy_attack(state, self, m)
 
 
 class Maw(Enemy):
@@ -547,13 +587,14 @@ class Maw(Enemy):
         self.move_history = []
 
     def select_move(self, state):
-        pattern = ["Roar", "Drool", "Nom", "Nom"]
-        idx = len(self.move_history) % len(pattern)
-        name = pattern[idx]
-        if name == "Roar":
+        # Roar is turn-1 ONLY (real fight). After that, cycle Drool/Nom/Nom.
+        if not self.move_history:
             self.current_move = Move("Roar", IntentType.DEBUFF)
-        elif name == "Drool":
-            self.current_move = Move("Drool", IntentType.DEBUFF)
+            return self.current_move
+        cycle = ["Drool", "Nom", "Nom"]
+        name = cycle[(len(self.move_history) - 1) % len(cycle)]
+        if name == "Drool":
+            self.current_move = Move("Drool", IntentType.BUFF)
         else:
             self.current_move = Move("Nom", IntentType.ATTACK, damage=25)
         return self.current_move
@@ -566,8 +607,9 @@ class Maw(Enemy):
             _apply_power(state, state.player, PowerId.VULNERABLE, 3)
             _apply_power(state, state.player, PowerId.WEAK, 3)
         elif m.name == "Drool":
-            from .cards import _apply_power
-            _apply_power(state, state.player, PowerId.CONFUSED, 1)
+            # Real Drool: Maw gains +5 Strength (was an invented CONFUSED that
+            # punished the LLM's cost model — not this fight's mechanic; M7).
+            self.powers[PowerId.STRENGTH] = self.powers.get(PowerId.STRENGTH, 0) + 5
         else:
             _enemy_attack(state, self, m)
 
@@ -606,9 +648,9 @@ class Nemesis(Enemy):
         m = self.current_move
         self.move_history.append(m.name)
         if m.name == "Debuff":
-            from .cards import Burn, _draw_cards
+            from .cards import Burn
             for _ in range(3):
-                state.combat.draw_pile.insert(0, Burn())
+                state.combat.discard_pile.append(Burn())  # was draw-pile top (M3)
         else:
             _enemy_attack(state, self, m)
 
@@ -629,7 +671,14 @@ class Reptomancer(Enemy):
         idx = len(self.move_history) % len(pattern)
         name = pattern[idx]
         if name == "Summon":
-            self.current_move = Move("Summon", IntentType.BUFF)
+            # Real Reptomancer caps at 4 daggers alive; a Summon slot with 4+
+            # already out fizzles to Slash (bug_audit L7).
+            alive_daggers = sum(1 for e in state.combat.enemies
+                                if e.id == "SnakeDagger" and e.hp > 0)
+            if alive_daggers >= 4:
+                self.current_move = Move("Slash", IntentType.ATTACK, damage=15)
+            else:
+                self.current_move = Move("Summon", IntentType.BUFF)
         elif name == "Big Slash":
             self.current_move = Move("Big Slash", IntentType.ATTACK, damage=30)
         else:
@@ -713,8 +762,8 @@ class SpireSpear(Enemy):
         if m.name == "Burn Strike":
             _enemy_attack(state, self, m)
             from .cards import Burn
-            state.combat.draw_pile.insert(0, Burn())
-            state.combat.draw_pile.insert(0, Burn())
+            state.combat.discard_pile.append(Burn())  # was draw-pile top (M3)
+            state.combat.discard_pile.append(Burn())
         else:
             _enemy_attack(state, self, m)
 
@@ -741,7 +790,9 @@ class DonuAndDeca(Enemy):
             if name == "Square of Protection":
                 self.current_move = Move("Square of Protection", IntentType.BUFF)
             else:
-                self.current_move = Move("Beam", IntentType.ATTACK, damage=10, hits=3)
+                # Both Donu and Deca Beam 10×2 in the real fight (was 10×3 Deca,
+                # 10×1 Donu). Deca's Beam also adds 2 Dazed to the discard (M8).
+                self.current_move = Move("Beam", IntentType.ATTACK, damage=10, hits=2)
         else:
             pattern = ["Circle of Power", "Beam", "Beam"]
             idx = len(self.move_history) % len(pattern)
@@ -749,7 +800,7 @@ class DonuAndDeca(Enemy):
             if name == "Circle of Power":
                 self.current_move = Move("Circle of Power", IntentType.BUFF)
             else:
-                self.current_move = Move("Beam", IntentType.ATTACK, damage=10)
+                self.current_move = Move("Beam", IntentType.ATTACK, damage=10, hits=2)
         return self.current_move
 
     def execute_move(self, state):
@@ -765,6 +816,10 @@ class DonuAndDeca(Enemy):
                     e.powers[PowerId.STRENGTH] = e.powers.get(PowerId.STRENGTH, 0) + 3
         else:
             _enemy_attack(state, self, m)
+            if self.is_deca:
+                from .cards import Dazed
+                state.combat.discard_pile.append(Dazed())
+                state.combat.discard_pile.append(Dazed())
 
 
 class AwakenedOne(Enemy):
@@ -774,6 +829,11 @@ class AwakenedOne(Enemy):
         self.move_history = []
         self._phase2 = False
         self._reborn = False
+        # Regenerate 10: real Awakened One heals 10/turn (the engine already
+        # ticks enemy REGENERATE in _tick_enemy_powers). Kept across both phases
+        # per the audit's default (bug_audit L9); see impl notes for the wiki
+        # ambiguity on whether phase 2 retains it.
+        self.powers[PowerId.REGENERATE] = 10
 
     def select_move(self, state):
         if not self._phase2:
@@ -814,7 +874,11 @@ class AwakenedOne(Enemy):
         elif m.name == "Sludge":
             _enemy_attack(state, self, m)
             from .cards import Slimed
-            state.combat.draw_pile.insert(0, Slimed())
+            # Real Sludge shuffles a Slimed INTO the draw pile at a random
+            # position (was guaranteed next draw via insert(0); M3).
+            draw = state.combat.draw_pile
+            pos = state.rng.misc_rng.next_int(len(draw) + 1)
+            draw.insert(pos, Slimed())
 
     def on_death(self, state):
         if not self._reborn:
@@ -840,7 +904,9 @@ class TimeEater(Enemy):
         if name == "Ripple":
             self.current_move = Move("Ripple", IntentType.BUFF)
         elif name == "Reverberate":
-            self.current_move = Move("Reverberate", IntentType.ATTACK, damage=18)
+            # Real Reverberate is 7×3 (was 18×1). The half-HP Haste (heal to 50%,
+            # shed debuffs) stays unimplemented (documented-design; L10).
+            self.current_move = Move("Reverberate", IntentType.ATTACK, damage=7, hits=3)
         else:
             self.current_move = Move("Head Slam", IntentType.ATTACK_DEBUFF, damage=26)
         return self.current_move

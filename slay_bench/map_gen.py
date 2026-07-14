@@ -13,7 +13,8 @@ if TYPE_CHECKING:
 ACT_STRUCTURE = {
     1: (15, 16),   # floors 1-15 content, floor 16 boss
     2: (15, 31),
-    3: (14, 54),
+    3: (15, 47),   # was (14, 54): Act 3 has 15 content floors like the others;
+                   # cumulative boss floor after 16+15 = 47 (bug_audit M9)
 }
 
 # Node distribution weights per act (approximate StS weights)

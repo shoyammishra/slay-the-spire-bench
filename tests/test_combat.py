@@ -1107,6 +1107,204 @@ def test_limit_break_no_zero_strength_key():
     print("[PASS] Limit Break writes no zero-Strength entry")
 
 
+# ── 2026-07-14 Act 2/3 audit regression tests ─────────────────────────────────
+
+def test_entangled_blocks_attacks_next_turn():
+    """H1: Entangle applied during the enemy phase blocks ATTACK cards for the
+    whole of the player's next turn (SKILLs still playable), then ticks away —
+    it used to be deleted at the start of the player's turn, a complete no-op."""
+    from slay_bench.enemies_act2 import Slavers
+    from slay_bench.enemies import Move, IntentType
+    from slay_bench.enums import PowerId
+    state = new_ironclad_game(42)
+    slaver = Slavers(state.rng.hp_rng, is_red=True)
+    start_combat(state, [slaver])
+    state.player.max_hp = 1000
+    state.player.hp = 1000
+    # Force Entangle as the move executed this enemy phase.
+    slaver.current_move = Move("Entangle", IntentType.DEBUFF)
+    state.combat.hand.clear()
+    end_player_turn(state)
+    assert PowerId.ENTANGLED in state.player.powers, \
+        "Entangle must survive into the player's next turn (just_applied guard)"
+    strike, defend = Strike(), Defend()
+    state.combat.hand[:] = [strike, defend]
+    state.player.energy = 3
+    assert not strike.can_play(state), "ATTACK must be blocked while Entangled"
+    assert defend.can_play(state), "SKILL must stay playable while Entangled"
+    # End of this round: Entangled ticks away -> attacks playable again.
+    state.combat.hand.clear()
+    end_player_turn(state)
+    assert PowerId.ENTANGLED not in state.player.powers, "Entangled must tick away"
+    s2 = Strike()
+    state.combat.hand[:] = [s2]
+    state.player.energy = 3
+    assert s2.can_play(state), "ATTACK must be playable again the turn after"
+    print("[PASS] Entangled blocks attacks for exactly one player turn")
+
+
+def test_bronze_automaton_spawns_orbs_once():
+    """H2: Bronze Automaton spawns its 2 Orb Walkers ONCE; repeat 'Spawn' slots
+    (moves 6, 12, ...) Boost instead. It used to add 2 fresh orbs every 6 turns
+    unbounded."""
+    from slay_bench.enemies_act2 import BronzeAutomaton
+    state = new_ironclad_game(42)
+    auto = BronzeAutomaton(state.rng.hp_rng)
+    start_combat(state, [auto])
+    state.player.max_hp = 10000
+    state.player.hp = 10000
+    for _ in range(14):  # covers Spawn slots at moves 0, 6 and 12
+        state.combat.hand.clear()
+        end_player_turn(state)
+    orbs = [e for e in state.combat.enemies if e.id == "OrbWalker"]
+    assert len(orbs) == 2, f"expected exactly 2 Orb Walkers ever, got {len(orbs)}"
+    from slay_bench.enums import PowerId
+    assert auto.powers.get(PowerId.STRENGTH, 0) >= 3, \
+        "repeat Spawn slots must Boost (+3 Strength) instead of spawning"
+    print("[PASS] Bronze Automaton spawns orbs once, Boosts thereafter")
+
+
+def test_malleable_grant_reset_and_attack_only():
+    """H3: Malleable grants its CURRENT stack (first hit = base 3, not 4), grows
+    +1 per attack hit within a round, resets to base at end of the enemy's turn,
+    and ignores non-attack damage."""
+    from slay_bench.enemies_act2 import WrithingMass
+    from slay_bench.cards import _apply_damage_to_enemy
+    from slay_bench.combat import _tick_enemy_powers
+    from slay_bench.enums import PowerId
+    state = new_ironclad_game(42)
+    wm = WrithingMass(state.rng.hp_rng)
+    start_combat(state, [wm])
+    wm.block = 0
+    _apply_damage_to_enemy(state, wm, 5, from_attack=True)
+    assert wm.block == 3, f"first attack hit must grant base 3 block, got {wm.block}"
+    assert wm.powers[PowerId.MALLEABLE] == 4
+    _apply_damage_to_enemy(state, wm, 10, from_attack=True)  # 3 blocked, 7 land
+    assert wm.block == 4, f"second hit must grant 4 (grown stack), got {wm.block}"
+    assert wm.powers[PowerId.MALLEABLE] == 5
+    _tick_enemy_powers(state, wm)
+    assert wm.powers[PowerId.MALLEABLE] == 3, "Malleable must reset to base 3 at round end"
+    wm.block = 0
+    hp0 = wm.hp
+    _apply_damage_to_enemy(state, wm, 20, from_attack=False)  # Combust/Juggernaut class
+    assert wm.hp == hp0 - 20 and wm.block == 0, "non-attack damage must not trigger Malleable"
+    assert wm.powers[PowerId.MALLEABLE] == 3
+    print("[PASS] Malleable: base-3 first grant, round reset, attack-only")
+
+
+def test_status_cards_land_in_documented_piles():
+    """M3: Taskmaster Wound / Nemesis Burns / Hexaghost Sear Burn / SpireSpear
+    Burns land in the DISCARD pile; Hexaghost Divider adds no Burns; Awakened
+    One's Sludge shuffles a Slimed INTO the draw pile (not guaranteed-next)."""
+    from slay_bench.enemies import Move, IntentType, Hexaghost
+    from slay_bench.enemies_act2 import Taskmaster, Nemesis, SpireSpear, AwakenedOne
+
+    def fresh(enemy_cls):
+        state = new_ironclad_game(42)
+        enemy = enemy_cls(state.rng.hp_rng)
+        start_combat(state, [enemy])
+        state.player.max_hp = 1000
+        state.player.hp = 1000
+        return state, enemy
+
+    def count(pile, name):
+        return sum(1 for c in pile if c.name == name)
+
+    state, tm = fresh(Taskmaster)
+    tm.current_move = Move("Scouring Whip", IntentType.ATTACK_DEBUFF, damage=7)
+    tm.execute_move(state)
+    assert count(state.combat.discard_pile, "Wound") == 1
+    assert count(state.combat.draw_pile, "Wound") == 0
+
+    state, nem = fresh(Nemesis)
+    nem.current_move = Move("Debuff", IntentType.DEBUFF)
+    nem.execute_move(state)
+    assert count(state.combat.discard_pile, "Burn") == 3
+    assert count(state.combat.draw_pile, "Burn") == 0
+
+    state, hexa = fresh(Hexaghost)
+    hexa.current_move = Move("Sear", IntentType.ATTACK, damage=6)
+    hexa.execute_move(state)
+    assert count(state.combat.discard_pile, "Burn") == 1
+    assert count(state.combat.draw_pile, "Burn") == 0
+    hexa.current_move = Move("Divider", IntentType.ATTACK, damage=2, hits=6)
+    hexa.execute_move(state)
+    assert count(state.combat.draw_pile, "Burn") + count(state.combat.discard_pile, "Burn") == 1, \
+        "Divider must not add Burns"
+
+    state, spear = fresh(SpireSpear)
+    spear.current_move = Move("Burn Strike", IntentType.ATTACK, damage=5, hits=2)
+    spear.execute_move(state)
+    assert count(state.combat.discard_pile, "Burn") == 2
+    assert count(state.combat.draw_pile, "Burn") == 0
+
+    state, awo = fresh(AwakenedOne)
+    n_draw = len(state.combat.draw_pile)
+    awo.current_move = Move("Sludge", IntentType.ATTACK, damage=18)
+    awo.execute_move(state)
+    assert count(state.combat.draw_pile, "Slimed") == 1, "Sludge Slimed must go to the draw pile"
+    assert len(state.combat.draw_pile) == n_draw + 1
+    assert count(state.combat.discard_pile, "Slimed") == 0
+    print("[PASS] Status cards land in their documented piles")
+
+
+def test_byrd_flight_halves_attacks_then_grounds():
+    """L1: while flying, Byrd takes half attack damage (rounded down); 3
+    damaging attack hits ground it (full damage after); non-attack damage is
+    full and does NOT reduce Flight."""
+    from slay_bench.enemies_act2 import Byrd
+    from slay_bench.cards import _apply_damage_to_enemy
+    state = new_ironclad_game(42)
+    byrd = Byrd(state.rng.hp_rng)
+    start_combat(state, [byrd])
+    byrd.max_hp = byrd.hp = 100
+    byrd.block = 0
+    _apply_damage_to_enemy(state, byrd, 9, from_attack=True)
+    assert byrd.hp == 100 - 4, f"flying: 9 attack dmg must land as 4, hp={byrd.hp}"
+    hp1 = byrd.hp
+    _apply_damage_to_enemy(state, byrd, 6, from_attack=False)
+    assert byrd.hp == hp1 - 6, "non-attack damage must be full while flying"
+    assert byrd._flying and byrd._flight_hits == 2, "non-attack damage must not reduce Flight"
+    _apply_damage_to_enemy(state, byrd, 4, from_attack=True)
+    _apply_damage_to_enemy(state, byrd, 4, from_attack=True)
+    assert not byrd._flying, "3 damaging attack hits must ground the Byrd"
+    hp2 = byrd.hp
+    _apply_damage_to_enemy(state, byrd, 9, from_attack=True)
+    assert byrd.hp == hp2 - 9, "grounded Byrd must take full attack damage"
+    print("[PASS] Byrd Flight halves attacks, grounds after 3 hits")
+
+
+def test_transient_damageable_and_fades():
+    """M6: Transient has NO Intangible (fully damageable), attacks 30 +10/turn
+    single-hit, and Fading ends the fight (win) at the end of its 5th turn."""
+    from slay_bench.enemies_act2 import Transient
+    from slay_bench.cards import _apply_damage_to_enemy
+    from slay_bench.enums import PowerId
+    state = new_ironclad_game(42)
+    tr = Transient(state.rng.hp_rng)
+    start_combat(state, [tr])
+    state.player.max_hp = 1000
+    state.player.hp = 1000
+    assert PowerId.INTANGIBLE not in tr.powers, "Transient must not be Intangible"
+    assert tr.current_move.damage == 30 and tr.current_move.hits == 1, \
+        f"turn-1 attack must be 30x1, got {tr.current_move.damage}x{tr.current_move.hits}"
+    tr.block = 0
+    hp0 = tr.hp
+    _apply_damage_to_enemy(state, tr, 25, from_attack=True)
+    assert tr.hp == hp0 - 25, "Transient must take full damage (no Intangible cap)"
+    for expected_dmg in (40, 50, 60, 70):
+        state.combat.hand.clear()
+        end_player_turn(state)
+        assert tr.current_move.damage == expected_dmg, \
+            f"attack curve must be 30+10/turn, got {tr.current_move.damage} (expected {expected_dmg})"
+    # Its 5th turn: executes the move then Fades (hp=0) -> fight is over (win).
+    state.combat.hand.clear()
+    end_player_turn(state)
+    assert tr.hp <= 0, "Fading must end the fight at the end of its 5th turn"
+    assert is_combat_over(state) == "win"
+    print("[PASS] Transient is damageable, real attack curve, Fades turn 5")
+
+
 if __name__ == "__main__":
     tests = [
         test_cultist_fight_determinism,
@@ -1168,6 +1366,13 @@ if __name__ == "__main__":
         test_mark_of_pain_shuffles_wounds,
         test_exhume_cannot_return_exhume,
         test_limit_break_no_zero_strength_key,
+        # 2026-07-14 Act 2/3 audit
+        test_entangled_blocks_attacks_next_turn,
+        test_bronze_automaton_spawns_orbs_once,
+        test_malleable_grant_reset_and_attack_only,
+        test_status_cards_land_in_documented_piles,
+        test_byrd_flight_halves_attacks_then_grounds,
+        test_transient_damageable_and_fades,
     ]
     passed = 0
     failed = 0

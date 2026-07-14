@@ -1,5 +1,49 @@
 # Decision Log
 
+## 2026-07-14 — Act 2/3 audit fix batch: encounter-pool reclassification, draw=loss symmetry, fail-loud spawning
+
+**Context.** Full adversarial audit of `enemies_act2.py` + multi-act plumbing
+(`docs/bug_audit_2026-07-14.md`: 1 critical + 3 high + 9 medium + 12 low). Acts 2/3 have
+never produced kept data (`--acts 3` is the M3b-gated appendix probe, decision_log
+2026-07-12 P3), so this was the last free window to fix them without a re-baseline.
+All items implemented + verified same day; per-item notes in the audit doc. Three items
+rise to decision level:
+
+1. **Encounter pools reclassified to real-game roles (M1).** Elites had sat in normal
+   pools (BookOfStabbing 160-175 HP, GiantHead 500 HP as Act-3 "normal") and Act-3
+   encounters in Act 2 (Transient, WrithingMass) — any `--acts 3` difficulty numbers
+   would have been fidelity-distorted in both directions. New tables use the real-game
+   classification restricted to our implemented roster; TorchHead×2 is a documented
+   stand-in; SpireShield/Spear (Act-4 Heart guards) leave the tables but stay registered.
+   Trade-off: our Act-2/3 pools are smaller than the real game's — accepted, documented.
+
+2. **100-turn combat draw = LOSS in both paths (M2).** `run_loop._resolve_combat`
+   previously let a timed-out combat continue the run while `benchmark._llm_combat`
+   scored it dead — an asymmetry that biased the greedy anchor against the LLM
+   exactly where Act-2/3 stalls are realistic (500-HP GiantHead). Conservative +
+   symmetric now. **Acceptance verified:** greedy baseline re-run both characters —
+   all anchor metrics identical (IC 12.48/.780/1%; Silent 11.26/.7037/0%). Per-sample
+   death-overkill `final_hp` shifted (~10 samples/char) via the Hexaghost M3 companion
+   fix (an Act-1 change: Sear Burn → discard, Divider Burns removed) — no outcome
+   flipped, no published metric feeds on death `final_hp`. **Consequence: this batch
+   is an instrument-version boundary for run-level** — never blend the existing
+   matrix's run-level numbers with post-batch run-level numbers (M3b runs on the new
+   engine, which was already the plan).
+
+3. **Unknown enemy ids now fail loud (C1).** "DonuAndDeca" was not a registry key;
+   `spawn_enemies` silently skipped it → the Act-3 boss fight spawned ZERO enemies →
+   instant free win on 1/3 of boss rolls. Fixed at three layers (real `["Donu","Deca"]`
+   table entry; `spawn_enemies` raises on unknown id; `start_combat` raises on an empty
+   enemy list) + an executable invariant test that every id in all 9 encounter tables
+   resolves. Principle applied: a silent fallback that can manufacture a perfect score
+   is an instrument bug even when dormant.
+
+**Spec correction during implementation (audit L8):** real Wither = 10 dmg + 2 Weak +
+2 **Vulnerable** (wiki-checked; the audit's "Frail" recollection was wrong).
+**Verification:** 146/146 tests (+8), mock pipeline ×4 green, multi-act mock smoke
+green, full Act-2/3 encounter sweep honest (no instant wins, no timeouts, sane
+difficulty gradient). No prompt bytes changed → the existing matrix stays valid.
+
 ## 2026-07-13 — M3b frontier-run token-budget protocol: matched-8k first, escalate only on measured truncation
 
 **Problem.** The parse probe established that the DeepSeek distills' collapse is *budget-bound

@@ -130,6 +130,11 @@ def _apply_damage_to_enemy(state: GameState, target: Enemy, amount: int,
     from .events import Event
     if PowerId.INTANGIBLE in target.powers:
         amount = 1
+    # Flight (Byrd): while flying, incoming ATTACK damage is halved (rounded
+    # down). The enemy's on_damage_taken decrements its flight counter per
+    # damaging attack hit and grounds it after enough hits.
+    if from_attack and getattr(target, '_flying', False):
+        amount = amount // 2
     # Thorns retaliates against ATTACK damage only (not Combust/Juggernaut/etc.)
     # Thorns damage to the player is non-attack: blockable, Intangible-capped,
     # but never amplified by the player's Vulnerable.
@@ -140,14 +145,19 @@ def _apply_damage_to_enemy(state: GameState, target: Enemy, amount: int,
     target.block -= blocked
     real_dmg = amount - blocked
     if real_dmg > 0:
-        if PowerId.MALLEABLE in target.powers:
-            target.powers[PowerId.MALLEABLE] += 1
+        # Malleable: attack damage only. Grant the CURRENT stack as block, THEN
+        # increment for the next hit (first attack hit of the combat grants the
+        # base 3, not 4). Reset to base happens at end of the enemy's turn in
+        # _tick_enemy_powers. Poison bypasses this (direct hp decrement, not
+        # through _apply_damage_to_enemy) — kept that way.
+        if from_attack and PowerId.MALLEABLE in target.powers:
             target.add_block(target.powers[PowerId.MALLEABLE])
+            target.powers[PowerId.MALLEABLE] += 1
         target.hp -= real_dmg
         state.bus.emit(Event.DAMAGE_DEALT, state, target=target, amount=real_dmg)
         # Curl Up: gain block the first time attack damage lands
         if hasattr(target, 'on_damage_taken'):
-            target.on_damage_taken(state, real_dmg)
+            target.on_damage_taken(state, real_dmg, from_attack)
         # Split (slimes): check HP threshold while still alive
         if target.hp > 0 and hasattr(target, 'on_hp_threshold'):
             target.on_hp_threshold(state)

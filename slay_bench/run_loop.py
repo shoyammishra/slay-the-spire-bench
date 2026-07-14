@@ -38,20 +38,25 @@ ACT1_BOSS_ENCOUNTERS = [
     ["Hexaghost"],
 ]
 
+# Act 2/3 encounter pools reclassified 2026-07-14 (bug_audit_2026-07-14 M1) to the
+# real-game classification with our implemented roster. Previously elites sat in
+# normal pools (BookOfStabbing, GiantHead) and Act-3 encounters (Transient,
+# WrithingMass) sat in Act 2. Byrd is a ×3 group (was ×2). TorchHead has no solo
+# real encounter → used as a documented stand-in pair. SpireShield/SpireSpear are
+# real Act-4 Heart guards → removed from the tables (kept registered, reserved).
 ACT2_MONSTER_ENCOUNTERS = [
     ["Chosen"],
     ["ShellParasite"],
-    ["Byrd", "Byrd"],
-    ["TorchHead"],
-    ["Transient"],
-    ["BookOfStabbing"],
-    ["WrithingMass"],
+    ["Byrd", "Byrd", "Byrd"],
+    ["Chosen", "Byrd"],
+    ["ShellParasite", "Byrd"],
+    ["TorchHead", "TorchHead"],  # documented stand-in pair
 ]
 
 ACT2_ELITE_ENCOUNTERS = [
     ["GremlinLeader"],
-    ["RedSlaver", "BlueSlaver"],
-    ["Taskmaster"],
+    ["RedSlaver", "BlueSlaver", "Taskmaster"],
+    ["BookOfStabbing"],
 ]
 
 ACT2_BOSS_ENCOUNTERS = [
@@ -61,19 +66,20 @@ ACT2_BOSS_ENCOUNTERS = [
 ]
 
 ACT3_MONSTER_ENCOUNTERS = [
-    ["Darkling"],
-    ["GiantHead"],
+    ["Darkling", "Darkling", "Darkling"],
     ["Maw"],
+    ["WrithingMass"],
+    ["Transient"],
 ]
 
 ACT3_ELITE_ENCOUNTERS = [
+    ["GiantHead"],
     ["Nemesis"],
     ["Reptomancer"],
-    ["SpireShield", "SpireSpear"],
 ]
 
 ACT3_BOSS_ENCOUNTERS = [
-    ["DonuAndDeca"],
+    ["Donu", "Deca"],
     ["AwakenedOne"],
     ["TimeEater"],
 ]
@@ -111,12 +117,16 @@ def spawn_enemies(state: GameState, enemy_ids: List[str],
     enemies = []
     for eid in enemy_ids:
         cls = ENEMY_REGISTRY.get(eid)
-        if cls:
-            e = cls(state.rng.hp_rng)
-            # Room-type tags consumed by Preserved Insect / Slaver's Collar
-            e._elite = elite
-            e._boss = boss
-            enemies.append(e)
+        if cls is None:
+            # A silent skip here masked C1 (the "DonuAndDeca" phantom id) for
+            # months: an unknown id produced an empty enemy list → instant
+            # auto-"win". Fail loud instead — an unresolved id is always a bug.
+            raise ValueError(f"Unknown enemy id: {eid!r}")
+        e = cls(state.rng.hp_rng)
+        # Room-type tags consumed by Preserved Insect / Slaver's Collar
+        e._elite = elite
+        e._boss = boss
+        enemies.append(e)
     return enemies
 
 
@@ -230,10 +240,20 @@ def _resolve_combat(run: RunState, node: MapNode,
             break
         end_player_turn(state)
 
-    # 100-turn draw: clear the stale combat so between-combat code that keys
-    # on `state.combat is None` doesn't see a dead combat object. (No
-    # COMBAT_END: a draw is not a win — Burning Blood must not heal.)
+    # 100-turn draw: score it a LOSS, symmetric with the LLM path
+    # (benchmark._llm_combat returns False on timeout → run over). Previously
+    # this path left outcome=None and the run CONTINUED, biasing the greedy
+    # anchor against the LLM in Acts 2/3 where 500-HP GiantHead / high-HP
+    # stalls are realistic. No COMBAT_END is emitted (a draw is not a win —
+    # Burning Blood must not heal); clear the stale combat so between-combat
+    # code keying on `state.combat is None` doesn't see a dead combat object.
+    # (bug_audit_2026-07-14 M2 — acceptance verified empirically 2026-07-14:
+    # greedy baseline re-run for both characters, all anchor metrics
+    # [floors/progress/survival] identical; Act-1 greedy never draws in 100
+    # turns. Per-sample death-overkill final_hp shifted via the Hexaghost M3
+    # companion fix, not this change — see the audit doc's impl notes.)
     if result["outcome"] is None:
+        result["outcome"] = "loss"
         state.combat = None
 
     if result["outcome"] == "win":

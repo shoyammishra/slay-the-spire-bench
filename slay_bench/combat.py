@@ -17,6 +17,12 @@ def start_combat(state: GameState, enemies: List[Enemy]) -> None:
     from .cards import _draw_cards
     from .powers import register_power_hooks
 
+    # Defense in depth (bug_audit_2026-07-14 C1): an empty enemy list makes
+    # is_combat_over return "win" immediately (all() over []), i.e. a free win
+    # before any card is played. That is never a meaningful combat — fail loud.
+    if not enemies:
+        raise ValueError("start_combat with no enemies")
+
     # Fresh combat state. Also drop any listeners left over from prior combats:
     # relic/power hooks are re-registered below, and without clearing they would
     # stack across a run (e.g. Burning Blood healing 6, then 12, then 18 ...).
@@ -117,9 +123,13 @@ def _begin_player_turn(state: GameState) -> None:
         if getattr(c, '_temp_retain', False):
             c._temp_retain = False
 
-    # Reset Entangled
-    if PowerId.ENTANGLED in player.powers:
-        del player.powers[PowerId.ENTANGLED]
+    # NOTE: ENTANGLED is NOT reset here. It is applied during the enemy phase
+    # (Red Slaver's Entangle), so with the just_applied guard it survives the
+    # round it is applied, blocks ATTACK cards for the whole of the player's
+    # next turn, then ticks away at end of that round in _tick_player_debuffs.
+    # Deleting it at the start of the player's turn (as this code used to) meant
+    # the player never actually held it during their own turn — ENTANGLED was a
+    # complete no-op. end_combat still clears it as a combat-only power.
 
     # Reset energy (Ice Cream: carry over)
     if getattr(player, '_ice_cream', False):
@@ -369,7 +379,7 @@ def _tick_player_debuffs(state: GameState) -> None:
     player = state.player
     combat = state.combat
     tick_down = {PowerId.WEAK, PowerId.VULNERABLE, PowerId.FRAIL,
-                 PowerId.INTANGIBLE, PowerId.DOUBLE_DAMAGE}
+                 PowerId.INTANGIBLE, PowerId.DOUBLE_DAMAGE, PowerId.ENTANGLED}
     for power in tick_down:
         if power in player.powers and power not in combat.just_applied:
             player.powers[power] -= 1
@@ -413,8 +423,10 @@ def _tick_enemy_powers(state: GameState, enemy: Enemy) -> None:
         enemy.hp = min(enemy.max_hp, enemy.hp + enemy.powers[PowerId.REGENERATE])
 
     # Intangible ticks down at end of round, like the player's. Enemies that
-    # should stay intangible (Nemesis phases 1-3, Transient) re-apply it in
-    # select_move, which runs AFTER this tick. Intangible freshly granted during
+    # should stay intangible (Nemesis phases 1-3) re-apply it in select_move,
+    # which runs AFTER this tick. (Transient no longer has Intangible — real
+    # Transient never did; bug_audit_2026-07-14 M6.) Intangible freshly granted
+    # during
     # the enemy phase this round (Awakened One's Rebirth) skips its first tick so
     # it actually covers the player's next turn.
     if PowerId.INTANGIBLE in enemy.powers:
@@ -425,7 +437,14 @@ def _tick_enemy_powers(state: GameState, enemy: Enemy) -> None:
             if enemy.powers[PowerId.INTANGIBLE] <= 0:
                 del enemy.powers[PowerId.INTANGIBLE]
 
-    # Malleable: increases each time blocked — reset stacking here if needed
+    # Malleable: gains block each time it takes ATTACK damage, +1 per hit within
+    # a turn, then RESETS to its base value at the end of the enemy's turn (real
+    # StS rule). Without the reset it grew monotonically all combat, making
+    # Writhing Mass ever-tankier. Base value stored on the enemy (Writhing Mass
+    # starts Malleable 3).
+    if PowerId.MALLEABLE in enemy.powers:
+        enemy.powers[PowerId.MALLEABLE] = getattr(enemy, '_malleable_base', 3)
+
     # Poison on enemies: direct HP loss, ignores block (StS rule)
     if PowerId.POISON in enemy.powers:
         from .events import Event
