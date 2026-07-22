@@ -1,5 +1,54 @@
 # Decision Log
 
+## 2026-07-23 — Sharanga HPC access (BITS Hyderabad): recon done, large-open-model ladder registered
+
+**Context.** The professor granted access to the **Sharanga HPC cluster** (BITS Hyderabad;
+public docs: `https://sharanga.hpc.bits-hyderabad.ac.in/docs/`) via a **shared account**, to
+run the largest open-source models before/alongside the M3b frontier-API runs. Access details
+(key-only SSH auth — password auth is disabled server-side; MobaXterm setup; account
+etiquette) live in the **gitignored** `docs/Sharanga_HPC_SOP.pdf` (`*Sharanga*SOP*.pdf` in
+`.gitignore`) — per the standing public-repo rule, no usernames/credentials/SSH keys are ever
+committed; the cluster hostname appears only via the university's public docs URL.
+
+**Recon (verified on-cluster 2026-07-23 — partition table + QOS + driver in the SOP §4):**
+- GPU partitions / per-user QOS caps: **gpu_a100_8** (8× A100 SXM4 80 GB, MaxTime 5 d,
+  **cap 2 GPUs** = 160 GB) · **gpu_h100_4** (2 nodes × 4× H100 80 GB, 3 d, **cap 3 GPUs /
+  cpu=8 / mem=300G** = 240 GB) · **gpu_h200_8** (8× H200 141 GB, 4 d, same 3-GPU cap =
+  **423 GB pooled, the per-user ceiling**). Exception tiers exist by name
+  (`qos_gpu_a100_priority` 8 GPU/300 d, `qos_gpu_h100_unlimited`) → full-node jobs are
+  grantable on request. The docs' "GPU jobs max 12 h" policy is NOT enforced; partition
+  MaxTime governs.
+- **Driver CUDA 13.0** (580.126.20) → **latest vLLM, no pin** (installed: vLLM 0.25.1,
+  torch 2.11.0+cu130, python 3.12). The CSIS vLLM-0.6.6 ladder explicitly does NOT apply.
+- Storage: home on Lustre (first `import torch` ≈ 100 s of pure I/O — normal), scratch
+  purges after 15 days idle; `HF_HOME=/scratch/$USER/hf` (set per-job, weights prefetched
+  on the login node).
+
+**Decisions.**
+1. **Model ladder registered (cheapest-information-first):** smoke qwen2.5-7b (1× A100,
+   validates pipeline + measures tok/s vs the CSIS 82 tok/s anchor) → **qwen3-32b FULL
+   4-dim matrix** (fills the intentional synergy-only gap; modern vLLM supports it now) →
+   **70B within-family scale axis** (Llama-3.1-70B and/or Qwen2.5-72B — same families as
+   the existing 8B/7B rows under identical prompts/seeds → a clean scale line on the
+   horizon-collapse curve) → **gpt-oss-120b** (open reasoning model, 1× H100/H200, MXFP4
+   needs Hopper+, not A100) → **Qwen3-235B-A22B FP8 on TP=2 H200** (largest model under
+   default QOS; extends the qwen 7B→32B→235B family axis; reasoning MoE).
+2. **R1-671B parked**: needs ~700 GB = a full-node QOS exception on gpu_h200_8. The ask is
+   concrete ("temporary priority QOS for one job") but deferred — Qwen3-235B answers the
+   same scale question under default QOS; revisit only if M3b results argue for it.
+3. **Shared-account etiquette (binding):** zero global footprint — no `conda init`/`.bashrc`
+   edits (manual `source ~/miniconda3/bin/activate slaybench` baked into every sbatch);
+   personal Miniconda at `~/miniconda3`; namespaced dirs; **never `scancel -u`** (kills
+   other users' jobs on the shared account); Anaconda ToS accepted with the professor's
+   explicit approval.
+4. **CSIS sbatch files stay untouched** (their headers encode CSIS-specific gotchas);
+   Sharanga gets parallel `cluster/sharanga_*.sbatch` variants. First: `sharanga_smoke.sbatch`
+   (1× A100, tiny 4-dim pass, `--run-tag sharanga_smoke` = no matrix overwrite). Smoke NOT
+   yet run — next session's first action.
+5. **Comparability:** same harness + current engine version (post-2026-07-14 audit batch) =
+   the same instrument version planned for M3b; gpu_a100_8 is hardware-like-for-like with
+   the CSIS A100 results. New-model rows extend the matrix without re-baselining anything.
+
 ## 2026-07-14 — External expert review adopted as evaluation baseline; backlog re-prioritized (stats pass promoted, P6 scope extended)
 
 **Context.** The user provided a NeurIPS-grade external review of the current project
