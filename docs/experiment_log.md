@@ -8,12 +8,21 @@ submits a qwen3-32b smoke gate + 4 combo jobs (ironclad/silent × structured/raw
 own-file `sharanga_matrix_combo.sbatch`, `--dependency=afterok` on the smoke → up to 3 run
 concurrently under the gpu_h200_8 3-GPU QOS cap, no result-file race.
 
-**Launch gotcha caught + fixed (durable cluster fact):** first launch put the smoke gate on
-`gpu_a100_8` (the smoke file's default partition) — but **that partition is DOWN for admin
-driver stress-testing**, so the smoke sat `PD (Priority)` forever and the 4 combos hung on
-`PD (Dependency)`. Fixed in the launcher (`2e6b9eb`): the smoke is now pinned
-`--partition=gpu_h200_8 --cpus-per-task=4` (also correct on principle — gate on the same GPU
-type the combos use). Relaunch after `scancel` of the 5 stalled jobs.
+**Launch gotchas caught + fixed (durable cluster/env facts):**
+1. **A100-partition misroute** (`2e6b9eb`) — first launch put the smoke gate on `gpu_a100_8`
+   (the smoke file's default partition), which is **DOWN for admin driver stress-testing**, so
+   the smoke sat `PD (Priority)` forever and the 4 combos hung `PD (Dependency)`. Launcher now
+   pins the smoke `--partition=gpu_h200_8 --cpus-per-task=4` (also correct on principle — gate
+   on the same GPU type the combos use).
+2. **`set -u` × cuda-nvcc conda hook** (`706b287`) — the `cuda-nvcc` package's activate/
+   deactivate hooks reference `CUDAARCHS_BACKUP` unbound; with `set -euo pipefail` placed
+   BEFORE `source activate`, the `-u` made that fatal and **every BATCH job aborted at
+   activation** (the `.out` held only the `CUDAARCHS_BACKUP: unbound variable` line). Invisible
+   in the interactive smoke (login shells don't set `-u`). Fixed in all five Sharanga sbatch:
+   `set -eo pipefail` → `source activate` → `set -u`. **Durable rule: never source conda
+   activation under `set -u`** — conda's own hooks aren't `-u`-clean.
+After both fixes the smoke cleared activation, ran `nvidia-smi` (H200), and began loading
+qwen3-32b — matrix chain genuinely in flight.
 
 **Expected artifacts on return:** `results/qwen3-32b{,_silent}_{structured,raw}_seed*.json`
 + the `_seeds42_1042_2042_3042_4042` aggregates (all 4 dims). Fold-in checklist: scp to laptop
