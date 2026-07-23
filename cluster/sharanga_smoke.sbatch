@@ -25,9 +25,12 @@
 #       HF_HOME=/scratch/$USER/hf hf download Qwen/Qwen2.5-7B-Instruct
 # ──────────────────────────────────────────────────────────────────────────────
 
-set -euo pipefail
-
+# conda's cuda-nvcc activate/deactivate hooks reference unbound vars (CUDAARCHS_BACKUP)
+# → they abort under `set -u`. Defer -u until AFTER activation (found 2026-07-24: it
+# killed the batch smoke at activation; never showed in the interactive smoke).
+set -eo pipefail
 source ~/miniconda3/bin/activate slaybench
+set -u
 export HF_HOME=/scratch/$USER/hf
 # Unbuffered Python: without this a wedged vLLM leaves a 0-byte log (seen job 261007
 # on gpu_h200_8 — 10 min alive, nothing flushed, no diagnostic survived the kill).
