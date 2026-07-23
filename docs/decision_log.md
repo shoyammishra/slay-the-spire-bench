@@ -58,6 +58,54 @@ committed; the cluster hostname appears only via the university's public docs UR
 5. **Comparability:** same harness + current engine version (post-2026-07-14 audit batch) =
    the same instrument version planned for M3b; gpu_a100_8 is hardware-like-for-like with
    the CSIS A100 results. New-model rows extend the matrix without re-baselining anything.
+6. **Matrix sbatch variants STAGED (2026-07-23 addendum, post-smoke):**
+   `cluster/sharanga_{turn_combat,synergy,run_level}.sbatch` — ladder rung-1 jobs
+   (qwen3-32b FULL 4-dim matrix, both characters × both formats, n=20,
+   `--seeds 42 1042 2042 3042 4042`, NO `--run-tag` = real matrix cells), model-
+   parametrized for every later rung via `HF_REPO`/`SERVED_NAME`/`TP_SIZE`
+   (+`HEALTH_WAIT_MIN`) overrides with documented partition-move and TP=2-H200 submit
+   forms. Conventions inherited from the validated `sharanga_smoke.sbatch` (same env
+   block; health loop parametrized to a 60-min default because cold Lustre weight load
+   scales with model size — 7.2 min for the 7B's ~15 GB ⇒ ~35+ min for the 32B's
+   ~65 GB, past the smoke's 25-min budget). Two deliberate improvements over the CSIS
+   loop files: a login-node **prefetch check** (fail-fast when the 15-day scratch purge
+   ate the weights, since `HF_HUB_OFFLINE=1` would otherwise kill vLLM minutes in) and
+   **fail-loud-keep-going loops** (a failed combo prints a `COMBO FAILED` marker and
+   continues — partial results > lost job — but the job exits non-zero at the end; the
+   CSIS files silently continued AND exited 0). **Sizing, documented anchors only**
+   (H200 7B = 190 tok/s; CSIS A100 7B = 82 tok/s with turn+combat ≈3 h/character and
+   run-level ≈4 h/character; qwen3-32b budgeted at ~1/3–1/2 the 7B's per-token speed
+   ⇒ ~63–95 tok/s, and 3–5× the output tokens for `<think>`): **turn_combat 72 h**
+   (central 15–39 h; 8k-budget-bound tail >50 h), **synergy 24 h** (400 single calls,
+   central 1.5–3.5 h; all-8k tail ~14 h), **run_level 96 h = gpu_h200_8 MaxTime**
+   (central 21–52 h; per-seed partial saves bound a wall-kill's loss to the in-flight
+   seed). Jobs submit SEQUENTIALLY tc → syn → run — all three merge into the same
+   per-seed JSONs, concurrent writers race. **Supersession rule (comparability): the
+   new full-matrix qwen3-32b cells SUPERSEDE its CSIS synergy-only cells** (those ran
+   on the CSIS vLLM-0.8.x stack); synergy is re-run on Sharanga precisely so all four
+   qwen3-32b dimensions share ONE serving stack — never blend the CSIS qwen3-32b
+   synergy numbers with the Sharanga ones.
+7. **PARALLEL fire-and-forget path added (2026-07-24)** — for the ~6-day unattended
+   window (user on exams, back 2026-07-30) the dimension-split files above are the WRONG
+   shape: each touches all 4 result files, so they can't overlap. Added
+   `cluster/sharanga_matrix_combo.sbatch` (one job = one character×format = all 4 dims →
+   ONE result file) + launcher `cluster/sharanga_submit_qwen3_matrix.sh`. Split the work
+   along the OUTPUT FILE instead of the dimension: 4 combos write disjoint files, so up to
+   **3 run concurrently under the gpu_h200_8 3-GPU QOS cap with no race**, and matrix
+   wall-clock collapses from ~sequential (tc→syn→run, days each) to ≈ one combo (~20–50 h,
+   3 of 4 parallel + 1 queued). **Two correctness guards this needed:** (a) **unique port
+   per job** `PORT=$((10000 + SLURM_JOB_ID % 40000))` — Slurm can co-schedule several
+   1-GPU jobs on one 8-GPU H200 node, so a hardcoded :8000 would let two concurrent combos
+   collide on the server socket; (b) **smoke-gated `--dependency=afterok` chain** — the
+   launcher submits a qwen3-32b smoke first (`HEALTH_WAIT_MIN=60`, `--time=02:30:00`) and
+   makes all 4 combos depend on it, so a serving/env failure blocks the multi-day jobs
+   (cheapest-first; the Gemma-3-12B empty-output precedent) instead of burning the whole
+   absence. Honest limit recorded in the launcher: afterok gates on the smoke's exit code,
+   NOT result quality — but qwen3-32b already parsed on CSIS, so the Sharanga-specific risk
+   (serving/env) is exactly what afterok catches; over-deliberation would still run but
+   stays diagnosable via partial-save + parse counters. The dimension-split files are kept
+   (valid for a future one-model-at-a-time sequential run); the combo path is the default
+   for filling the matrix. Same supersession + comparability rules as §6.
 
 ## 2026-07-14 — External expert review adopted as evaluation baseline; backlog re-prioritized (stats pass promoted, P6 scope extended)
 

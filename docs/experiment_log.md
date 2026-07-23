@@ -44,6 +44,11 @@ identically to CSIS ⇒ **pipeline valid on Sharanga; ladder sizing can proceed.
 stress-testing (do not trust early A100 tok/s when it returns); **≤4 CPUs per H200 GPU**
 submit-time rule; **multi-partition submits rejected** (per-partition associations);
 compile/JIT caches live in shared `~/.cache` → warm starts on ANY node after the first.
+From the login MOTD (2026-07-23): **scratch auto-purges 15 days after last modification**
+(CSIS was 30 — model weights evaporate across gaps; re-prefetch is the plan, scratch is never
+storage; results always scp'd to the laptop); **home quota is 40 GiB** (29 used / 11 free at
+smoke time — miniconda + `~/.cache` compile caches live there; rules out installing the full
+`cuda-toolkit` (~5+ GB) as a flashinfer fallback; if tight: `du -sh ~/miniconda3 ~/.cache/*`).
 
 **Next:** sync the patched sbatch to the cluster (commit+push+pull), then ladder rung 1:
 qwen3-32b prefetch + FULL 4-dim matrix (fills the synergy-only gap).

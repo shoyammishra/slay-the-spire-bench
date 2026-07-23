@@ -44,6 +44,10 @@ export VLLM_USE_FLASHINFER_SAMPLER=0
 MODEL_REPO=${HF_REPO:-Qwen/Qwen2.5-7B-Instruct}
 SERVED_NAME=${SERVED_NAME:-qwen2.5-7b}
 PORT=${PORT:-8000}
+# Health-wait budget (minutes). Default 25 (the validated 7B smoke). Bigger models
+# have longer cold Lustre loads (~65 GB qwen3-32b ≈ 35+ min) → override, e.g.
+# HEALTH_WAIT_MIN=60 when using this file as a gate for a 32B+ rung.
+HEALTH_WAIT_MIN=${HEALTH_WAIT_MIN:-25}
 
 cd ~/slay-bench
 
@@ -62,9 +66,9 @@ trap 'kill $VLLM_PID 2>/dev/null || true' EXIT
 
 # Wait for the OpenAI-compatible server. Sharanga cold-node startup is SLOW:
 # weight load off Lustre alone took 7.2 min (job 261007's interactive repro,
-# 2026-07-23) + dynamo/inductor compile — allow 25 min.
+# 2026-07-23) + dynamo/inductor compile — default 25 min, override HEALTH_WAIT_MIN.
 UP=0
-for i in $(seq 1 300); do
+for i in $(seq 1 $(( HEALTH_WAIT_MIN * 12 ))); do
   if curl -sf -o /dev/null "http://localhost:${PORT}/health"; then
     echo "vLLM up after ~$((i * 5))s"
     UP=1
