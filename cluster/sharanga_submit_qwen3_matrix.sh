@@ -37,10 +37,14 @@ fi
 
 # 1) smoke gate — bigger health budget (60 min) + walltime (2.5 h) for the 32B's
 #    cold Lustre load; --run-tag inside the smoke keeps it out of the matrix.
+#    Pin to gpu_h200_8 (the smoke file defaults to gpu_a100_8, which was DOWN for
+#    driver stress-testing 2026-07-23+; also correct on principle — gate on the
+#    SAME GPU type the combos run on). H200 rule: --cpus-per-task=4 for 1 GPU.
 SMOKE=$(HF_REPO=Qwen/Qwen3-32B SERVED_NAME=qwen3-32b HEALTH_WAIT_MIN=60 \
   sbatch --parsable --job-name=slay_smoke_q3 --time=02:30:00 \
+  --partition=gpu_h200_8 --cpus-per-task=4 \
   cluster/sharanga_smoke.sbatch)
-echo "smoke gate submitted: job $SMOKE"
+echo "smoke gate submitted: job $SMOKE (gpu_h200_8)"
 
 # 2) four combos, each afterok on the smoke, each its own (char,fmt) → own file.
 for combo in "ironclad structured" "ironclad raw" "silent structured" "silent raw"; do
