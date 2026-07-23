@@ -17,7 +17,9 @@
 #     (partition MaxTime 5-00:00:00 governs). H100/H200 QOS also cap cpu=8.
 #   • Driver CUDA 13.0 (580.126.20) → latest vLLM (cu130 torch). The CSIS
 #     vLLM-0.6.6 pin does NOT apply on this cluster.
-#   • SHARED ACCOUNT: conda is activated manually (no conda init in .bashrc);
+#   • SHARED ACCOUNT: `conda init` IS in the shared .bashrc (professor-approved
+#     2026-07-23, auto_activate_base false) — interactive shells use plain
+#     `conda activate slaybench`; this script still sources explicitly (batch shell);
 #     HF cache lives on scratch. NEVER `scancel -u` — it kills others' jobs.
 #   • Weights should be prefetched on the login node first:
 #       HF_HOME=/scratch/$USER/hf hf download Qwen/Qwen2.5-7B-Instruct
@@ -27,6 +29,17 @@ set -euo pipefail
 
 source ~/miniconda3/bin/activate slaybench
 export HF_HOME=/scratch/$USER/hf
+# Unbuffered Python: without this a wedged vLLM leaves a 0-byte log (seen job 261007
+# on gpu_h200_8 — 10 min alive, nothing flushed, no diagnostic survived the kill).
+export PYTHONUNBUFFERED=1
+# Everything is prefetched into $HF_HOME — skip HF Hub liveness checks (two ~1-min
+# stalls observed on gpu_h200_8, 2026-07-23).
+export HF_HUB_OFFLINE=1
+# FlashInfer's JIT sampling kernel won't build on this cluster (no system CUDA
+# toolkit; env-local nvcc + libcurand-dev got close but ninja still failed,
+# 2026-07-23). Native torch sampler instead — identical sampling semantics,
+# irrelevant perf delta at our batch≈1 sequential workload.
+export VLLM_USE_FLASHINFER_SAMPLER=0
 
 MODEL_REPO=${HF_REPO:-Qwen/Qwen2.5-7B-Instruct}
 SERVED_NAME=${SERVED_NAME:-qwen2.5-7b}
@@ -47,9 +60,11 @@ vllm serve "$MODEL_REPO" \
 VLLM_PID=$!
 trap 'kill $VLLM_PID 2>/dev/null || true' EXIT
 
-# Wait for the OpenAI-compatible server (CSIS A100 startup was ~3.5 min; allow 10)
+# Wait for the OpenAI-compatible server. Sharanga cold-node startup is SLOW:
+# weight load off Lustre alone took 7.2 min (job 261007's interactive repro,
+# 2026-07-23) + dynamo/inductor compile — allow 25 min.
 UP=0
-for i in $(seq 1 120); do
+for i in $(seq 1 300); do
   if curl -sf -o /dev/null "http://localhost:${PORT}/health"; then
     echo "vLLM up after ~$((i * 5))s"
     UP=1

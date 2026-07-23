@@ -36,15 +36,25 @@ committed; the cluster hostname appears only via the university's public docs UR
 2. **R1-671B parked**: needs ~700 GB = a full-node QOS exception on gpu_h200_8. The ask is
    concrete ("temporary priority QOS for one job") but deferred — Qwen3-235B answers the
    same scale question under default QOS; revisit only if M3b results argue for it.
-3. **Shared-account etiquette (binding):** zero global footprint — no `conda init`/`.bashrc`
-   edits (manual `source ~/miniconda3/bin/activate slaybench` baked into every sbatch);
-   personal Miniconda at `~/miniconda3`; namespaced dirs; **never `scancel -u`** (kills
-   other users' jobs on the shared account); Anaconda ToS accepted with the professor's
-   explicit approval.
+3. **Shared-account etiquette (binding):** ~~zero global footprint — no `conda init`/`.bashrc`
+   edits~~ **superseded 2026-07-23: professor directed `conda init bash` in the shared
+   `.bashrc` (done; `auto_activate_base false` — conda on PATH at every login, base NOT
+   auto-activated). Interactive shells (login + `srun --pty`) now use plain
+   `conda activate slaybench`.** Sbatch scripts KEEP the explicit
+   `source ~/miniconda3/bin/activate slaybench` (batch shells don't reliably source
+   `.bashrc`); personal Miniconda at `~/miniconda3`; namespaced dirs; **never `scancel -u`**
+   (kills other users' jobs on the shared account); Anaconda ToS accepted with the
+   professor's explicit approval.
 4. **CSIS sbatch files stay untouched** (their headers encode CSIS-specific gotchas);
    Sharanga gets parallel `cluster/sharanga_*.sbatch` variants. First: `sharanga_smoke.sbatch`
-   (1× A100, tiny 4-dim pass, `--run-tag sharanga_smoke` = no matrix overwrite). Smoke NOT
-   yet run — next session's first action.
+   (1× A100, tiny 4-dim pass, `--run-tag sharanga_smoke` = no matrix overwrite). ~~Smoke NOT
+   yet run — next session's first action.~~ **✅ RUN + PASSED 2026-07-23** — on H200, not A100
+   (gpu_a100_8 down for admin driver stress-testing): ~190 tok/s gen (2.3× CSIS), 57 s wall,
+   scores sanity-clean. Three env blockers found + fixed (non-executable system `nvcc` broke
+   AOT compile → env-local `cuda-nvcc`+`libcurand-dev`; flashinfer JIT sampling unbuildable →
+   `VLLM_USE_FLASHINFER_SAMPLER=0`, native sampler, same semantics; 0-byte-log/HF-stall/timeout
+   observability patches in the sbatch). Full record: experiment_log 2026-07-23. New submit
+   rules learned: ≤4 CPUs per H200 GPU; one `--partition` per job (per-partition associations).
 5. **Comparability:** same harness + current engine version (post-2026-07-14 audit batch) =
    the same instrument version planned for M3b; gpu_a100_8 is hardware-like-for-like with
    the CSIS A100 results. New-model rows extend the matrix without re-baselining anything.

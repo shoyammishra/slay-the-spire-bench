@@ -1,5 +1,53 @@
 # Experiment Log
 
+## 2026-07-23 (SHARANGA, gpu_h200_8) — SMOKE PASSED on H200: ~190 tok/s gen (2.3× CSIS A100), 57 s wall — pipeline validated, env unblocked after 3 fixes
+
+**Why:** first run on the Sharanga cluster (BITS Hyderabad, shared account) — validate the exact
+pipeline end-to-end + measure tok/s before sizing the registered model ladder (decision_log
+2026-07-23). Buy-information-cheapest-first: tiny 4-dim pass, qwen2.5-7b, 1× H200.
+
+**Config.** Interactive `srun` on gpunode7 (gpu_h200_8) after the batch job hit env blockers
+(below); vLLM 0.25.1 / torch 2.11.0+cu130, `--max-model-len 16384 --gpu-memory-utilization 0.90`,
+benchmark `--n-turn 2 --n-combat 1 --n-synergy 4 --n-run 1 --format structured --seed 42
+--run-tag sharanga_smoke` (= no matrix overwrite). Artifacts on-cluster:
+`results/qwen2.5-7b_structured_seed42_sharanga_smoke.{json,txt,png}`.
+
+**Anchors (vs CSIS A100 references):**
+| Metric | Sharanga H200 | CSIS A100 | Ratio |
+|---|---|---|---|
+| Generation throughput (batch-1) | **~190 tok/s** sustained | ~82 tok/s | ~2.3× |
+| Prompt throughput | ~1,070–1,275 tok/s | ~700–900 | ~1.4× |
+| Smoke wall (benchmark only) | **57 s** (`elapsed_seconds` 38.2) | 1m35s | ~1.7× |
+| Server cold start (cold node) | ~12–15 min (Lustre load 7.2 min + first compile) | ~3.5 min | — |
+| Server warm start (caches hit) | **~90 s** (weights 3.6 s, compile 4 s AOT hit) | — | — |
+
+**Score sanity (per-sample audit vs known 7B matrix behavior — all clean, no boundary values):**
+turn dmg .67/1.00 parse_ok=1.0 (expected quantization); combat Cultist win, hp_ratio 1.15,
+3 illegal-action / 0 JSON errors; synergy 1/4 archetype (matches the 7B's weak .37); run =
+floors 16/16 with hp −16 = died at the boss (correct semantics), survival 0. Instrument behaves
+identically to CSIS ⇒ **pipeline valid on Sharanga; ladder sizing can proceed.**
+
+**Env blockers found + fixed (all durable in the env / sbatch, none need root):**
+1. **`nvcc` PermissionError killed vLLM's AOT torch.compile** — a non-executable `nvcc` sits in a
+   system PATH dir (execvp EACCES; `which` skips it). Fix: `conda install -c nvidia cuda-nvcc`
+   into `slaybench` (env bin precedes PATH). CSIS never hit this (vLLM 0.6.6 predates AOT compile).
+2. **flashinfer JIT sampling kernel: `curand.h` missing** — conda `cuda-nvcc` ships no library
+   headers. `libcurand-dev` fixed the include; ninja STILL failed further in (conda `-ccbin`
+   toolchain). Resolution: **`VLLM_USE_FLASHINFER_SAMPLER=0`** (native torch sampler — identical
+   sampling semantics, irrelevant at batch≈1; we run temperature 0 anyway). Both packages kept:
+   future JIT paths (deep_gemm for the 235B FP8 rung) may want them.
+3. **Observability**: first batch job died with a 0-byte vLLM log (block buffering) →
+   `PYTHONUNBUFFERED=1`; two ~1-min HF Hub stalls → `HF_HUB_OFFLINE=1`; health-check timeout
+   10 → 25 min (cold-node Lustre load alone is 7 min). All baked into `sharanga_smoke.sbatch`.
+
+**Cluster facts learned (also in CLAUDE.md bullet):** gpu_a100_8 DOWN for admin driver
+stress-testing (do not trust early A100 tok/s when it returns); **≤4 CPUs per H200 GPU**
+submit-time rule; **multi-partition submits rejected** (per-partition associations);
+compile/JIT caches live in shared `~/.cache` → warm starts on ANY node after the first.
+
+**Next:** sync the patched sbatch to the cluster (commit+push+pull), then ladder rung 1:
+qwen3-32b prefetch + FULL 4-dim matrix (fills the synergy-only gap).
+
 ## 2026-07-13 (CLUSTER, gpu-3day) — PARSE PROBE: truncation-vs-malformed ANSWERED — budget-bound deliberation (ratio = 1.0 in all four cells)
 
 **Why:** decide whether the DeepSeek distills' JSON parse failures are token-budget truncation
