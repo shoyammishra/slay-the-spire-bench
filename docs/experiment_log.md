@@ -1,5 +1,26 @@
 # Experiment Log
 
+## 2026-07-24 (SHARANGA) — qwen3-32b FULL matrix LAUNCHED (parallel fire-and-forget, smoke-gated); results expected ~2026-07-30
+
+**Why:** user on exams until 2026-07-30 → fill the qwen3-32b full 4-dim matrix unattended,
+fast. Parallel path (decision_log 2026-07-23 §7): `cluster/sharanga_submit_qwen3_matrix.sh`
+submits a qwen3-32b smoke gate + 4 combo jobs (ironclad/silent × structured/raw), each an
+own-file `sharanga_matrix_combo.sbatch`, `--dependency=afterok` on the smoke → up to 3 run
+concurrently under the gpu_h200_8 3-GPU QOS cap, no result-file race.
+
+**Launch gotcha caught + fixed (durable cluster fact):** first launch put the smoke gate on
+`gpu_a100_8` (the smoke file's default partition) — but **that partition is DOWN for admin
+driver stress-testing**, so the smoke sat `PD (Priority)` forever and the 4 combos hung on
+`PD (Dependency)`. Fixed in the launcher (`2e6b9eb`): the smoke is now pinned
+`--partition=gpu_h200_8 --cpus-per-task=4` (also correct on principle — gate on the same GPU
+type the combos use). Relaunch after `scancel` of the 5 stalled jobs.
+
+**Expected artifacts on return:** `results/qwen3-32b{,_silent}_{structured,raw}_seed*.json`
++ the `_seeds42_1042_2042_3042_4042` aggregates (all 4 dims). Fold-in checklist: scp to laptop
+→ per-sample sanity audit (watch for reasoning-model over-deliberation: parse counters,
+truncation_errors, run-level wall time) → experiment_log + findings + Current Results tables;
+these SUPERSEDE the CSIS synergy-only qwen3-32b cells (never blend serving stacks).
+
 ## 2026-07-23 (SHARANGA, gpu_h200_8) — SMOKE PASSED on H200: ~190 tok/s gen (2.3× CSIS A100), 57 s wall — pipeline validated, env unblocked after 3 fixes
 
 **Why:** first run on the Sharanga cluster (BITS Hyderabad, shared account) — validate the exact
