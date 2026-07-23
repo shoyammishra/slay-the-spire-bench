@@ -24,6 +24,33 @@ concurrently under the gpu_h200_8 3-GPU QOS cap, no result-file race.
 After both fixes the smoke cleared activation, ran `nvidia-smi` (H200), and began loading
 qwen3-32b — matrix chain genuinely in flight.
 
+**qwen3-32b SMOKE PASSED (H200, `--run-tag sharanga_smoke`, gate for the matrix chain):**
+- **The key risk is CLEARED — qwen3-32b does NOT over-deliberate/truncate.** `parse_ok_rate`
+  = 1.0 on turn AND synergy; combat `parse_errors`/`json_parse_errors`/`truncation_errors` all
+  0; no empty `model_said`. Unlike the DeepSeek distills (budget-bound deliberation, parse_probe
+  2026-07-13), qwen3-32b finishes its `<think>` and emits clean JSON at 16k ctx / 8k gen. So
+  the matrix combos are safe to run.
+- Scores sane: turn dmg **.91** (parse 1.0, legal 1.0), combat win 1.0 / hp .98 / 0 errors,
+  synergy **2/4** archetype+pick+removal (n=4; > the 7B smoke's 1/4), run died at boss
+  (survival 0, floors 16 = correct). Artifacts: `results/qwen3-32b_structured_seed42_sharanga_smoke.*`.
+- **⚠️ SIZING SIGNAL (drives the run-level decision below): the tiny smoke pass took 53 min**
+  (`elapsed_seconds` 3187, model already served) vs **57 s** for the same pass on the 7B —
+  **~55× slower**. The single run-level run dominated (~30–40 min); a reasoning call spends
+  ~30–60 s emitting thinking tokens. Extrapolated to the matrix (`run_all` runs the full n
+  once PER seed → `--n-run 20 --seeds ×5` = **100 full runs/combo**): turn+combat+synergy
+  ≈ 7–15 h/combo (cheap, run FIRST → land safely), but **run-level ≈ 50–67 h/combo**
+  (~200–270 GPU-h across 4 combos) — for the dimension the matrix already treats as the
+  non-discriminating floor (qwen3-32b's run cell is currently "—" like the other reasoning
+  models).
+- **DECISION (2026-07-24, user): LET IT RIDE — combos run all 4 dims at 72 h as launched;
+  revisit run-level scope on 2026-07-30 (user's return).** Consequence to expect: turn+combat
+  +synergy complete cleanly for all 4 combos (these are the discriminating horizons where
+  qwen3-32b is interesting — synergy is where it bends away from the 7–8B pack); run-level is
+  the at-risk tail — partial-save protects completed seeds, but some combos may wall-clip at
+  72 h and the 4th (queued) combo's data is delayed ~60 h behind the first batch's run-level.
+  On return: audit what run-level actually completed, then decide keep-partial / re-run at
+  reduced n / drop (options were: drop-and-defer, reduce to n=5, let-it-ride — chose the last).
+
 **Expected artifacts on return:** `results/qwen3-32b{,_silent}_{structured,raw}_seed*.json`
 + the `_seeds42_1042_2042_3042_4042` aggregates (all 4 dims). Fold-in checklist: scp to laptop
 → per-sample sanity audit (watch for reasoning-model over-deliberation: parse counters,
