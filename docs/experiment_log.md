@@ -58,6 +58,11 @@ qwen3-32b — matrix chain genuinely in flight.
 - **Cluster note (sinfo 2026-07-24):** `gpu_h200_8` is a SINGLE node (gpunode7, 8× H200),
   usually `mix` (shared) → combos queue `PD (Priority)` until 3 GPUs free; real contention with
   other users on the one H200 node, but the 6-day window has slack.
+- **▶▶ RELAUNCHED + LIVE (2026-07-24):** `N_RUN=5 SKIP_SMOKE=1 bash cluster/sharanga_submit_qwen3_matrix.sh`
+  submitted the final matrix — **jobs 261120 (IC/structured), 261121 (IC/raw), 261122
+  (Silent/structured), 261123 (Silent/raw)**, no gate (qwen3-32b already validated), queued
+  `PD (Priority)` on gpu_h200_8. This is the in-flight run; expect the four
+  `results/qwen3-32b*_seeds42_1042_2042_3042_4042.json` aggregates by ~2026-07-30.
 
 **Expected artifacts on return:** `results/qwen3-32b{,_silent}_{structured,raw}_seed*.json`
 + the `_seeds42_1042_2042_3042_4042` aggregates (all 4 dims). Fold-in checklist: scp to laptop
