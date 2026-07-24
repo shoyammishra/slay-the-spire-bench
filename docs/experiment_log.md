@@ -42,14 +42,22 @@ qwen3-32b — matrix chain genuinely in flight.
   (~200–270 GPU-h across 4 combos) — for the dimension the matrix already treats as the
   non-discriminating floor (qwen3-32b's run cell is currently "—" like the other reasoning
   models).
-- **DECISION (2026-07-24, user): LET IT RIDE — combos run all 4 dims at 72 h as launched;
-  revisit run-level scope on 2026-07-30 (user's return).** Consequence to expect: turn+combat
-  +synergy complete cleanly for all 4 combos (these are the discriminating horizons where
-  qwen3-32b is interesting — synergy is where it bends away from the 7–8B pack); run-level is
-  the at-risk tail — partial-save protects completed seeds, but some combos may wall-clip at
-  72 h and the 4th (queued) combo's data is delayed ~60 h behind the first batch's run-level.
-  On return: audit what run-level actually completed, then decide keep-partial / re-run at
-  reduced n / drop (options were: drop-and-defer, reduce to n=5, let-it-ride — chose the last).
+- **DECISION (2026-07-24, user): reduce run-level to `N_RUN=5`** (revised from an initial
+  "let it ride at n=20" while the combos sat queued `PD (Priority)` — they hadn't started, so
+  no compute lost). Rationale: run-level at n=20 = ~50–67 h/combo of the non-discriminating
+  floor dimension; n=5 (25 runs/combo ≈ 12–17 h) still confirms qwen3-32b floors while keeping
+  each combo to ~20–32 h → all 4 done in ~2–2.7 days, comfortably before the 30th. Comparability
+  caveat (documented): run-n=5 differs from the matrix's n=20 elsewhere — fine for a floor dim
+  (most reasoning-model run cells are "—" anyway); label qwen3-32b run-level "n=5 floor
+  estimate," never blend its magnitude with n=20 rows. turn+combat+synergy stay full n=20 (the
+  discriminating horizons — synergy is where qwen3-32b bends away from the 7–8B pack).
+  Implemented by parametrizing the combo (`N_RUN`, default 20; 0 skips run) + launcher
+  (`N_RUN`, `SKIP_SMOKE`). Relaunch after `scancel 261116–261119`:
+  `N_RUN=5 SKIP_SMOKE=1 bash cluster/sharanga_submit_qwen3_matrix.sh` (SKIP_SMOKE=1 because the
+  qwen3-32b smoke already passed this session — no need to burn another 53-min gate).
+- **Cluster note (sinfo 2026-07-24):** `gpu_h200_8` is a SINGLE node (gpunode7, 8× H200),
+  usually `mix` (shared) → combos queue `PD (Priority)` until 3 GPUs free; real contention with
+  other users on the one H200 node, but the 6-day window has slack.
 
 **Expected artifacts on return:** `results/qwen3-32b{,_silent}_{structured,raw}_seed*.json`
 + the `_seeds42_1042_2042_3042_4042` aggregates (all 4 dims). Fold-in checklist: scp to laptop

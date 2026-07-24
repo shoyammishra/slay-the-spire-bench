@@ -67,6 +67,10 @@ CHAR=${CHAR:-ironclad}       # ironclad | silent   (the launcher always sets thi
 FMT=${FMT:-structured}       # structured | raw
 TP_SIZE=${TP_SIZE:-1}
 HEALTH_WAIT_MIN=${HEALTH_WAIT_MIN:-60}
+# run-level runs PER SEED (× the 5 seeds). Default 20 (matrix n). Reasoning models
+# make run-level the expensive tail (qwen3-32b ≈30–40 min/run → n=20 ≈50–67 h/combo);
+# set N_RUN=5 for a cheaper floor estimate, or N_RUN=0 to skip run-level entirely.
+N_RUN=${N_RUN:-20}
 # Unique port per job: Slurm can co-schedule several single-GPU jobs onto one
 # 8-GPU H200 node, so a hardcoded :8000 would let two concurrent combos collide.
 PORT=${PORT:-$(( 10000 + SLURM_JOB_ID % 40000 ))}
@@ -146,12 +150,16 @@ if ! python run_benchmark.py --provider local --base-url "$BASE" \
   echo "!!!! DIM FAILED (continuing): synergy $SERVED_NAME $CHAR $FMT !!!!"; FAILED=1
 fi
 
-echo "=== [$CHAR/$FMT] run-level (n=20, 5 seeds) — longest, last ==="
-if ! python run_benchmark.py --provider local --base-url "$BASE" \
-    --model "$SERVED_NAME" --character "$CHAR" --format "$FMT" \
-    --only run --n-run 20 \
-    --seeds 42 1042 2042 3042 4042; then
-  echo "!!!! DIM FAILED (continuing): run-level $SERVED_NAME $CHAR $FMT !!!!"; FAILED=1
+if [ "$N_RUN" -gt 0 ]; then
+  echo "=== [$CHAR/$FMT] run-level (n=$N_RUN, 5 seeds) — longest, last ==="
+  if ! python run_benchmark.py --provider local --base-url "$BASE" \
+      --model "$SERVED_NAME" --character "$CHAR" --format "$FMT" \
+      --only run --n-run "$N_RUN" \
+      --seeds 42 1042 2042 3042 4042; then
+    echo "!!!! DIM FAILED (continuing): run-level $SERVED_NAME $CHAR $FMT !!!!"; FAILED=1
+  fi
+else
+  echo "=== [$CHAR/$FMT] run-level SKIPPED (N_RUN=0) ==="
 fi
 
 if [ "${FAILED}" -ne 0 ]; then
