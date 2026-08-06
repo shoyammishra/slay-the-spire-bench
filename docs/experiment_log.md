@@ -1,5 +1,151 @@
 # Experiment Log
 
+## 2026-08-07 (SHARANGA) — ✅ qwen3-32b FULL 4-DIMENSION MATRIX RETRIEVED + AUDITED
+
+**Status: complete and clean.** Jobs **261120–261123** (ironclad/silent × structured/raw)
+all logged `=== combo qwen3-32b <char> <fmt> COMPLETE (all four dimensions) ===`; no
+`DIM FAILED`, no wall-clock kill, no partial saves. Retrieved 2026-08-07 to the laptop:
+four aggregates `results/qwen3-32b*_seeds42_1042_2042_3042_4042.json` + 20 per-seed files
+(per-sample records) + the four Slurm logs (`results/_sharanga_logs/`, gitignored).
+The `--run-tag sharanga_smoke` gate file stayed out of the matrix as designed.
+
+**Wall clock (validates the 2026-07-23 §6 sizing arithmetic):** combos ran 27.6 / 33.4 /
+34.5 / 37.1 h of summed evaluator time — inside the predicted **20–50 h central band**.
+Jobs started staggered Jul 25 07:06 → Jul 27 15:39 (gpu_h200_8 is one shared node,
+gpunode7, so the 4th combo queued behind the 3-GPU per-user cap). vLLM cold start
+305–475 s on warm nodes, as predicted by the shared `~/.cache` compile cache.
+
+**Config:** vLLM 0.25.1 / torch 2.11.0+cu130 on 1× H200, `Qwen/Qwen3-32B` TP=1,
+`--max-model-len 16384`, n=20 turn/combat/synergy, `--seeds 42 1042 2042 3042 4042`,
+**run-level n=5 per seed (25 runs/combo)** per the 2026-07-24 decision.
+
+### Results — qwen3-32b, all four dimensions, 5 seeds (mean ± std)
+
+| Dim | Metric | IC structured | IC raw | Silent structured | Silent raw |
+|---|---|---|---|---|---|
+| Turn | dmg_ratio | 0.960±0.018 | 0.933±0.041 | **1.000±0.000** | 0.990±0.022 |
+| Turn | legal_rate | 0.99±0.022 | 0.98±0.027 | 1.00±0.0 | 0.99±0.022 |
+| Turn | parse_ok | 1.00±0.0 | 0.99±0.022 | 1.00±0.0 | 1.00±0.0 |
+| Combat | win_rate | 1.00±0.0 | 1.00±0.0 | 1.00±0.0 | 0.99±0.022 |
+| Combat | hp_ratio | 1.075±0.029 | 1.051±0.031 | 1.059±0.028 | 0.995±0.050 |
+| Combat | parse_errors (conflated) | 0.09±0.042 | 1.13±0.115 | 0.13±0.027 | 0.87±0.261 |
+| Combat | ├ json_parse_errors | 0.06±0.065 | 0.20±0.128 | 0.05±0.035 | 0.34±0.185 |
+| Combat | ├ illegal_action_errors | 0.03±0.027 | 0.93±0.182 | 0.08±0.027 | 0.53±0.091 |
+| Combat | └ truncation_errors | 0.06±0.065 | 0.20±0.128 | 0.05±0.035 | 0.34±0.185 |
+| Synergy | archetype_acc | 0.606±0.095 | 0.510±0.065 | **0.790±0.103** | 0.710±0.065 |
+| Synergy | card_pick_acc | 0.534±0.091 | 0.560±0.096 | 0.370±0.076 | 0.430±0.115 |
+| Synergy | removal_acc | 0.334±0.048 | 0.190±0.082 | **0.530±0.135** | 0.230±0.027 |
+| Synergy | parse_ok | 0.99±0.022 | 1.00±0.0 | 1.00±0.0 | 1.00±0.0 |
+| Run (n=5) | survival_rate | **0.12±0.179** | 0.00±0.0 | 0.00±0.0 | 0.00±0.0 |
+| Run (n=5) | avg_floors_reached | **13.24±2.14** | 12.20±2.09 | 11.56±0.95 | 10.12±2.16 |
+| Run (n=5) | avg_progress | 0.828±0.134 | 0.763±0.131 | 0.723±0.060 | 0.633±0.135 |
+| Run (n=5) | draft_coherence | 0.353±0.089 | 0.302±0.040 | 0.346±0.033 | 0.335±0.079 |
+
+Measured greedy anchors for comparison (2026-07-12, same seeds): **Ironclad 12.48 floors /
+0.780 progress / 1% survival; Silent 11.26 / 0.704 / 0%.**
+
+### ⚠️ Per-sample instrument audit — the 1.000 was interrogated before it was believed
+
+`turn.avg_damage_ratio = 1.000 ± 0.000` on Silent/structured is the textbook boundary +
+zero-variance signature the project rule says to distrust. Two audits were run before any
+number was folded in:
+
+**(a) Per-sample decomposition** (from the persisted `turn.samples[]`, n=100 per combo):
+
+| Combo | exact oracle sequence | tied at optimum, different sequence | sub-optimal |
+|---|---|---|---|
+| IC structured | 64 | 22 | 14 |
+| IC raw | 61 | 20 | 19 |
+| Silent structured | 48 | **52** | **0** |
+| Silent raw | 49 | 50 | 1 (a single illegal play → 0.0) |
+
+No trivial states: oracle sequences are 2–3 cards (Ironclad) and 3–4 cards (Silent), never
+≤1. The 52 "different sequence" samples are permutation ties among *optimal* orderings.
+
+**(b) Degenerate-strategy baseline** — new reproducible artifact
+**`scripts/turn_saturation_check.py`** (zero API, deterministic). Rebuilds all 100 turn
+states per character and enumerates the FULL space of maximal legal play sequences:
+
+| | Ironclad | Silent |
+|---|---|---|
+| oracle optimal damage (mean / min / max) | 16.26 / 6 / 18 | 18.18 / 9 / 21 |
+| fraction of all legal sequences that are optimal | 0.010 | 0.000 |
+| states where EVERY legal sequence is optimal | **0 / 100** | **0 / 100** |
+| random legal sequence | 0.231 | 0.145 |
+| naive "play hand left-to-right" (zero planning) | 0.614 | 0.510 |
+| **qwen3-32b (structured)** | **0.960** | **1.000** |
+
+**Verdict: the 1.000 is REAL, not an instrument ceiling.** The optimal set is a vanishing
+slice of the legal space (0.0–1.0%); a non-planning policy scores 0.15–0.61. qwen3-32b
+found a damage-maximizing sequence on 100/100 Silent-structured states. Consistency check:
+qwen2.5-7b scored 0.663 Silent-structured with legal_rate 0.87 — below its own legal rate,
+so legal-but-suboptimal play exists and the dimension discriminates.
+
+**Consequence for M3b (important):** turn-level is now **saturated at the top**. A frontier
+model cannot separate above 1.000 on Silent-structured, so the left edge of the
+horizon-collapse curve has no headroom left. Do not expect turn-level to rank frontier
+models; the discriminating horizons are synergy and run.
+
+### Findings from this run
+
+1. **Best short-horizon scores in the matrix, by a wide margin.** Turn 0.933–1.000 vs the
+   previous best (deepseek-r1-14b 0.823 IC / 0.839 Silent) and the 7–8B pack (0.18–0.81).
+2. **Reasoning ≠ free win needs correction — the collapse is a property of the DISTILLS,
+   not of reasoning models.** deepseek-r1-14b *lost* combats (Silent raw win 0.34,
+   hp_ratio 0.21) and its IC run floors crashed to 9.75 (below greedy 12.48). qwen3-32b,
+   a full reasoning model, holds win 0.99–1.00 with hp_ratio 0.995–1.075 (≥ greedy bot) and
+   its run floors sit **at or above** the greedy anchor. See findings.md finding 2
+   supersession marker.
+3. **First non-zero run-level survival lift in the project's history** — IC structured
+   0.12 survival vs the measured greedy 0.01, floors 13.24 vs 12.48. ⚠️ **Report as a
+   signal, not a result:** n=25 runs (5/seed × 5 seeds), std 0.179 across seeds → 3
+   survivors concentrated in one or two seeds. At n=5 this cannot be strengthened; it is a
+   **floor estimate** and must never be blended with the n=20 run-level rows.
+4. **The parse-probe verdict replicates in a second model family.**
+   `avg_json_parse_errors == avg_truncation_errors` EXACTLY in all four combos
+   (.06/.06, .20/.20, .05/.05, .34/.34) — every JSON failure is a truncation, zero
+   malformed-but-complete outputs. Same identity the 2026-07-13 DeepSeek probe found, at
+   ~25× smaller magnitude (0.05–0.34 vs ~8 parse_errors/combat). Confirms the counter split
+   is measuring what it claims to across families.
+5. **Format effect: structured wins archetype, removal, and run; raw wins card_pick.**
+   Removal IC 0.334/0.190 and Silent 0.530/0.230; archetype IC 0.606/0.510 and Silent
+   0.790/0.710 — qwen3-32b stays on the structured side, so the standing "**5 of 6 models**,
+   deepseek-14b the sole reversal" claim is unchanged (qwen3-32b was already one of the 6;
+   its cell now rests on this full-matrix data instead of the CSIS synergy-only data).
+   card_pick reverses on both characters (IC 0.534/0.560, Silent 0.370/0.430).
+   New: **structured also wins run-level floors on both characters** (13.24/12.20 IC,
+   11.56/10.12 Silent) — the first time the format ablation reaches the survival horizon,
+   where it had been documented as format-insensitive.
+6. **Combat `illegal_action_errors` is a strong format signal**: raw 0.93 / 0.53 vs
+   structured 0.03 / 0.08 — a ~10× difference in action legality, while the JSON-failure
+   component barely moves. Cite the matrix combat metric as **"invalid-action errors"**
+   (standing rule).
+
+### ⚠️ SUPERSESSION — these cells replace the CSIS qwen3-32b synergy-only cells
+
+Different serving stack (CSIS vLLM 0.8.x vs Sharanga vLLM 0.25.1) → **never blend**. Old
+vs new synergy, for the record only:
+
+| Combo | archetype (CSIS → Sharanga) | card_pick | removal |
+|---|---|---|---|
+| IC structured | .53 → .606 | .59 → .534 | .29 → .334 |
+| IC raw | .50 → .510 | .58 → .560 | .22 → .190 |
+| Silent structured | .80 → .790 | **.57 → .370** | .55 → .530 |
+| Silent raw | .64 → .710 | .46 → .430 | .32 → .230 |
+
+Cross-stack agreement is close on archetype and removal (≤0.07 except Silent-raw archetype
+0.07). **Silent-structured card_pick moved 0.20** — the single large disagreement; flag it
+if cross-stack stability is ever claimed. The superseded CSIS files are preserved locally
+at `results/_csis_qwen3-32b_2026-06-22/` (gitignored).
+
+### Coverage after this run
+qwen3-32b is now **complete on all four dimensions for all four combos** — the last
+intentional matrix gap for this model is closed. Remaining `—` cells in the matrix tables
+are deepseek-14b Silent run and deepseek-7b run, both intentionally skipped (floor
+dimension / execution collapse).
+
+---
+
 ## 2026-07-24 (SHARANGA) — qwen3-32b FULL matrix LAUNCHED (parallel fire-and-forget, smoke-gated); results expected ~2026-07-30
 
 **Why:** user on exams until 2026-07-30 → fill the qwen3-32b full 4-dim matrix unattended,

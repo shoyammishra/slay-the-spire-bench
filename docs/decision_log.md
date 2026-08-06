@@ -1,5 +1,76 @@
 # Decision Log
 
+## 2026-08-07 — qwen3-32b matrix retrieval: turn-saturation verdict, run-n=5 reporting rule, `.gitignore` leak fix
+
+**Context.** The Sharanga qwen3-32b full matrix (jobs 261120–261123) completed and was
+retrieved. Three decisions had to be made before any number entered the docs.
+
+### 1. The `turn dmg_ratio = 1.000 ± 0.000` boundary value — ACCEPTED as real
+
+**Problem.** Silent/structured returned a perfect exhaustive-oracle match on 100/100 samples
+with zero variance across 5 seeds. Standing rule: a boundary + std≈0 measurement is a harness
+bug until a per-sample audit clears it. The specific failure mode to rule out: if most legal
+play sequences tie at the optimum, `1.000` means "played legally", the dimension does not
+discriminate, and the number is an instrument ceiling.
+
+**Options.** (a) accept it — a 32B reasoning model plausibly maxes a short-horizon task;
+(b) reject/flag it pending a re-run; (c) **measure what a non-planning policy scores on the
+identical states** and let that decide.
+
+**Choice: (c).** Built `scripts/turn_saturation_check.py` — reconstructs all 100 turn states
+per character (same seeds, same `new_game`+`start_combat`+Cultist construction the harness
+uses), enumerates the full space of maximal legal sequences, and reports the fraction that are
+optimal plus two degenerate baselines. Zero API cost, deterministic, committed so the claim is
+reproducible by a teammate.
+
+**Result.** 0/100 saturated states for BOTH characters; only 1.0% (Ironclad) / 0.0% (Silent) of
+legal sequences reach the optimum; random legal sequence scores 0.231/0.145; naive
+left-to-right scores 0.614/0.510. Cross-check: qwen2.5-7b scored 0.663 Silent-structured with
+legal_rate 0.87 — below its own legal rate, so legal-but-suboptimal play exists.
+**Verdict: real planning result, folded in unqualified.**
+
+**Trade-off / limitation registered.** The dimension is now **saturated at the top**: nothing
+can score above 1.000 on Silent-structured. **This bounds M3b** — turn-level cannot rank
+frontier models, and the horizon-collapse curve's left edge has no headroom. If frontier
+ranking at short horizon is wanted later, the turn task must be made harder (deeper hands,
+multi-enemy targeting, or scoring defense as well as damage) — which would be an
+instrument-version boundary requiring a full re-baseline. Not doing that now; the
+discriminating horizons (synergy, run) are unaffected.
+
+### 2. Run-level at n=5 — reporting rule fixed BEFORE the number gets quoted
+
+Ironclad/structured produced the project's **first non-zero run survival lift**: 0.12 vs the
+measured greedy 0.01, floors 13.24 vs 12.48. Tempting headline, weak evidence: n=25 runs
+(5/seed × 5 seeds) with std 0.179 across seeds → roughly 3 survivors concentrated in one or two
+seeds.
+
+**Decision: quote it as a signal, never as a win.** Registered phrasing — *"the first model to
+rise off the run-level floor, at n=25 with wide seed spread; needs n=20 to confirm."* Forbidden
+phrasings: "beats greedy", "solves run-level", any bare 0.12 without the n and the spread. The
+n=5 rows are a **floor estimate** and must never be blended with n=20 run-level rows in a table
+or a mean. If the lift matters to the paper, the cost to confirm is one Ironclad/structured
+combo re-run at N_RUN=20 (~50–67 h on one H200) — deferred, not scheduled.
+
+### 3. `.gitignore` leak — results/ subdirectories were committable (fixed)
+
+**Found during this retrieval.** The ignore rules were `results/*.json`, `results/*.txt`,
+`results/*.png` — per-extension globs that match only the TOP level. Creating
+`results/_sharanga_logs/` (Slurm `.out` logs) and `results/_csis_qwen3-32b_2026-06-22/`
+(superseded-run backup) staged **88 files clean for `git add -A`** in this PUBLIC repo,
+including cluster job logs. `.out` was not in the ignore list at any level.
+
+**This run's logs were scanned and are clean** (nvidia-smi + vLLM startup + benchmark progress;
+no usernames, no IPs, no node hostnames) — so nothing leaked. But Slurm logs *can* carry
+`/home/<user>` paths and node names, and this is the same failure class as the 2026-06-12 CSIS
+IP incident.
+
+**Fix:** `results/**` + `!results/.gitkeep`. Verified: `git add -An` now stages nothing from
+`results/`, `.gitkeep` remains trackable. **Durable rule: ignore result/artifact directories
+recursively (`dir/**`), never per-extension — a per-extension glob is one `mkdir` away from
+being bypassed.**
+
+---
+
 ## 2026-07-23 — Sharanga HPC access (BITS Hyderabad): recon done, large-open-model ladder registered
 
 **Context.** The professor granted access to the **Sharanga HPC cluster** (BITS Hyderabad;

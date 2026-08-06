@@ -22,12 +22,15 @@ build/
 venv/
 env/
 
-# Results (keep .gitkeep, ignore actual result files — regenerated per run)
-results/raw/
-results/*.jsonl
-results/*.json
-results/*.txt
-results/*.png
+# Results (keep .gitkeep, ignore everything else — regenerated per run).
+# `results/**` not `results/*.json`: the old per-extension globs matched only the
+# TOP level, so any subdirectory was committable. Found 2026-08-07, when the
+# Sharanga retrieval created results/_sharanga_logs/*.out (Slurm logs) and
+# results/_csis_qwen3-32b_2026-06-22/ (superseded-run backup) — 88 files, incl.
+# cluster logs, staged clean for `git add -A` in this PUBLIC repo. Slurm logs can
+# carry /home/<user> paths and node hostnames; never let results/ leak.
+results/**
+!results/.gitkeep
 
 # Jupyter
 .ipynb_checkpoints/

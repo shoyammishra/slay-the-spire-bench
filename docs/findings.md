@@ -1,5 +1,56 @@
 # Findings
 
+## 🟢 qwen3-32b FULL 4-dimension matrix (Sharanga H200, retrieved + audited 2026-08-07) — CURRENT for every qwen3-32b cell
+
+qwen3-32b's intentional synergy-only gap is **closed**: all four dimensions × both characters
+× both formats, n=20 (turn/combat/synergy), run-level at **n=5 per seed = 25 runs/combo**.
+Full tables, wall-clock, and the per-sample audit: `docs/experiment_log.md` 2026-08-07 (top).
+⚠️ These cells **SUPERSEDE the CSIS qwen3-32b synergy-only cells** (vLLM 0.8.x there vs 0.25.1
+here) — never blend the two; the superseded files are archived at
+`results/_csis_qwen3-32b_2026-06-22/` (gitignored).
+
+**A. The instrument was interrogated before the numbers were believed.** Silent-structured
+returned `turn dmg_ratio = 1.000 ± 0.000` — boundary value, zero variance across 5 seeds, the
+exact signature the project rule says to distrust. Cleared by two audits: per-sample
+decomposition (oracle sequences are 2–4 cards, never trivial; 0 sub-optimal samples out of 100;
+the 52 non-identical sequences are permutation ties among *optimal* orderings) and a
+degenerate-strategy baseline (**`scripts/turn_saturation_check.py`**, reproducible, zero API):
+across all 100 states per character, **0/100 are saturated**, only 0.0–1.0% of legal sequences
+reach the optimum, a random legal sequence scores 0.145 (Silent) / 0.231 (Ironclad), and a
+zero-planning left-to-right policy scores 0.510 / 0.614. **Verdict: the 1.000 is a real
+planning result, not an instrument ceiling.**
+
+**B. ⚠️ Turn-level is now SATURATED AT THE TOP — an instrument limit for M3b.** qwen3-32b maxes
+Silent-structured at 1.000, so no frontier model can separate above it there. The left edge of
+the horizon-collapse curve has lost its headroom; **do not expect turn-level to rank frontier
+models**. The discriminating horizons are now synergy and run. (This does not invalidate any
+existing number — it bounds what the dimension can still show.)
+
+**C. Best short-horizon performance in the matrix** — turn 0.933–1.000 vs the previous best
+(deepseek-r1-14b 0.823/0.839) and the 7–8B pack (0.18–0.81).
+
+**D. First non-zero run-level survival lift in the project's history** — Ironclad structured
+**0.12 survival vs the measured greedy 0.01**, floors **13.24 vs greedy 12.48**; Silent
+structured 11.56 vs greedy 11.26. ⚠️ **A signal, not a result:** n=25 runs, std 0.179 across
+seeds → ~3 survivors concentrated in one or two seeds. Registered as an **n=5 floor estimate**;
+never blend with the n=20 run-level rows, and do not write "beats greedy" — write "the first
+model to rise off the run-level floor, at n=25 with wide seed spread."
+
+**E. The 2026-07-13 parse-probe verdict replicates in a second model family.**
+`avg_json_parse_errors == avg_truncation_errors` **exactly** in all four combos (.06/.06,
+.20/.20, .05/.05, .34/.34): every JSON failure is a token-budget truncation, zero
+malformed-but-complete outputs — the same identity found for the DeepSeek distills, at ~25×
+smaller magnitude. The counter split measures what it claims to, across families.
+
+**F. Format effect reaches the survival horizon for the first time.** Structured wins archetype
+(IC .606/.510, Silent .790/.710), removal (IC .334/.190, Silent .530/.230) **and run-level
+floors on both characters** (13.24/12.20 IC, 11.56/10.12 Silent) — run-level had been documented
+as format-insensitive on outcome. raw wins card_pick on both characters (IC .534/.560, Silent
+.370/.430). Combat `illegal_action_errors` is the sharpest format trace: raw 0.93/0.53 vs
+structured 0.03/0.08 (~10×) while the JSON-failure component barely moves.
+
+---
+
 ## ✅✅ Full 5-model matrix, 5 seeds (2026-06-22; DeepSeek gap-fill folded 2026-07-11) — CURRENT valid data (supersedes Qwen-only)
 
 Five model families now run under the post-audit harness: qwen2.5-7b, llama-3.1-8b (2nd
@@ -15,9 +66,17 @@ skipped run-level cells.
    away at the synergy horizon** — Silent-structured archetype **0.80** and removal **0.55** are
    the highest anywhere in the matrix, well above the 7–8B pack (archetype ~0.33–0.72). This is
    exactly the D&B-grade claim the curve needed: a frontier/reasoning model sustains coherent
-   *deck-level* planning where smaller models plateau. (qwen3-32b is synergy-only, so the curve's
+   *deck-level* planning where smaller models plateau. ~~(qwen3-32b is synergy-only, so the curve's
    turn/combat/run points for it are not yet filled — a known gap, but synergy is the horizon
-   where the separation lives.)
+   where the separation lives.)~~
+   **⚠️ UPDATED 2026-08-07 — the gap is closed and the shape of the claim changed.** qwen3-32b now
+   has all four dimensions (section 🟢 above). Its line does not merely *bend away at synergy*: it
+   is **highest at turn (0.933–1.000), holds combat at the ceiling, leads synergy, and is the only
+   model to rise off the run-level floor** (IC structured 13.24 floors / 0.12 survival vs greedy
+   12.48 / 0.01). The honest re-statement is **"qwen3-32b degrades least across all four
+   horizons"**, not "it separates only at synergy." Two consequences: the curve's turn point is now
+   **saturated** (no headroom above 1.000 for M3b frontier models), and the numbers behind
+   qwen3-32b's synergy point are the Sharanga ones, not the CSIS ones used when this was written.
 
 2. **Reasoning is not a free win — the deepseek distills split hard by size, and verbose decode
    actively hurts long horizons.** deepseek-r1-distill-**14b** is the *best* model at the
@@ -39,6 +98,15 @@ skipped run-level cells.
    the parseable ~14–18 of 20 fixtures. **Lesson for the paper:** "reasoning model" is not a
    monolith; distillation size and output discipline gate whether reasoning helps, and the cost
    lands on the *long* horizons — itself a horizon-collapse result.
+   **⚠️ CORRECTED 2026-08-07 — attribute the collapse to DISTILLATION, not to reasoning.** With
+   qwen3-32b's full matrix in hand the contrast is direct: a *full* reasoning model at 32B holds
+   combat win 0.99–1.00 with hp_ratio 0.995–1.075 (≥ the greedy bot) and run floors **at or
+   above** the greedy anchor, while the R1 *distills* lose combats and die below it. The
+   verbose-decode penalty is a property of **the distills' budget-bound deliberation**
+   (parse-probe, 2026-07-13), not of reasoning training as such. Do NOT write "reasoning models
+   over-deliberate into death" — write "the R1 distills do; the full 32B reasoning model does not,
+   and is the strongest model in the matrix at every horizon." The distill-vs-full dissociation
+   the P6 rebuttal plan leans on is unaffected — it was always distill against full.
 
 3. **Format ablation replicates across families but its *sign* is model- and character-dependent
    — synergy removal is the most robust signal, with exactly one exception.** Structured ≥ raw on
@@ -54,6 +122,14 @@ skipped run-level cells.
    blanket per-cell rule. Report it as: format matters, the effect is concentrated at the
    deck-building horizon, and its magnitude/sign varies by model — which is itself a finding
    (format sensitivity is a model property, not a constant).
+   **⚠️ UPDATED 2026-08-07 (count unchanged, one number restated, one scope EXTENDED).** The
+   qwen3-32b removal figures above are the superseded CSIS ones; the current values are
+   **IC .334→.190 and Silent .530→.230** (Sharanga full matrix). qwen3-32b stays on the structured
+   side, so **"5 of 6 models" is unchanged** — qwen3-32b was always one of the 6, and deepseek-14b
+   remains the sole reversal. **New and worth a sentence in the paper: the format effect now
+   reaches the RUN horizon.** qwen3-32b structured beats raw on run-level floors for both
+   characters (13.24/12.20 IC, 11.56/10.12 Silent), the first breach of the standing
+   "combat/run are format-insensitive on outcome" claim — see finding 4's marker.
 
 4. **Combat/run remain the shared collapse floor — model differences wash out where engine
    survival dominates.** All instruct models win ~100% of scripted combats with hp_ratio ≈ 1.0
@@ -62,9 +138,18 @@ skipped run-level cells.
    large at the reasoning horizons (turn spread 0.18→0.84, synergy archetype 0.33→0.80) and
    near-zero at the survival horizons (combat win, run floors)** — so the benchmark's
    discriminating power lives at turn + synergy, and run is honestly the convergence floor.
+   **⚠️ FIRST CRACK IN THE FLOOR, 2026-08-07 — keep the claim, weaken the "never".** qwen3-32b is
+   the first model to rise off the run-level floor: IC structured **0.12 survival / 13.24 floors**
+   vs measured greedy **0.01 / 12.48**, and structured > raw on floors for both characters — so
+   run-level is not *perfectly* format-insensitive or *perfectly* non-discriminating. It is still
+   the convergence floor for the other five models, and this lift rests on **n=25 runs with std
+   0.179 across seeds** (~3 survivors, likely one or two seeds). Write it as "the floor holds for
+   every model except the strongest, where a first lift appears at n=25 and needs n=20 to
+   confirm" — not as a refutation. The turn spread quoted above also widens to **0.18→1.00**.
 
 5. **Family-level synergy ordering holds: Silent > Ironclad almost everywhere** (qwen3-32b
-   archetype .80 vs .53, llama .72 vs .51, qwen2.5 .60 vs .37) — replicating that Silent's
+   archetype .80 vs .53 — *current Sharanga values .790 vs .606, ordering unchanged*, llama .72
+   vs .51, qwen2.5 .60 vs .37) — replicating that Silent's
    Poison/Shiv/Block/Discard labels read more literally off card text than Ironclad's
    abstractions. mistral is the exception (≈ flat .33/.34), consistent with it being the weakest
    reasoner overall.
