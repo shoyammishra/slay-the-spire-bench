@@ -1,5 +1,125 @@
 # Decision Log
 
+## 2026-08-07 (later) — P4b statistical rigor pass: unit of analysis, test family, and what it corrected
+
+**Context.** Backlog row P4b (`handoff.md` §6; `review_2026-07-14.md` §2.4 item 1) — the
+external review named statistics as a top-5 rejection reason, and the seed-matched format
+ablation *had never actually been tested as paired data*. Zero GPU: everything below is
+computed from files already on disk. Deliverables: **`scripts/stats_rigor.py`** (reusable,
+model-discovering), **`tests/test_stats.py`** (26 known-answer tests), **`docs/stats_report.md`**
+(committed human artifact), `results/stats/stats_rigor.json` (machine artifact, gitignored).
+
+**§5.1 data-validity classification: NONE of the three invalidating rows is touched.** No
+engine change, no prompt byte, no scoring change — the script only reads results. No published
+mean moves. Comparability is untouched by construction.
+
+### 1. Unit of analysis — dictated by what was persisted, not by preference
+
+| Dimension | Unit | Why |
+|---|---|---|
+| turn / combat / run | **seed** (5 per combo) | `turn.samples[]`/`combat.samples[]` were instrumented 2026-07-13, *after* the matrix ran — only qwen3-32b has them. Per-seed summaries are all that exist for the other five models. |
+| synergy | **sample** (100 per model×character) | `synergy.samples[]` has persisted since 2026-06-10 for every combo. |
+
+**Precondition verified before any paired test, not assumed:** for all **60** (model ×
+character × seed) triples, the structured and raw sample streams carry byte-identical
+`(expert_archetype, expert_pick_idx)` sequences — the two formats saw the *same fixtures in
+the same rotated offer positions*. The script re-checks this on every run and refuses
+sample-level tests if it ever fails.
+
+### 2. Exact sign-flip permutation, not a t-test — and its hard power ceiling
+
+**Choice:** exact two-sided sign-flip permutation on the 5 seed-matched differences. n=5
+cannot support a normality assumption, and the design's exchangeability under H0 is exactly
+what a permutation test needs.
+
+**The consequence had to be registered, not discovered later: 2⁵ = 32 sign assignments ⇒ the
+smallest attainable two-sided p for ANY single combo is 0.0625.** No per-combo test in this
+matrix can reach α=0.05 — *by construction, not by weakness of effect*. Therefore per-combo
+rows are **descriptive**, and inference is carried by (a) the pooled stratified permutation
+test across all 12 model×character strata and (b) sample-level McNemar on synergy. This
+ceiling is printed in the report header and must travel with any per-combo p-value cited.
+
+### 3. Two pooled tests, deliberately — magnitude AND direction
+
+The stratified permutation statistic is a *mean of stratum means*, so one model with a huge
+effect can produce a "significant" pooled result while the sign flips across models. Added an
+exact **sign test on per-stratum direction** (ties dropped) alongside it. A claim is called
+**general** only when both are significant; magnitude-only results are labelled
+`SUPPORTED-MAGNITUDE-ONLY` and must be reported as *model-dependent*. This is what kept the
+turn-level result honest (§6 below).
+
+### 4. Multiplicity, equivalence, and boundary cells
+
+- **Holm–Bonferroni** within each family (family = one metric across the 12 combos).
+- **A non-significant result is never reported as "no effect."** Format *insensitivity* is
+  tested as **equivalence** (TOST via the 90% bootstrap CI) against a **pre-declared margin of
+  ±0.05** — chosen as the instrument's own granularity, since one sample in 20 moves any rate
+  by exactly 0.05. Outcomes are `equivalent` or `inconclusive`; "inconclusive" is a real,
+  reportable state that means *neither* equivalence nor difference was shown.
+- **Clopper–Pearson exact intervals for every boundary cell.** A bootstrap of a constant
+  vector returns a zero-width CI, which reads as certainty and is not. `turn dmg_ratio` is
+  included at the boundary only, where its k/n reading is exact (mean 1.0 with all ratios ≤ 1
+  ⇒ every sample hit the oracle).
+- **Bootstrap:** percentile, B=10,000, fixed RNG seed 20260807 ⇒ byte-reproducible. Seed-level
+  CIs resample 5 numbers and are labelled **COARSE** everywhere they appear. Synergy uses a
+  **hierarchical** (seed → sample) bootstrap because the same 20 fixtures recur across seeds;
+  a flat bootstrap would understate the interval.
+
+### 5. Run-level compared against a *run-seed-matched* greedy anchor (new, and it mattered)
+
+`run_all` draws run seeds `range(base+300, base+300+n_run)`; `scripts/greedy_baseline.py`
+swept the same scheme at n_run=20 **and kept per-run records**. So greedy can be subset to the
+*exact same run seeds* the model played before pairing. Adopted as the standard run-level
+comparator — it is strictly tighter than comparing against greedy's 100-run global average.
+**This immediately corrected a published number** (§6, C5).
+
+### 6. What the pass CORRECTED (the reason it was worth doing)
+
+1. **"combat/run are format-insensitive on outcome" — NOT supported as stated.** Format
+   reaches combat `hp_ratio` with a consistent direction (10 of 12 strata favour structured,
+   sign test p=0.039, pooled p=0.0001). Diagnosis: the old reading was a **ceiling artifact** —
+   for `win_rate`, *every* combo whose effect exceeds the margin sits below the combat ceiling
+   (all four R1-distill combos); models that win 100% of fights leave format nothing to move.
+   `hp_ratio` is the finer instrument and moves even for two win-saturated combos
+   (mistral/Silent +0.112, qwen3-32b/Silent +0.064). Restate as: *format-insensitivity at
+   combat holds only where the win-rate ceiling removes the variance.*
+2. **The turn-level pooled effect favours RAW (−0.076, p=0.0005) but the direction splits
+   5 S / 7 R (sign test n.s.).** Registered reading: **"format matters at turn level; its sign
+   is a model property"** — never "raw beats structured at turn level". The existing
+   format-as-model-property framing is now quantified rather than asserted.
+3. **qwen3-32b's run-level lift shrinks under the matched anchor.** Published comparison was
+   the model's 25 runs vs greedy's *100-run* anchor (.01 survival / 12.48 floors). On the
+   **same 25 run seeds** greedy scores .04 / 12.76 — so the honest gap is **3/25 vs 1/25
+   survivors (+0.08, p=0.75)** and **+0.48 floors (p=0.5625)**, not ".12 vs .01". The
+   registered phrasing ("signal, not a win; needs n=20") stands and is now quantified;
+   the *numbers quoted alongside it* must be the matched ones.
+4. **Synergy `archetype` and `card_pick` are downgraded to `SUPPORTED-MAGNITUDE-ONLY`**
+   (direction 7/5 and 8/4, n.s.). Only **`removal`** survives as a general structured>raw
+   effect (10/2, sign p=0.039, McNemar significant in 4 combos after Holm). The paper's format
+   claim should lead with removal.
+5. **`card_pick` is the noisiest synergy metric** — seed residual 0.362 vs model 0.229. It
+   should not carry a headline claim on its own.
+
+### 7. What it CONFIRMED
+
+- **"5 of 6 models" on synergy removal** — exactly reproduced at sample level; deepseek-14b is
+  the sole reversal and its reversal is *significant* (Silent p=0.0001 after Holm), so it is a
+  real property of that model, not noise.
+- **The horizon-collapse story, now as a variance statement.** Between-model η² share:
+  turn **0.83**, combat **0.89**, synergy **0.51**, run **0.02** — while at run level
+  *character* explains **0.57** and seed noise **0.34**. One line for the paper: **at the run
+  horizon, which model you use explains ~2% of the variance; which character you play explains
+  ~57%.** That is the collapse-floor claim in a single number.
+- Seed noise is small at short horizons (turn 0.07, combat 0.01–0.03), so n=5 seeds was
+  adequate *there*; it is the dominant term at run level, which is why run-level needs n=20.
+
+**Known limitations (recorded, not hidden):** per-combo tests cannot reach α=0.05 (§2); run
+rows in the variance decomposition use only the 3 models with complete n=20 run data;
+McNemar assumes independent pairs while the 20 fixtures recur across seeds (mitigated by
+reporting the cluster-safe seed-level test beside it, and by the hierarchical bootstrap);
+deepseek-7b synergy pairs drop 37–38 of 100 to parse failures and its accuracies stay
+conditioned on the parseable subset.
+
 ## 2026-08-07 — qwen3-32b matrix retrieval: turn-saturation verdict, run-n=5 reporting rule, `.gitignore` leak fix
 
 **Context.** The Sharanga qwen3-32b full matrix (jobs 261120–261123) completed and was

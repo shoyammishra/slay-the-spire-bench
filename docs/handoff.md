@@ -17,7 +17,7 @@ Single source of truth stays where it already lives (see §2).
   configs) are on this laptop and folded into all docs. Every remaining `—` cell in the
   CLAUDE.md tables is *intentional*, not pending. Nothing is running on the cluster.
 - **Engine + harness are post-audit stable**: 5 full audits (2026-06-10 → 06-12) found and
-  fixed ~130 bugs; 133/133 tests pass; mock pipeline green for both characters × both
+  fixed ~130 bugs; **172/172 tests pass** (as of 2026-08-07); mock pipeline green for both characters × both
   formats.
 - **The two D&B-blocking gaps from the novelty review are closed** (≥3 model families +
   a reasoning model).
@@ -37,6 +37,7 @@ Single source of truth stays where it already lives (see §2).
 | 4 | `docs/decision_log.md` | Why every design decision was made (rationale record) |
 | 5 | `docs/experiment_log.md` | Every run: config, numbers, failures. 2026-06-22 section = current matrix |
 | 6 | `docs/findings.md` | Interpretations/hypotheses over the numbers |
+| 6b | `docs/stats_report.md` | **Uncertainty** on every headline number: CIs, effect sizes, paired format tests, variance decomposition, claim verdicts (regenerate with `scripts/stats_rigor.py`) |
 | 7 | `docs/novelty_and_related_work.md` | What's novel vs FDG-2024/Orak; D&B viability |
 | 7b | `docs/review_2026-07-14.md` | External expert review (ADOPTED evaluation baseline for paper-side decisions) + response + derived priorities |
 | 8 | `docs/roadmap.md` | Milestones M3a/M3b, run order |
@@ -154,6 +155,16 @@ chain-of-thought — is only catchable by smoke).
   subset; say so.
 - Old numbers never get silently blended with new ones. When an instrument changes, the
   old files are deleted or marked ⛔ in docs (see the 2026-06-14 Groq-file deletion).
+- **(added 2026-08-07, P4b)** Statistics have their own honesty rules, all enforced by
+  `scripts/stats_rigor.py`: (a) every per-combo p-value travels with **"min attainable
+  p = 0.0625 at 5 seed pairs"** — the design cannot reach α=0.05 per combo, so never present
+  a per-combo null as evidence of no effect; (b) a pooled effect is **general** only if the
+  magnitude test *and* the direction (sign) test agree — otherwise say **model-dependent**;
+  (c) *insensitivity* claims must pass an **equivalence** test (TOST, ±0.05 margin), never be
+  inferred from a non-significant result; (d) run-level comparisons against greedy use the
+  **run-seed-matched** anchor (greedy subset to the exact seeds the model played), not the
+  100-run global average; (e) before believing a "format-insensitive" or "no difference"
+  result, check whether a **ceiling** is removing the variance.
 
 ### 5.5 Model/serving selection heuristics (cluster)
 
@@ -186,7 +197,7 @@ chain-of-thought — is only catchable by smoke).
 | 2 | ~~**Fable 5 lit note** into `docs/draft.md` Related Work~~ — **✅ DONE 2026-07-12** (Opus 4.8 agent; 4 insertions in draft.md + Anthropic entry in `novelty_and_related_work.md` §10) | done | Met: domain validation cited; floor-vs-ceiling complement framing; ~3×-with-memory as corroboration-only; memory = future-work only |
 | 3 | ~~**Run-level discriminability decision**~~ — **✅ DECIDED 2026-07-12** (decision_log P3 entry): **reframe run as the shared collapse floor (Option B)**; `--acts 3` = conditional appendix probe gated on M3b frontier results also flooring at 1 act, preceded by an Act-2/3 engine audit + smoke (~12h/cell; full matrix would be ~72–144 GPU-h). roadmap step 6 re-tagged | done | Met: decision + trade-offs + revisit trigger (M3b) recorded; no compute spent |
 | 4 | **M3b frontier runs** (Claude/GPT via professor's channel) — fills the frontier gap; expected to bend the collapse curve. **⚠️ Budget protocol registered 2026-07-13 (decision_log): matched-8k first, escalate only on measured truncation** — the smoke test MUST read `parse_fail_truncated`/`truncation_errors` before any full cell (the DeepSeek budget-bound confound now instrumented); reasoning APIs need their decoupled budgets configured (Claude thinking budget separate from answer tokens; OpenAI `max_completion_tokens` covers reasoning too). **Scope added 2026-07-14 (review-driven, decision_log): fold-in includes a cross-benchmark correlation** — per-model collapse points vs *published* external agent-benchmark scores (GAIA/SWE-Bench/WebArena…); we run nothing external, n≈8–10 models, reported as directional only | Opus 4.8 + user (credentials) | Same harness, same seeds, all 4 combos; provider class may need adding to `benchmark.py`; smoke truncation check ≈ 0 (or the raised-budget condition added + both reported); correlation table with the directional caveat |
-| 4b | **Statistical rigor pass** (NEW 2026-07-14, review-driven — decision_log + `docs/review_2026-07-14.md` Part 3). Bootstrap CIs, effect sizes, **paired seed-matched tests for the format ablation** (the design was built for paired testing; the test has never been run), variance decomposition (seed/model/format). **Zero GPU** — pure analysis on the 24 aggregates + persisted per-sample records (2,400 synergy samples; `turn.samples[]`/`combat.samples[]`). Unblocked NOW, ahead of P6; script it so it re-runs trivially when M3b rows land | Opus 4.8 | Reusable analysis script (not a one-off notebook); CIs + effect sizes for every headline claim; paired format test with p-values; outputs feed P6 directly; no published mean changes (additive analysis only) |
+| 4b | ~~**Statistical rigor pass**~~ — **✅ DONE 2026-08-07.** `scripts/stats_rigor.py` (models discovered from filenames → M3b rows join with no code change) + `tests/test_stats.py` (26 known-answer tests, **172/172 total**) + `docs/stats_report.md` (committed) + `results/stats/stats_rigor.json`. Methods/limitations: decision_log 2026-08-07 (later); numbers: experiment_log 2026-08-07 (later); wording impact: findings 📊 section. **⚠️ Registered power ceiling: exact sign-flip over 5 seed pairs ⇒ min attainable two-sided p per combo = 0.0625**, so inference rests on the pooled stratified test + sample-level McNemar. **Corrected two published claims** — "combat/run format-insensitive" (ceiling artifact; format reaches combat hp_ratio, 10/12 strata) and qwen3-32b's run lift (run-seed-matched greedy = .04/12.76, not .01/12.48). **Delivered the paper's cleanest number:** between-model η² share turn .83 / combat .89 / synergy .51 / **run .02**. **Re-run it as step 1 of the M3b fold-in.** | done | Met: reusable script (not a notebook); CIs + effect sizes on every headline claim; paired format test with p-values (+ direction test); no published mean changed |
 | 5 | Complete qwen3-32b non-synergy dims (needs vLLM 0.8.x env) — optional | Opus 4.8 | Only if P3/P4 make the curve need it |
 | 5b | ~~**Run the parse probe** and fold the truncation-vs-malformed answer into findings + the paper's DeepSeek framing~~ — **✅ DONE 2026-07-13.** Four cells ran (deepseek-7b IC + 14b Silent, both formats): **`parse_fail_truncated/parse_fail_n` = 1.0 in every cell** ⇒ verdict = **budget-bound deliberation** (models exhaust the 8k budget mid-`<think>`; zero malformed-but-complete outputs). Folded into experiment_log (2026-07-13), findings (probe section + finding-2 supersession), draft.md (finding 3 mechanism + §5.4), report_matrix.html. Probe caveats recorded (seed 42 only, combat n=3); diagnostic cells kept OUT of matrix tables. The **"invalid-action errors"** reporting rule for the matrix metric remains in force | done | Met: answer recorded as budget-bound with n/seed caveat; no diagnostic scores in matrix tables |
 | 6 | **Paper assembly** for a D&B-track submission; citations need venue/year completion. ~~**Scope added 2026-07-12 (found during P2): full draft-refresh pass**~~ — **✅ REFRESH SUBTASK DONE 2026-07-12** (draft.md: new matrix-accurate Abstract + superseded-claims box, "contributes" numbers updated, §4–5 results-summary skeleton added with the run-as-collapse-floor framing + horizon-figure caption language ("0 = non-planning floor"; combat = `win×min(1,hp)` so greedy ≈ 1.0), venue ladder + gaps re-ranked — no stale pilot claims remain). **Also delivered: `docs/report_matrix.html`** — standalone professor-facing results report (both horizon-collapse PNGs base64-embedded, full matrix tables, 5 findings, honest caveats, M3b ask; supersedes the pilot `docs/report.html`). **REMAINING P6 scope:** full paper assembly (Sections 1, 3–6 prose from the draft.md skeleton) + BibTeX completion — best done after P4/M3b lands. **Scope extended 2026-07-14 (review-driven, decision_log + `docs/review_2026-07-14.md` §2.3):** (a) explicit oracle-quality limitations taxonomy (turn exact → combat greedy → synergy expert → run baseline); (b) three named rebuttal arguments — difficulty≠horizon (dissociation pattern: deepseek-7b execution collapse vs matrix-2nd synergy removal, qwen3-32b bends only at synergy), run collapse ≠ context accumulation (memoryless harness, bounded prompts), budget-bound deliberation as mechanism (promote from footnote to first-class finding); (c) claim-scoping pass — every general claim reads "in this benchmark" until M3b/second-domain evidence; (d) explicit memory/tools scope-out defense (floor vs ceiling); (e) positioning vs FDG-2024/Orak LEADS the paper (the review estimates 45% of reviewers open with "already done") | Opus 4.8 (writing) + Sonnet (formatting/BibTeX mechanics) | Novelty framing follows `novelty_and_related_work.md` + §5.4 honesty rules; no stale pilot claims survive the refresh; all five 2026-07-14 scope items present; P4b numbers used wherever stats are cited |
@@ -202,12 +213,13 @@ chain-of-thought — is only catchable by smoke).
   batch any remaining GPU work.
 - **Fake-precision risk**: n=20 × 5 seeds is paper-grade for this scope, but any new
   claim needs its own power check (12.5pp steps at n=8 was the old trap).
-- **No CI** (see §9): the 133 tests only run when someone runs them. Run all three files
+- **No CI** (see §9): the 172 tests only run when someone runs them. Run all four files
   before every commit.
 
 ## 8. Review checklist (no merge without)
 
-1. All 3 test files pass (133 tests), run directly with `PYTHONIOENCODING=utf-8`.
+1. All 4 test files pass (**172 tests**: benchmark 48, combat 62, run 36, stats 26), run
+   directly with `PYTHONIOENCODING=utf-8`.
 2. Mock pipeline green: both characters × both formats.
 3. §5.1 classification done: does this change invalidate data? If yes, re-baseline plan
    is written down first.

@@ -1,5 +1,138 @@
 # Experiment Log
 
+## 2026-08-07 (later) — ✅ P4b STATISTICAL RIGOR PASS (zero GPU, zero API)
+
+**What ran:** `scripts/stats_rigor.py` over the 24 on-disk combos (6 models × 2 characters ×
+2 formats × 5 seeds) + the 2,400 persisted synergy per-sample records + the two greedy-baseline
+files. **No benchmark re-run, no API call, no published mean changed** — this is additive
+analysis. Human artifact: **`docs/stats_report.md`** (committed). Machine artifact:
+`results/stats/stats_rigor.json` (gitignored). Methods + rationale: decision_log 2026-08-07
+(later). Reproducible: fixed RNG seed 20260807, B=10,000 → identical numbers every run
+(~77 s wall). Tests: **172/172** (146 + 26 new in `tests/test_stats.py`); mock pipeline green.
+
+**Precondition verified, not assumed:** structured vs raw synergy streams are byte-identical on
+`(expert_archetype, expert_pick_idx)` for **60/60** (model × character × seed) triples ⇒ the
+formats saw the same fixtures in the same rotated positions, licensing sample-level paired
+tests. The script re-checks this every run.
+
+**⚠️ Power ceiling that travels with every per-combo p-value below:** the paired test is an
+exact sign-flip permutation over 5 seed differences; 2⁵ = 32 sign assignments ⇒ **minimum
+attainable two-sided p per combo = 0.0625**. No single combo can reach α=0.05 *by
+construction*. Per-combo rows are descriptive; inference comes from the pooled stratified test
+and sample-level McNemar.
+
+### Format ablation, pooled across the matrix (the paired test that had never been run)
+
+Stratified sign-flip permutation (magnitude) + exact sign test on per-stratum direction. A
+claim is **general** only when both are significant; magnitude-only = model-dependent.
+
+| Dim | Metric | mean diff (S−R) | p (magnitude) | S>R / R>S / tie | p (direction) | reading |
+|---|---|---|---|---|---|---|
+| turn | dmg_ratio | −0.0758 | **0.0005** | 5/7/0 | 0.774 | model-specific |
+| turn | legal_rate | −0.0558 | 0.0125 | 6/6/0 | 1.000 | model-specific |
+| combat | win_rate | +0.0542 | **0.0002** | 5/0/7 | 0.0625 | model-specific* |
+| combat | hp_ratio | +0.0603 | **0.0001** | 10/2/0 | **0.0386** | **general** |
+| combat | invalid_action_errors | −1.0308 | **0.0001** | 2/10/0 | **0.0386** | **general** (fewer with structured) |
+| synergy | archetype | +0.0384 | 0.0187 | 7/5/0 | 0.774 | model-specific |
+| synergy | card_pick | +0.0729 | 0.0012 | 8/4/0 | 0.388 | model-specific |
+| synergy | removal | +0.0764 | **0.0007** | 10/2/0 | **0.0386** | **general** |
+| run | floors | +0.3862 | 0.0641 | 5/3/0 | 0.727 | no evidence |
+| run | progress | +0.0241 | 0.0629 | 5/3/0 | 0.727 | no evidence |
+| run | survival | +0.0175 | 0.2012 | 3/3/2 | 1.000 | no evidence |
+
+\* win_rate: all 5 non-tied strata favour structured, but 7 combos are exactly tied at the
+ceiling, so the sign test only reaches its own floor of 0.0625.
+
+### Synergy removal at the sample level (McNemar exact, fixture-matched, n=100 pairs/combo)
+
+| Model | Char | pairs | dropped | structured | raw | risk diff | b/c | p | p (Holm) |
+|---|---|---|---|---|---|---|---|---|---|
+| qwen2.5-7b | ironclad | 100 | 0 | .240 | .020 | +0.220 | 22/0 | <0.0001 | **<0.0001** |
+| qwen2.5-7b | silent | 100 | 0 | .360 | .180 | +0.180 | 25/7 | 0.0021 | **0.0168** |
+| qwen3-32b | silent | 100 | 0 | .530 | .230 | +0.300 | 36/6 | <0.0001 | **<0.0001** |
+| qwen3-32b | ironclad | 99 | 1 | .333 | .192 | +0.141 | 24/10 | 0.0243 | 0.1459 |
+| mistral-7b | ironclad | 100 | 0 | .150 | .000 | +0.150 | 15/0 | 0.0001 | **0.0006** |
+| mistral-7b | silent | 100 | 0 | .040 | .000 | +0.040 | 4/0 | 0.1250 | 0.5000 |
+| llama-3.1-8b | ironclad | 100 | 0 | .150 | .070 | +0.080 | 8/0 | 0.0078 | 0.0547 |
+| llama-3.1-8b | silent | 100 | 0 | .180 | .160 | +0.020 | 8/6 | 0.7905 | 1.0000 |
+| deepseek-7b | ironclad | 62 | **38** | .452 | .371 | +0.081 | 13/8 | 0.3833 | 1.0000 |
+| deepseek-7b | silent | 63 | **37** | .444 | .444 | 0.000 | 10/10 | 1.0000 | 1.0000 |
+| deepseek-14b | ironclad | 93 | 7 | .183 | .323 | **−0.140** | 15/28 | 0.0660 | 0.3300 |
+| deepseek-14b | silent | 99 | 1 | .151 | .404 | **−0.253** | 7/32 | 0.0001 | **0.0006** |
+
+"dropped" = pairs where either format failed to parse (deepseek-7b's conditioning caveat,
+now quantified: 37–38 of 100). **The "5 of 6 models" claim reproduces exactly**, and
+deepseek-14b's reversal is *significant* — a real model property, not noise.
+
+### Variance decomposition (η² shares, balanced model × character × format, seeds as replicates)
+
+| Dim | Metric | models | model | character | format | interactions | residual (seed) |
+|---|---|---|---|---|---|---|---|
+| turn | dmg_ratio | 6 | **0.832** | 0.000 | 0.021 | 0.077 | 0.070 |
+| combat | win_rate | 6 | **0.891** | 0.011 | 0.007 | 0.065 | 0.025 |
+| combat | hp_ratio | 6 | **0.935** | 0.013 | 0.006 | 0.033 | 0.013 |
+| synergy | archetype | 6 | **0.506** | 0.149 | 0.017 | 0.222 | 0.106 |
+| synergy | removal | 6 | **0.609** | 0.016 | 0.052 | 0.237 | 0.086 |
+| synergy | card_pick | 6 | 0.229 | 0.028 | 0.060 | 0.321 | **0.362** |
+| run | floors / progress | 3 | **0.021** | **0.565** | 0.002 | 0.068 | **0.345** |
+| run | survival | 3 | 0.048 | 0.114 | 0.005 | 0.176 | **0.657** |
+
+**The headline number of this pass:** at the run horizon *which model you use* explains
+**~2%** of the variance while *which character you play* explains **~57%** and seed noise
+**~34%**. At the turn horizon the model explains **83%**. That is the horizon-collapse claim
+stated as variance rather than as a curve. (Run rows use only the 3 models with complete n=20
+run data — qwen2.5-7b, llama-3.1-8b, mistral-7b — never blended with qwen3-32b's n=5 rows.
+floors and progress share identical shares because progress = floors/16, a linear transform:
+a built-in sanity check that the decomposition is wired correctly.)
+
+### Run level vs a RUN-SEED-MATCHED greedy anchor (new comparator)
+
+Greedy is subset to the exact run seeds each model played (`range(base+300, base+300+n_run)`)
+before pairing — strictly tighter than the 100-run global anchor.
+
+| Combo | Metric | model | greedy (matched) | diff | 95% CI | p |
+|---|---|---|---|---|---|---|
+| qwen3-32b IC structured | survival | .120 (3/25) | **.040 (1/25)** | +0.080 | [−0.08, +0.24] | 0.750 |
+| qwen3-32b IC structured | floors | 13.24 | **12.76** | +0.48 | [−0.56, +1.64] | 0.5625 |
+| llama-3.1-8b IC raw | floors | 13.76 | 12.48 | **+1.28** | [+0.67, +1.77] | 0.0625† |
+| llama-3.1-8b IC structured | floors | 13.37 | 12.48 | +0.89 | [+0.40, +1.39] | 0.0625† |
+| deepseek-14b IC structured | floors | 9.75 | 12.48 | **−2.73** | [−3.50, −1.93] | 0.0625† |
+
+† = the most extreme result the 5-pair design can produce (all seeds same sign).
+**Exact binomial CI on qwen3-32b's survival: 3/25 → [0.026, 0.312].**
+
+**⚠️ CORRECTION this table forces:** the published qwen3-32b run-level comparison (".12 survival
+/ 13.24 floors vs measured greedy .01 / 12.48") used greedy's *100-run* anchor. On the **same
+25 run seeds** greedy scores **.04 / 12.76**, so the honest gap is **3 vs 1 survivors
+(+0.08, p=0.75)** and **+0.48 floors (p=0.5625)**. The registered phrasing ("signal, not a win;
+needs n=20") stands — the *numbers* quoted with it must now be the matched ones.
+
+### Claim verdicts (full detail + evidence in `docs/stats_report.md` §1)
+
+| ID | Claim | Verdict |
+|---|---|---|
+| C1 | structured ≥ raw on synergy removal for 5 of 6 models | **SUPPORTED** |
+| C2-removal | structured beats raw on synergy removal matrix-wide | **SUPPORTED** (general) |
+| C2-archetype / C2-card_pick | same for archetype / card_pick | SUPPORTED-**MAGNITUDE-ONLY** |
+| C3-combat-win_rate | combat win_rate is format-insensitive | PARTIAL (8/12 equivalent) |
+| C3-combat-hp_ratio | combat hp_ratio is format-insensitive | **NOT-SUPPORTED-AS-STATED** (5/12) |
+| C3-run-progress | run progress is format-insensitive | **NOT-SUPPORTED-AS-STATED** (3/8) |
+| C7-hp_ratio | format reaches the COMBAT horizon | **SUPPORTED** |
+| C8 | the turn-level format effect has no consistent direction | **SUPPORTED** |
+| C4 | run level is a shared collapse floor | SUPPORTED-WITH-NUANCE |
+| C5 | qwen3-32b first off the run floor | **UNDERPOWERED** (see correction above) |
+| C6 | model variance large at reasoning horizons, small at survival | **SUPPORTED** |
+
+**Ceiling diagnosis behind C3/C7:** for combat `win_rate`, *every* combo whose format effect
+exceeds the ±0.05 margin sits **below** the combat ceiling (all four R1-distill combos; 0 of
+the 8 win-saturated combos move materially). Models that win 100% of fights leave format
+nothing to move ⇒ the old "combat is format-insensitive" reading was a **ceiling artifact**,
+not a property of the horizon. `hp_ratio` is the finer instrument and moves even for two
+win-saturated combos (mistral/Silent +0.112, qwen3-32b/Silent +0.064).
+
+**Re-run trigger:** models are discovered from `results/` filenames, so M3b frontier rows join
+every table with no code change — re-run `stats_rigor.py` as the first step of the M3b fold-in.
+
 ## 2026-08-07 (SHARANGA) — ✅ qwen3-32b FULL 4-DIMENSION MATRIX RETRIEVED + AUDITED
 
 **Status: complete and clean.** Jobs **261120–261123** (ironclad/silent × structured/raw)

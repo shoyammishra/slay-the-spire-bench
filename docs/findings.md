@@ -1,5 +1,88 @@
 # Findings
 
+## 📊 P4b STATISTICAL RIGOR PASS (2026-08-07, zero GPU) — CIs, effect sizes, paired tests, variance decomposition
+
+Full tables: `docs/stats_report.md` (committed) + experiment_log 2026-08-07 (later); method
+choices: decision_log 2026-08-07 (later). Reproduce with
+`.venv/Scripts/python.exe scripts/stats_rigor.py`. **Additive analysis only — no published mean
+changed.** What follows is what the statistics *changed about how we may write*.
+
+**0. The power ceiling that must travel with every per-combo p-value.** The paired format test
+is an exact sign-flip permutation over 5 seed-matched differences. 2⁵ = 32 sign assignments ⇒
+**the smallest attainable two-sided p for any single combo is 0.0625** — no combo can reach
+α=0.05 *by construction, not by weakness of effect*. Per-combo rows are descriptive; the
+inferential weight sits on the pooled stratified test (12 model×character strata) and on
+sample-level McNemar for synergy. Say this out loud in the paper; a reviewer who works it out
+before we do will not be generous.
+
+**1. The pairing the design promised is real — verified, not assumed.** For **60/60**
+(model × character × seed) triples the structured and raw synergy streams are byte-identical on
+`(expert_archetype, expert_pick_idx)`: same fixtures, same rotated offer positions. This is the
+precondition for every paired test here, and the script re-checks it on every run.
+
+**2. ⭐ The horizon-collapse claim now has a single number: between-model η² share by horizon —
+turn 0.83, combat 0.89, synergy 0.51, run 0.02.** At the run horizon, *which model you use*
+explains **~2%** of the variance while *which character you play* explains **~57%** and seed
+noise **~34%**. This is the shared-collapse-floor finding restated as variance instead of as a
+converging curve, and it is the most quotable output of this pass. (Run rows: the 3 models with
+complete n=20 run data.) Corollary for design: seed noise is small at short horizons (turn 0.07,
+combat 0.01–0.03), so 5 seeds was adequate *there* — it is the dominant term at run level,
+which is exactly why run-level needs n=20 rather than more models.
+
+**3. ⚠️ CORRECTION — "combat/run are format-insensitive on outcome" is NOT supported as stated,
+and the old reading was a CEILING ARTIFACT.** Format reaches combat `hp_ratio` with a consistent
+direction: **10 of 12 strata favour structured, sign test p=0.039, pooled p=0.0001**. The
+diagnosis is the useful part: for `win_rate`, *every* combo whose effect exceeds the ±0.05
+margin sits **below** the combat ceiling (all four R1-distill combos), and **0 of the 8
+win-saturated combos** move materially. Models that win 100% of fights leave format nothing to
+move. `hp_ratio` is the finer instrument and moves even for two win-saturated combos
+(mistral/Silent +0.112, qwen3-32b/Silent +0.064). **Registered wording:** *"format-insensitivity
+at the combat horizon holds only where the win-rate ceiling removes the variance; where combat
+still discriminates, format moves hp_ratio by up to +0.19."* This generalises the single-model
+breach noted in finding F below. Also confirmed as a **general** effect: structured produces
+~1.03 fewer invalid-action errors per combat (10/12 strata, sign p=0.039).
+
+**4. ⚠️ CORRECTION — the qwen3-32b run-level lift shrinks under a run-seed-matched anchor.** The
+published comparison put the model's 25 runs against greedy's **100-run** anchor (.01 survival /
+12.48 floors). Greedy's per-run records let us subset it to the **exact same 25 run seeds**,
+which is the honest comparator: greedy scores **.04 / 12.76** there. So the gap is **3 vs 1
+survivors (+0.08, paired p=0.75)** and **+0.48 floors (p=0.5625)**, with an exact binomial CI on
+3/25 of **[0.026, 0.312]**. The registered phrasing ("the first model to rise off the
+run-level floor, at n=25 with wide seed spread; needs n=20 to confirm") **stands** — but the
+numbers quoted beside it must now be the matched ones. **Run-seed-matched comparison is the
+standard run-level comparator from here on.**
+
+**5. Only synergy `removal` survives as a GENERAL format effect.** Pooled magnitude *and*
+direction both significant (10/2 strata, sign p=0.039, pooled p=0.0007; McNemar significant in
+4 combos after Holm). `archetype` (7/5) and `card_pick` (8/4) are **magnitude-only** ⇒ report
+them as model-dependent, not as general format effects. The paper's format claim should lead
+with removal.
+
+**6. The turn-level format effect has no consistent direction — now quantified.** Pooled
+magnitude favours **raw** (−0.076, p=0.0005) but direction splits 5 structured / 7 raw (sign
+test n.s.), because llama and mistral swing hard toward raw (−0.19 to −0.34) while deepseek-14b
+and qwen3-32b lean structured. **Registered wording:** *"format matters at turn level; its sign
+is a model property"* — never "raw beats structured at turn level". The existing
+format-as-model-property framing is now measured rather than asserted.
+
+**7. Confirmations worth citing.** (a) **"5 of 6 models"** on synergy removal reproduces exactly
+at sample level, and deepseek-14b's reversal is *significant* (Silent p=0.0006 after Holm) — a
+real model property, not noise. (b) deepseek-7b's parse conditioning is now quantified: **37–38
+of 100** synergy pairs dropped; its accuracies stay conditioned on the parseable subset.
+(c) `card_pick` is the noisiest synergy metric (seed residual 0.362 vs model 0.229) and should
+not carry a headline claim alone. (d) Boundary cells now have exact Clopper–Pearson intervals:
+qwen3-32b Silent-structured turn 100/100 → **[0.964, 1.0]**; the all-zero cells (mistral raw
+removal, several survivals) → **[0.0, 0.036]**.
+
+**8. Nuance to carry on the run floor.** Survival is floored for everyone, but *floors/progress*
+show small seed-consistent lifts over the matched greedy anchor for some combos — llama-3.1-8b
+Ironclad is **+0.89 (structured) / +1.28 (raw) floors with every seed the same sign**, while
+deepseek-14b Ironclad is **−2.73**. "On par with greedy, not beating" is exactly right for
+**survival**; for **floors** the honest phrasing is "within ~1 floor of greedy, in both
+directions."
+
+---
+
 ## 🟢 qwen3-32b FULL 4-dimension matrix (Sharanga H200, retrieved + audited 2026-08-07) — CURRENT for every qwen3-32b cell
 
 qwen3-32b's intentional synergy-only gap is **closed**: all four dimensions × both characters
@@ -31,6 +114,10 @@ existing number — it bounds what the dimension can still show.)
 
 **D. First non-zero run-level survival lift in the project's history** — Ironclad structured
 **0.12 survival vs the measured greedy 0.01**, floors **13.24 vs greedy 12.48**; Silent
+*(⚠️ **numbers superseded 2026-08-07 by the P4b pass, §4 above** — greedy's .01/12.48 is its
+100-run anchor; on the **same 25 run seeds** greedy scores **.04 / 12.76**, so the honest gap is
+3 vs 1 survivors, +0.08 survival p=0.75, +0.48 floors p=0.5625, CI on 3/25 = [0.026, 0.312].
+The "signal, not a result" framing below is unchanged — only the comparator numbers are.)*
 structured 11.56 vs greedy 11.26. ⚠️ **A signal, not a result:** n=25 runs, std 0.179 across
 seeds → ~3 survivors concentrated in one or two seeds. Registered as an **n=5 floor estimate**;
 never blend with the n=20 run-level rows, and do not write "beats greedy" — write "the first
@@ -130,6 +217,15 @@ skipped run-level cells.
    reaches the RUN horizon.** qwen3-32b structured beats raw on run-level floors for both
    characters (13.24/12.20 IC, 11.56/10.12 Silent), the first breach of the standing
    "combat/run are format-insensitive on outcome" claim — see finding 4's marker.
+   **⚠️ TESTED 2026-08-07 (P4b, §3 + §5 + §6 at the top of this file) — three refinements.**
+   (a) The combat half of the breach **generalises**: format reaches combat `hp_ratio`
+   matrix-wide (10/12 strata favour structured, sign p=0.039, pooled p=0.0001), and the old
+   "format-insensitive" reading was a **ceiling artifact** — only combos below the win-rate
+   ceiling move materially. (b) The **run** half does **not** survive the pooled test (floors
+   p=0.064, direction 5/3 n.s.), so it remains a single-model observation. (c) Of the three
+   synergy metrics only **removal** is a *general* effect (magnitude + direction both
+   significant); archetype and card_pick are **magnitude-only** ⇒ model-dependent. "5 of 6
+   models" is reproduced exactly at sample level and deepseek-14b's reversal is *significant*.
 
 4. **Combat/run remain the shared collapse floor — model differences wash out where engine
    survival dominates.** All instruct models win ~100% of scripted combats with hp_ratio ≈ 1.0
@@ -138,9 +234,14 @@ skipped run-level cells.
    large at the reasoning horizons (turn spread 0.18→0.84, synergy archetype 0.33→0.80) and
    near-zero at the survival horizons (combat win, run floors)** — so the benchmark's
    discriminating power lives at turn + synergy, and run is honestly the convergence floor.
+   **✅ QUANTIFIED 2026-08-07 (P4b §2): between-model η² share is turn 0.83 / combat 0.89 /
+   synergy 0.51 / run 0.02** — at the run horizon the *model* explains ~2% of the variance while
+   the *character* explains ~57% and seed noise ~34%. Cite this instead of the spread ranges;
+   it is the same claim with an actual denominator.
    **⚠️ FIRST CRACK IN THE FLOOR, 2026-08-07 — keep the claim, weaken the "never".** qwen3-32b is
    the first model to rise off the run-level floor: IC structured **0.12 survival / 13.24 floors**
-   vs measured greedy **0.01 / 12.48**, and structured > raw on floors for both characters — so
+   vs measured greedy **0.01 / 12.48** *(⚠️ comparator superseded — on the same 25 run seeds
+   greedy scores .04 / 12.76; see P4b §4 at the top)*, and structured > raw on floors for both characters — so
    run-level is not *perfectly* format-insensitive or *perfectly* non-discriminating. It is still
    the convergence floor for the other five models, and this lift rests on **n=25 runs with std
    0.179 across seeds** (~3 survivors, likely one or two seeds). Write it as "the floor holds for
