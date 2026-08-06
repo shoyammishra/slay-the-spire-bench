@@ -67,6 +67,10 @@ CHAR=${CHAR:-ironclad}       # ironclad | silent   (the launcher always sets thi
 FMT=${FMT:-structured}       # structured | raw
 TP_SIZE=${TP_SIZE:-1}
 HEALTH_WAIT_MIN=${HEALTH_WAIT_MIN:-60}
+# KV-cache/activation headroom. 0.90 suits models with slack; Qwen3-235B-A22B-FP8
+# needs ~240 GB of the 282 GB TP=2 H200 budget, so that rung runs at 0.95 (batch is
+# ~1 here and 16k KV with GQA is only ~3 GB, so the headroom is genuinely spare).
+GPU_MEM_UTIL=${GPU_MEM_UTIL:-0.90}
 # run-level runs PER SEED (× the 5 seeds). Default 20 (matrix n). Reasoning models
 # make run-level the expensive tail (qwen3-32b ≈30–40 min/run → n=20 ≈50–67 h/combo);
 # set N_RUN=5 for a cheaper floor estimate, or N_RUN=0 to skip run-level entirely.
@@ -90,13 +94,13 @@ echo "=== combo: model=$SERVED_NAME  character=$CHAR  format=$FMT  TP=$TP_SIZE  
 echo "=== GPU ==="
 nvidia-smi
 
-echo "=== starting vLLM ($MODEL_REPO as $SERVED_NAME, TP=$TP_SIZE, port=$PORT) ==="
+echo "=== starting vLLM ($MODEL_REPO as $SERVED_NAME, TP=$TP_SIZE, mem_util=$GPU_MEM_UTIL, port=$PORT) ==="
 vllm serve "$MODEL_REPO" \
   --served-model-name "$SERVED_NAME" \
   --port "$PORT" \
   --tensor-parallel-size "$TP_SIZE" \
   --max-model-len 16384 \
-  --gpu-memory-utilization 0.90 \
+  --gpu-memory-utilization "$GPU_MEM_UTIL" \
   > "vllm_combo_${SLURM_JOB_ID}.log" 2>&1 &
 VLLM_PID=$!
 trap 'kill $VLLM_PID 2>/dev/null || true' EXIT

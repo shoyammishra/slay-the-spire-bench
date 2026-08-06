@@ -51,18 +51,27 @@ PORT=${PORT:-8000}
 # have longer cold Lustre loads (~65 GB qwen3-32b ≈ 35+ min) → override, e.g.
 # HEALTH_WAIT_MIN=60 when using this file as a gate for a 32B+ rung.
 HEALTH_WAIT_MIN=${HEALTH_WAIT_MIN:-25}
+# Multi-GPU. Added 2026-08-07: this file had NO --tensor-parallel-size, so it could
+# not gate any model too big for one card — it would have failed the 235B rung at
+# the gate, before a single combo ran. Remember to match --gres=gpu:$TP_SIZE and
+# the H200 rule of <=4 CPUs per GPU when overriding.
+TP_SIZE=${TP_SIZE:-1}
+# KV-cache/activation headroom. 0.90 is right for models that leave slack; the
+# 235B-FP8 rung needs ~240 GB of a 282 GB TP=2 budget, so it must run higher.
+GPU_MEM_UTIL=${GPU_MEM_UTIL:-0.90}
 
 cd ~/slay-bench
 
 echo "=== GPU ==="
 nvidia-smi
 
-echo "=== starting vLLM ($MODEL_REPO as $SERVED_NAME) ==="
+echo "=== starting vLLM ($MODEL_REPO as $SERVED_NAME, TP=$TP_SIZE, mem_util=$GPU_MEM_UTIL) ==="
 vllm serve "$MODEL_REPO" \
   --served-model-name "$SERVED_NAME" \
   --port "$PORT" \
+  --tensor-parallel-size "$TP_SIZE" \
   --max-model-len 16384 \
-  --gpu-memory-utilization 0.90 \
+  --gpu-memory-utilization "$GPU_MEM_UTIL" \
   > "vllm_smoke_${SLURM_JOB_ID}.log" 2>&1 &
 VLLM_PID=$!
 trap 'kill $VLLM_PID 2>/dev/null || true' EXIT
