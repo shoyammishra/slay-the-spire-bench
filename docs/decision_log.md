@@ -1,5 +1,83 @@
 # Decision Log
 
+## 2026-08-07 (latest) — Qwen3-235B-A22B-FP8 rung: two-stage launch, and why the 32B playbook does not transfer
+
+**Context.** Top of the registered model ladder (2026-07-23 §1): the largest model runnable
+under the default QOS. Prefetched and verified this session; smoke pending. R1-671B stays
+parked (~700 GB ⇒ full-node QOS exception).
+
+### 1. TP=2 under a 3-GPU cap destroys the parallelism — this is the governing constraint
+
+Qwen3-235B-A22B-FP8 is **239.1 GB** (measured from the Hub manifest, not estimated), so it
+needs **TP=2** on 141 GB H200s. The `gpu_h200_8` per-user cap is **3 GPUs**, therefore **two
+TP=2 jobs cannot co-run**. The qwen3-32b matrix landed in ~2.7 days only because 1 GPU/combo
+let 3 of 4 combos run concurrently; here the four combos are **strictly sequential**.
+
+Consequence: total wall-clock ≈ **4 × per-combo**, against a **96 h MaxTime per job**. Per-combo
+throughput is no longer a detail — it decides whether the full matrix is feasible at all.
+
+**Decision: launch in TWO STAGES (`sharanga_submit_235b.sh {smoke|matrix}`), not
+fire-and-forget.** The 32B launcher submitted a smoke gate and the combos together with
+`--dependency=afterok`, which was right when the matrix cost ~one combo of wall-clock. Here the
+smoke's *measured throughput* determines the scope decision, so a human must read it before
+stage 2. Sizing a multi-day sequential chain from an estimate would be guessing (handoff §5.3).
+
+**Registered scope-down ladder if the smoke says >96 h/combo:** drop run-level first
+(`N_RUN=0`) — it is ~half the cost and P4b measured its between-model variance share at **2%**,
+the least discriminating horizon; then cut to one character; then one format.
+
+### 2. `GPU_MEM_UTIL` raised to 0.95 for this rung only (default stays 0.90)
+
+239.1 GB of weights in a 282 GB TP=2 budget leaves **~15 GB at 0.90** vs **~29 GB at 0.95**.
+Batch is ~1 and 16k of GQA KV is ~3 GB, so the extra is genuinely spare rather than risky.
+If it OOMs anyway, the registered first move is `--max-model-len 8192` (halves KV) *before*
+touching utilisation further.
+
+### 3. Base `Qwen3-235B-A22B-FP8`, not the 2507 Instruct/Thinking split
+
+Keeps the **qwen3 family axis consistent** (7B → 32B → 235B, same series and same
+thinking-capable mode) so the scale line is not confounded by a mode change. The risk is
+budget-bound deliberation (the DeepSeek-distill failure), but qwen3-32b was **parse-clean at
+the same 8k budget**, which is direct evidence the family handles it. `HF_REPO` is a knob;
+the smoke's truncation counters are the gate, per the registered M3b budget protocol
+(2026-07-13).
+
+### 4. Two staging bugs found and fixed BEFORE any GPU was claimed
+
+- **`sharanga_smoke.sbatch` had no `--tensor-parallel-size`** — it could not serve any model
+  too big for one card, so it would have failed this rung *at the gate*, before a single combo
+  ran. `TP_SIZE` + `GPU_MEM_UTIL` now parametrized in both the smoke and the combo file.
+- **Smoke walltime (3 h) was ≤ its own health budget (180 min)** — a cold start could consume
+  the entire allocation and be wall-killed having run **zero** samples while holding 2× H200.
+  Now 6 h. **Durable rule: walltime must strictly exceed the health-wait budget, with room for
+  the actual work.**
+
+### 5. Prefetch completeness is verified against the manifest, never by `du`
+
+`du -sh` reported **212 GiB** for a **complete** 239.1 GB model — a 5% gap that looks exactly
+like truncation but was Xet chunk dedup plus block accounting. Meanwhile the sbatch guards only
+check that the cache *directory exists*, which a truncated download passes.
+
+**Decision: new `cluster/verify_prefetch.py`** — checks every file in the remote manifest for
+presence and exact byte size, reports orphaned `*.incomplete` blobs, and is wired into the
+235B launcher's guard so it **refuses to submit** an unverified model. Login-node only (needs
+network; `HF_HUB_OFFLINE` must be unset). Generic over repo id, so every later rung gets it.
+
+### 6. Operational gotchas learned this session (durable)
+
+- **A multi-line paste into `tmux new` is swallowed.** The session was created but the
+  `conda activate` / `hf download` lines never ran — the pane held only the login banner while
+  the outer shell looked busy. Use `tmux send-keys -t <sess> '<cmd>' C-m` (discrete lines), or
+  `nohup env HF_HOME=… hf download … > ~/log 2>&1 &`. Verify with
+  `tmux capture-pane -p -t <sess> | tail`, which reads the pane **without attaching**.
+- **A returning shell prompt does not mean the download died.** It kept running; relaunching
+  "the failed" download produced **two concurrent processes writing the same HF cache**,
+  racing on the same blobs.
+- **Kill by explicit PID on the shared account.** `pkill -f "hf download"` would also kill
+  another student's transfer — the same reasoning as the standing "never `scancel -u`" rule.
+- Unauthenticated Hub pulls warn about lower rate limits; setting `HF_TOKEN` is the cheap
+  mitigation for large multi-shard fetches.
+
 ## 2026-08-07 (later) — P4b statistical rigor pass: unit of analysis, test family, and what it corrected
 
 **Context.** Backlog row P4b (`handoff.md` §6; `review_2026-07-14.md` §2.4 item 1) — the

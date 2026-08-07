@@ -1,5 +1,58 @@
 # Experiment Log
 
+## 2026-08-07 (latest) — ▶ Qwen3-235B-A22B-FP8 rung STAGED + PREFETCHED (smoke pending)
+
+**Status: weights on scratch and verified; nothing submitted yet.** Top of the registered
+ladder — the largest model runnable under the default QOS. Decisions + rationale:
+decision_log 2026-08-07 (latest).
+
+**Prefetch (login node, `HF_HOME=/scratch/$USER/hf`):**
+
+| Item | Value |
+|---|---|
+| Repo | `Qwen/Qwen3-235B-A22B-FP8` |
+| Manifest size | **239.1 GB** across **58 files** (measured via `HfApi(files_metadata=True)`, not estimated) |
+| Verified | **58/58 present, 0 missing, 0 size-mismatch, local total 239.1 GB** |
+| Transfer rate | 90–114 MB/s (Xet reconstruction 205–442 MB/s); ~1 h wall |
+| Scratch | no per-user block quota (`quota`/`limit` = 0); ~633 GB in use, 159 TB free |
+
+**⚠️ `du -sh` read 212 GiB for this COMPLETE model** (expected 222.7 GiB) — a 5% gap that
+looks exactly like truncation but is Xet chunk dedup + block accounting. Completeness is now
+established only by `cluster/verify_prefetch.py` (per-file manifest check), which the launcher
+runs as a hard guard.
+
+**Planned serving config:** 1 job × **2× H200, TP=2**, `--cpus-per-task=8`, `--mem=250G`,
+`--max-model-len 16384`, **`--gpu-memory-utilization 0.95`** (239.1 GB weights in a 282 GB
+budget ⇒ ~29 GB headroom at 0.95 vs ~15 GB at 0.90; 16k GQA KV at batch ~1 is ~3 GB).
+
+**⚠️ Governing constraint — the 32B playbook does NOT transfer.** TP=2 under the 3-GPU
+per-user cap means two such jobs cannot co-run ⇒ the four combos are **strictly sequential**,
+so matrix wall-clock ≈ 4 × per-combo against a **96 h MaxTime per job**. The smoke therefore
+gates a *scope* decision, not just a go/no-go — hence the two-stage launcher
+(`bash cluster/sharanga_submit_235b.sh {smoke|matrix}`).
+
+**Smoke read-off order (registered, in the launcher header):** (1) wall time of the tiny pass
+— anchors on identical config are qwen2.5-7b **57 s** and qwen3-32b **53 min**; scale the 32B's
+measured 27.6–37.1 h/combo by the ratio. (2) truncation counters — this is a hybrid-reasoning
+model with thinking on by default, i.e. the DeepSeek budget-bound-deliberation risk at 235B
+scale; qwen3-32b was parse-clean at the same 8k budget, which is the encouraging precedent.
+(3) score sanity. **If >96 h/combo:** drop run-level first (`N_RUN=0`, ~half the cost, and P4b
+put its between-model variance share at 2%), then one character, then one format.
+
+**Two staging bugs fixed before any GPU was claimed** (see decision_log §4): the smoke sbatch
+had **no `--tensor-parallel-size`** (would have failed this rung at the gate), and its walltime
+(3 h) was **≤ its own health budget** (180 min) — a cold start could have consumed the whole
+allocation and been wall-killed with zero samples run on 2× H200. Now 6 h.
+
+**Operational gotchas recorded** (decision_log §6): a multi-line paste into `tmux new` is
+swallowed (use `send-keys`/`nohup`; read panes with `capture-pane` without attaching); a
+returning prompt does not mean a download died — relaunching produced **two concurrent
+processes writing the same HF cache**; kill by explicit PID, never `pkill -f` on the shared
+account.
+
+**Next:** `bash cluster/sharanga_submit_235b.sh smoke` → read the three items above → size and
+scope stage 2.
+
 ## 2026-08-07 (later) — ✅ P4b STATISTICAL RIGOR PASS (zero GPU, zero API)
 
 **What ran:** `scripts/stats_rigor.py` over the 24 on-disk combos (6 models × 2 characters ×

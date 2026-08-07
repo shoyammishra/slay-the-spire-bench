@@ -67,12 +67,15 @@ N_RUN=${N_RUN:-5}
 # ~14 GB at 0.90. Batch is ~1 and 16k of GQA KV is ~3 GB, so the extra is spare.
 GPU_MEM_UTIL=${GPU_MEM_UTIL:-0.95}
 
-HUB="/scratch/${USER}/hf/hub/models--${REPO//\//--}"
-if [ ! -d "$HUB" ]; then
-  echo "ERROR: $REPO is not prefetched (missing $HUB)."
-  echo "On the login node:"
-  echo "  df -h /scratch/\$USER    # need >260 GB free"
-  echo "  conda activate slaybench && HF_HOME=/scratch/\$USER/hf hf download $REPO"
+# Completeness guard. A directory-exists check is NOT enough: a truncated download
+# passes it, the job claims 2× H200, spends ~2 h loading off Lustre, then dies.
+# `du` is not enough either (Xet dedup made a complete 239.1 GB model read as
+# 212 GiB, 2026-08-07). verify_prefetch.py checks every file against the remote
+# manifest byte-for-byte. Needs network + no HF_HUB_OFFLINE, hence login node only.
+export HF_HOME=${HF_HOME:-/scratch/$USER/hf}
+if ! HF_HUB_OFFLINE= python cluster/verify_prefetch.py "$REPO"; then
+  echo
+  echo "Refusing to submit: $REPO is not verifiably complete on scratch."
   exit 1
 fi
 
