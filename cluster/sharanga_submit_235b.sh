@@ -77,12 +77,16 @@ if [ ! -d "$HUB" ]; then
 fi
 
 if [ "$STAGE" = "smoke" ]; then
-  # 3 h walltime, 180 min health budget: cold Lustre load scales with size and the
-  # 32B's ~65 GB already took 35+ min; ~240 GB could take well over two hours on a
-  # cold node. Warm nodes reuse the shared ~/.cache compile artifacts (~90 s).
+  # WALLTIME MUST EXCEED THE HEALTH BUDGET. Cold Lustre load scales with size: the
+  # 32B's ~65 GB took 35+ min, so 239 GB extrapolates to ~2 h, plus compile. The
+  # health wait therefore needs 180 min -- but an earlier version of this file paired
+  # that with --time=03:00:00, i.e. the startup wait alone could consume the ENTIRE
+  # walltime and the job would be killed having run zero benchmark samples on 2 GPUs.
+  # 6 h = up to 3 h of cold start + 3 h for the tiny pass (the 32B smoke took 53 min;
+  # a 235B MoE could be several times that).
   JID=$(HF_REPO="$REPO" SERVED_NAME="$NAME" TP_SIZE=2 \
         GPU_MEM_UTIL="$GPU_MEM_UTIL" HEALTH_WAIT_MIN=180 \
-    sbatch --parsable --job-name=slay_smoke_235b --time=03:00:00 \
+    sbatch --parsable --job-name=slay_smoke_235b --time=06:00:00 \
       --partition=gpu_h200_8 --gres=gpu:2 --cpus-per-task=8 --mem=250G \
       cluster/sharanga_smoke.sbatch)
   echo "235B smoke submitted: job $JID (gpu_h200_8, 2× H200, TP=2)"
