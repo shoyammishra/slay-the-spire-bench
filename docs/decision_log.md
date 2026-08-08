@@ -78,6 +78,12 @@ in the compile-cache key — a stale graph replays the old failure. Cheap insura
   named all five variables in one shot after three failed guesses had cost ~25 minutes.
 - Grep from the FIRST `ERROR` (`awk '/ERROR/{f=1} f'`), not the tail — vLLM's tail shows only
   the outer wrapper (`Engine core initialization failed`), never the cause.
+- **Login shells have conda on PATH but no env activated** (`conda init` is in the shared
+  `.bashrc` with `auto_activate_base false`), so a login-node script that imports project
+  packages dies with a bare `huggingface_hub not importable`. `sharanga_submit_235b.sh` now
+  self-activates — wrapped in `set +u` / `set -u`, since conda's `cuda-nvcc` hooks reference
+  unbound vars and abort under `set -u` (the 2026-07-24 blocker). **Any future login-node
+  script that imports project packages must do the same.**
 
 ## 2026-08-07 (latest) — Qwen3-235B-A22B-FP8 rung: two-stage launch, and why the 32B playbook does not transfer
 
