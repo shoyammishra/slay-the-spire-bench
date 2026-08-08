@@ -60,6 +60,26 @@ export HF_HUB_OFFLINE=1
 # FlashInfer JIT sampling kernel won't build here — native torch sampler instead
 # (identical sampling semantics; irrelevant at our batch≈1 sequential workload).
 export VLLM_USE_FLASHINFER_SAMPLER=0
+# ── FlashInfer is structurally unbuildable on Sharanga (found 2026-08-08) ──────
+# Its JIT compiles NVIDIA TRT-LLM internals with the conda toolchain against a
+# partial CUDA install. The sampler workaround above was found 2026-07-23 at TP=1;
+# TP=2 + FP8 + MoE walk into three MORE FlashInfer kernels, each failing the same
+# way, discovered one per ~8-minute serve attempt:
+#   trtllm_mnnvl_comm         (TP comm)        -> ld: cannot find -lcuda
+#   flashinfer_trtllm_fused_allreduce_norm     -> via the fuse_allreduce_rms pass
+#   fp8_blockscale_gemm_90    (FP8 GEMM)       -> via linear_backend=auto/DeepGEMM
+# These five vars disable every FlashInfer/DeepGEMM path at once. Validated
+# 2026-08-08: Qwen3-235B-A22B-FP8 TP=2 served in 160 s and scored a clean pass.
+# COMPARABILITY: all four new vars are NO-OPS for a BF16 dense model at TP=1
+# (allreduce needs TP>1; blockscale/DeepGEMM are FP8-only), so the qwen3-32b rows
+# stay valid and re-runnable under this file.
+export VLLM_ALLREDUCE_USE_FLASHINFER=0
+export VLLM_BLOCKSCALE_FP8_GEMM_FLASHINFER=0
+export VLLM_USE_DEEP_GEMM=0
+export VLLM_MOE_USE_DEEP_GEMM=0
+# `-lcuda` lives in /usr/lib64 on the compute nodes, but conda's linker only
+# searches $CONDA_PREFIX/lib + its sysroot. Link-time only; installs nothing.
+export LIBRARY_PATH=/usr/lib64:${LIBRARY_PATH:-}
 
 MODEL_REPO=${HF_REPO:-Qwen/Qwen3-32B}
 SERVED_NAME=${SERVED_NAME:-qwen3-32b}
@@ -71,6 +91,18 @@ HEALTH_WAIT_MIN=${HEALTH_WAIT_MIN:-60}
 # needs ~240 GB of the 282 GB TP=2 H200 budget, so that rung runs at 0.95 (batch is
 # ~1 here and 16k KV with GQA is only ~3 GB, so the headroom is genuinely spare).
 GPU_MEM_UTIL=${GPU_MEM_UTIL:-0.90}
+# Extra vllm serve args. TP>1 needs both of these on Sharanga (2026-08-08):
+#   --disable-custom-all-reduce            -> plain NCCL instead of a custom kernel
+#   pass_config.fuse_allreduce_rms=false   -> keeps the FlashInfer fused
+#                                             allreduce+RMSNorm op OUT of the
+#                                             inductor graph (it gets baked in and
+#                                             then fails at profile_run)
+# Both are no-ops at TP=1, so leaving them on costs the single-GPU rungs nothing.
+if [ "$TP_SIZE" -gt 1 ]; then
+  EXTRA_SERVE_ARGS=${EXTRA_SERVE_ARGS:-"--disable-custom-all-reduce --compilation-config {\"pass_config\":{\"fuse_allreduce_rms\":false}}"}
+else
+  EXTRA_SERVE_ARGS=${EXTRA_SERVE_ARGS:-}
+fi
 # run-level runs PER SEED (× the 5 seeds). Default 20 (matrix n). Reasoning models
 # make run-level the expensive tail (qwen3-32b ≈30–40 min/run → n=20 ≈50–67 h/combo);
 # set N_RUN=5 for a cheaper floor estimate, or N_RUN=0 to skip run-level entirely.
@@ -101,6 +133,7 @@ vllm serve "$MODEL_REPO" \
   --tensor-parallel-size "$TP_SIZE" \
   --max-model-len 16384 \
   --gpu-memory-utilization "$GPU_MEM_UTIL" \
+  ${EXTRA_SERVE_ARGS} \
   > "vllm_combo_${SLURM_JOB_ID}.log" 2>&1 &
 VLLM_PID=$!
 trap 'kill $VLLM_PID 2>/dev/null || true' EXIT

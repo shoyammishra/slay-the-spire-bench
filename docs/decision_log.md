@@ -1,5 +1,84 @@
 # Decision Log
 
+## 2026-08-08 — FlashInfer is structurally unbuildable on Sharanga: the full account + the validated serving config
+
+**Context.** First attempt to serve Qwen3-235B-A22B-FP8 at TP=2. The model is fine and the
+memory arithmetic was right; **every** failure was FlashInfer's JIT compiler.
+
+### 1. The symptom chain (three kernels, each ~8 min to discover)
+
+| # | Kernel | Reached via | Failure |
+|---|---|---|---|
+| 1 | `trtllm_mnnvl_comm` | TP>1 communication | `ld: cannot find -lcuda` |
+| 2 | `flashinfer_trtllm_fused_allreduce_norm` | the `fuse_allreduce_rms` compile pass | baked into the inductor graph, fails at `profile_run` |
+| 3 | `fp8_blockscale_gemm_90` | `linear_backend='auto'` → DeepGEMM | ninja build fails |
+
+**Why no previous run ever hit this:** every earlier rung was BF16, dense, TP=1. The comm
+kernels require TP>1; blockscale/DeepGEMM are FP8-only. The 2026-07-23
+`VLLM_USE_FLASHINFER_SAMPLER=0` workaround was the same root cause surfacing on the one path
+a TP=1 BF16 model does touch.
+
+**Root cause.** FlashInfer JIT compiles NVIDIA TRT-LLM internals with the conda toolchain
+against a partial CUDA install. Two distinct sub-problems: (a) `libcuda.so` **exists** at
+`/usr/lib64` on compute nodes, but conda's `x86_64-conda-linux-gnu-ld` only searches
+`$CONDA_PREFIX/lib` and its sysroot, so `-lcuda` never resolves; (b) even with that fixed,
+further kernels fail to build.
+
+### 2. DECISION: disable FlashInfer, do not try to fix it
+
+**Options.** (a) install a full CUDA toolkit — blocked in practice: **home quota is 40 GiB
+with ~29 used**, no root, and it would change the environment that produced every existing
+row; (b) ask the professor for a CUDA-toolkit module — spends goodwill on a dependency we do
+not need; (c) **disable every FlashInfer path** — vLLM has native equivalents for all of them.
+
+**Chose (c).** Validated 2026-08-08: server up in **160 s** and scoring a clean pass.
+
+```
+export VLLM_USE_FLASHINFER_SAMPLER=0        # 2026-07-23, TP=1 sampler
+export VLLM_ALLREDUCE_USE_FLASHINFER=0      # kernel 1
+export VLLM_BLOCKSCALE_FP8_GEMM_FLASHINFER=0  # kernel 3
+export VLLM_USE_DEEP_GEMM=0
+export VLLM_MOE_USE_DEEP_GEMM=0             # pre-empts the MoE DeepGEMM path
+export LIBRARY_PATH=/usr/lib64:$LIBRARY_PATH  # link-time only; installs nothing
+vllm serve … --disable-custom-all-reduce \
+             --compilation-config '{"pass_config":{"fuse_allreduce_rms":false}}'   # kernel 2
+```
+
+**COMPARABILITY — the reason this is safe to apply unconditionally:** all four new env vars
+and both serve flags are **no-ops for a BF16 dense model at TP=1** (allreduce paths need TP>1;
+blockscale/DeepGEMM are FP8-only). The qwen3-32b rows therefore remain valid and that sbatch
+stays re-runnable. Now baked into `sharanga_smoke.sbatch` + `sharanga_matrix_combo.sbatch`,
+with the serve flags gated behind `TP_SIZE > 1`.
+
+**⚠️ Wipe `~/.cache/vllm/torch_compile_cache` when changing these.** The FlashInfer op is
+compiled *into* the inductor graph, and it is not established that these env vars participate
+in the compile-cache key — a stale graph replays the old failure. Cheap insurance
+(recompile ≈ minutes) against an expensive misdiagnosis.
+
+### 3. Measurements that settle earlier open questions
+
+- **Weights load in 44.55 s**; server ready in **160 s** total. The ~2 h cold-start budget
+  extrapolated from the 32B was wrong by two orders of magnitude — startup contributes
+  essentially nothing to per-combo cost. The generous 6 h walltime / 180 min health budget
+  stay (harmless, and a genuinely cold node is untested).
+- **`Model loading took 110.19 GiB` per worker** ⇒ ~220 GiB total, matching the 239.1 GB
+  manifest, leaving **~24 GiB per GPU** free at `--gpu-memory-utilization 0.95`.
+  **The memory arithmetic is confirmed; `--max-model-len 16384` is retained** and the
+  contingency plan to reduce context is not needed.
+
+### 4. Process lessons (durable)
+
+- **Never run a measurement pass inside a time-boxed interactive session you may walk away
+  from.** The 2 h `srun` expired unattended mid-pass ⇒ **no results file, zero data**, despite
+  the serving problem being solved. Interactive sessions are for *debugging serving*;
+  measurement belongs in batch, where per-dimension partial saves protect the work.
+- **Never reuse a log filename across attempts.** Attempt A's log was overwritten by attempt
+  B, so whether A failed on `-lcuda` could not be confirmed. Use `probe1/2/3…`.
+- **Enumerate the knobs, don't guess them.** `python -c "import vllm.envs as e; print(dir(e))"`
+  named all five variables in one shot after three failed guesses had cost ~25 minutes.
+- Grep from the FIRST `ERROR` (`awk '/ERROR/{f=1} f'`), not the tail — vLLM's tail shows only
+  the outer wrapper (`Engine core initialization failed`), never the cause.
+
 ## 2026-08-07 (latest) — Qwen3-235B-A22B-FP8 rung: two-stage launch, and why the 32B playbook does not transfer
 
 **Context.** Top of the registered model ladder (2026-07-23 §1): the largest model runnable

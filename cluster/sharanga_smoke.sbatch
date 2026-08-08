@@ -43,6 +43,16 @@ export HF_HUB_OFFLINE=1
 # 2026-07-23). Native torch sampler instead — identical sampling semantics,
 # irrelevant perf delta at our batch≈1 sequential workload.
 export VLLM_USE_FLASHINFER_SAMPLER=0
+# FlashInfer is structurally unbuildable here (full account in
+# sharanga_matrix_combo.sbatch, decision_log 2026-08-08). TP>1 / FP8 / MoE reach
+# three further FlashInfer kernels; these disable every such path. All are no-ops
+# for a BF16 dense TP=1 model, so existing rows stay comparable.
+export VLLM_ALLREDUCE_USE_FLASHINFER=0
+export VLLM_BLOCKSCALE_FP8_GEMM_FLASHINFER=0
+export VLLM_USE_DEEP_GEMM=0
+export VLLM_MOE_USE_DEEP_GEMM=0
+# `-lcuda` is in /usr/lib64 on compute nodes; conda's linker doesn't search there.
+export LIBRARY_PATH=/usr/lib64:${LIBRARY_PATH:-}
 
 MODEL_REPO=${HF_REPO:-Qwen/Qwen2.5-7B-Instruct}
 SERVED_NAME=${SERVED_NAME:-qwen2.5-7b}

@@ -1,5 +1,52 @@
 # Experiment Log
 
+## 2026-08-08 — ⚙️ Qwen3-235B-A22B-FP8 SERVES at TP=2 (FlashInfer solved); smoke pass NOT yet measured
+
+**Status: serving problem SOLVED and validated; no benchmark numbers yet.** Full rationale +
+the working config: decision_log 2026-08-08 (top).
+
+**Batch attempt (job 264929, gpu_h200_8, 2× H200):** FAILED at 13:19 elapsed, exit 1.
+Not memory — the model loaded, then died in `profile_run` building a FlashInfer JIT kernel.
+`MaxRSS 226 GiB` of `--mem=250G` (90%, close enough that later runs use **290G**).
+
+**Interactive debugging (job 265639, 2 h `srun` on the shared H200 node):** four serve attempts,
+~8 min each. Every failure was FlashInfer's JIT, never the model:
+
+| Attempt | Config | Outcome |
+|---|---|---|
+| A | `--disable-custom-all-reduce` | died — the fused-allreduce pass is a separate path |
+| B | + `LIBRARY_PATH=/usr/lib64` (fixes `ld: cannot find -lcuda`) | died — `flashinfer_trtllm_fused_allreduce_norm` baked into the inductor graph |
+| C | + `--compilation-config '{"pass_config":{"fuse_allreduce_rms":false}}'` | died — `fp8_blockscale_gemm_90` via `linear_backend=auto` → DeepGEMM |
+| **D** | **+ 5 FlashInfer/DeepGEMM env vars + compile-cache wipe** | ✅ **UP after 160 s**, turn samples scoring, no new kernel |
+
+**Validated serving numbers (the ones that change sizing):**
+
+| Metric | Value | Supersedes |
+|---|---|---|
+| Weight load | **44.55 s** | the ~2 h extrapolation from the 32B's 65 GB / 35 min |
+| Server ready | **160 s** total | — |
+| Weights on GPU | **110.19 GiB per worker** (~220 GiB total) | matches the 239.1 GB manifest |
+| Free per GPU @ util 0.95 | **~24 GiB** | memory arithmetic CONFIRMED; `--max-model-len 16384` retained |
+
+⇒ **Cold start contributes essentially nothing to per-combo cost**, and the contingency to cut
+context to 12288 is not needed.
+
+**⛔ No wall-time measurement: the 2 h interactive session expired unattended mid-pass, so
+`results/qwen3-235b-a22b-fp8_*_sharanga_smoke.json` was never written.** The harness writes on
+completion, and nothing survived. Early observations only, from terminal output — turn-level
+`dmg_ratio=1.00, parse_ok=True, legal=True` on both samples (n=2, worthless statistically, and
+consistent with the documented turn-level saturation ceiling). **The three smoke read-offs —
+wall time, truncation counters, score sanity — all remain OPEN.**
+
+**Durable lesson (decision_log §4): measurement passes belong in BATCH, not in a time-boxed
+interactive session.** Interactive is for debugging serving; batch has per-dimension partial
+saves. Also: never reuse a probe log filename (attempt A's log was overwritten, so its exact
+failure is unconfirmed).
+
+**Next:** `bash cluster/sharanga_submit_235b.sh smoke` — the working config is now baked into
+`sharanga_smoke.sbatch` + `sharanga_matrix_combo.sbatch`, so this needs no manual flags and no
+babysitting.
+
 ## 2026-08-07 (latest) — ▶ Qwen3-235B-A22B-FP8 rung STAGED + PREFETCHED (smoke pending)
 
 **Status: weights on scratch and verified; nothing submitted yet.** Top of the registered
