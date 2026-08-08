@@ -47,6 +47,21 @@
 set -euo pipefail
 cd ~/slay-bench
 
+# The prefetch verification below imports huggingface_hub, so it needs the project
+# env. Login shells have conda on PATH (conda init lives in the shared .bashrc) but
+# base is NOT auto-activated, so running this script straight after logging in used
+# to fail with a bare "huggingface_hub not importable".
+# `set +u` around the activation is mandatory, not cosmetic: conda's cuda-nvcc hooks
+# reference unbound vars (CUDAARCHS_BACKUP) and abort under `set -u` -- the
+# 2026-07-24 blocker that silently killed every batch job at activation.
+if ! python -c "import huggingface_hub" 2>/dev/null; then
+  echo "activating conda env slaybench ..."
+  set +u
+  # shellcheck disable=SC1090
+  source ~/miniconda3/bin/activate slaybench
+  set -u
+fi
+
 STAGE=${1:-}
 if [ "$STAGE" != "smoke" ] && [ "$STAGE" != "matrix" ]; then
   echo "usage: bash cluster/sharanga_submit_235b.sh {smoke|matrix}"
