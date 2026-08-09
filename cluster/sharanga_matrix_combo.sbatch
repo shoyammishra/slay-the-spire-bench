@@ -39,10 +39,17 @@
 #   + cold start; per-dimension partial saves bound any wall-kill loss to the
 #   in-flight dimension (turn+combat+synergy already on disk when run starts).
 #
-# OVERRIDES (env; the launcher sets CHAR/FMT). Later rungs, e.g. 235B FP8 TP=2:
+# MEASURED 235B SIZING (job 266749 smoke, 2026-08-09 — supersedes the guesses above
+# for that rung): smoke wall 75m35s = 1.43× the 32B's 53 min ⇒ ≈39-53 h/combo, i.e.
+# ~2× headroom under --time=96:00:00. MaxRSS 228.9 GiB, so --mem must be 290G (250G
+# measured 90% full on the 2026-08-08 attempt). Truncation counters all ZERO at the
+# matched-8k budget — this model does NOT over-deliberate like the R1 distills.
+#
+# OVERRIDES (env; the launcher sets CHAR/FMT). Later rungs, e.g. 235B FP8 TP=2 --
+# but prefer `bash cluster/sharanga_submit_235b.sh matrix`, which sets all of this:
 #   CHAR=ironclad FMT=structured HF_REPO=Qwen/Qwen3-235B-A22B-FP8 \
-#     SERVED_NAME=qwen3-235b-a22b-fp8 TP_SIZE=2 HEALTH_WAIT_MIN=180 \
-#     sbatch --gres=gpu:2 --cpus-per-task=8 --mem=250G cluster/sharanga_matrix_combo.sbatch
+#     SERVED_NAME=qwen3-235b-a22b-fp8 TP_SIZE=2 GPU_MEM_UTIL=0.95 HEALTH_WAIT_MIN=180 \
+#     sbatch --gres=gpu:2 --cpus-per-task=8 --mem=290G cluster/sharanga_matrix_combo.sbatch
 # ──────────────────────────────────────────────────────────────────────────────
 
 # conda's cuda-nvcc activate/deactivate hooks reference unbound vars (CUDAARCHS_BACKUP)

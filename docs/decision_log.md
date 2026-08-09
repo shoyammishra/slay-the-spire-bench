@@ -1,5 +1,65 @@
 # Decision Log
 
+## 2026-08-09 — 235B matrix: GO at the full scope (`N_RUN=5`), no scope-down
+
+**Context.** The 235B smoke (job 266749) answered all three registered read-offs
+(experiment_log 2026-08-09). The decision the two-stage launcher exists to make — *does the
+full four-combo matrix fit?* — is now answerable from measurement instead of extrapolation.
+
+### 1. Sizing decision: run all four combos, keep run-level
+
+**The constraint.** 239 GB ⇒ TP=2; the 3-GPU per-user H200 cap means two TP=2 jobs cannot
+co-run, so the combos are **strictly sequential** and total wall clock ≈ 4 × per-combo against
+a 96 h `MaxTime` *per job*.
+
+**The measurement.** Smoke 75 m 35 s vs the 32B's 53 min on identical config = **1.43×**;
+applied to the 32B's measured 27.6–37.1 h/combo ⇒ **≈39–53 h/combo**, ≈6.6–8.8 days total.
+
+**Options.** (a) full matrix at `N_RUN=5` ≈ 6.6–8.8 days; (b) `N_RUN=0` ≈ 3.3–4.4 days,
+dropping the run horizon; (c) fewer combos.
+
+**Chose (a).** Every combo clears the cap with ~2× headroom, so the registered scope-down
+ladder is not triggered — and the ladder was always conditional on *not fitting*, never a
+preference. Scoping down would also break the deliberate symmetry with qwen3-32b, which has
+all four dimensions × all four combos at `N_RUN=5`; an asymmetric top rung would put the
+frontier model's run-level cell in a different instrument tier from the model it is meant to
+be compared against. Cost of being wrong is bounded: per-dimension partial saves mean a
+wall-kill can only lose the in-flight (run) dimension, with turn+combat+synergy already on disk.
+
+**Comparability:** run-level stays the **`N_RUN=5` floor-estimate tier** (25 runs/combo) —
+never blended with the n=20 run rows, exactly as for qwen3-32b.
+
+### 2. Token budget: matched-8k CONFIRMED for this model
+
+The registered M3b protocol (2026-07-13) required reading truncation diagnostics *before*
+committing a frontier model to a budget. All counters came back **zero** across turn, combat
+and synergy. ⇒ the matrix runs on the matched-8k default; **no raised-budget condition, no
+dual reporting.** This was not a foregone conclusion: Qwen3-235B-A22B is a hybrid-reasoning
+model with thinking on by default, i.e. the exact structural setup that made the DeepSeek
+distills spend the whole budget inside `<think>`.
+
+**What this settles for the paper:** budget-bound deliberation is an **R1-distill** property,
+not a property of reasoning models. Three qwen3 rungs (7B, 32B, 235B) are parse-clean at the
+same budget. Frame the DeepSeek mechanism finding as distill-specific — an over-generalisation
+to "reasoning models" is now contradicted by our own data at three scales.
+
+### 3. Compile cache: do NOT wipe it before the matrix
+
+The 2026-08-08 rule ("wipe `~/.cache/vllm/torch_compile_cache` when changing these vars")
+applies **to a config change**, and is now actively counterproductive: the smoke populated the
+cache with a *good* inductor graph for exactly the config the matrix will serve (same repo,
+TP=2, `--max-model-len 16384`, `--gpu-memory-utilization 0.95`, same flags). Wiping would pay
+the compile cost four more times for nothing. The rule is unchanged in substance — wipe when
+the serve config changes, not on principle.
+
+### 4. Gate integrity confirmed
+
+The smoke and the combo file now issue a **byte-identical `vllm serve` invocation** and export
+the identical six env vars; they differ only in log filename, port, and `LOCAL_TIMEOUT`
+(600 s in the combo, unset ⇒ 300 s in the smoke, which passed). This is the property job
+265759 lacked and died for. A gate is only worth its GPU-hours if it serves the model the way
+the gated run will.
+
 ## 2026-08-08 — FlashInfer is structurally unbuildable on Sharanga: the full account + the validated serving config
 
 **Context.** First attempt to serve Qwen3-235B-A22B-FP8 at TP=2. The model is fine and the

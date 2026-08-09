@@ -1,5 +1,73 @@
 # Experiment Log
 
+## 2026-08-09 — ✅ Qwen3-235B-A22B-FP8 SMOKE PASSED (job 266749) — all three read-offs answered; matrix sized and FEASIBLE
+
+**Status: the rung is GO.** First complete measurement of this model. Batch job, the config
+validated 2026-08-08, no manual flags — `bash cluster/sharanga_submit_235b.sh smoke`.
+
+| Slurm | Value |
+|---|---|
+| Job | 266749, `COMPLETED` |
+| Elapsed (whole job) | 01:27:04 |
+| Benchmark pass alone | `real 75m35.447s` (`elapsed_seconds: 4523.23`) |
+| MaxRSS | 240032800 K ≈ **228.9 GiB** of `--mem=290G` |
+
+The ~11 min between job elapsed and pass wall is serve startup + inductor compile. `MaxRSS`
+confirms the 250G→290G bump was necessary, not defensive: the old limit would have left
+under 25 GiB of host headroom.
+
+### Read-off 1 — WALL TIME ⇒ ≈39–53 h/combo, under the 96 h cap
+
+The launcher's registered method: scale the 32B's *measured* per-combo time by the ratio of
+the two models' **identical-config** smoke passes.
+
+| Model | Smoke wall | Ratio vs 32B | Measured per-combo |
+|---|---|---|---|
+| qwen2.5-7b | 57 s | 0.018× | — |
+| qwen3-32b | 53 min | 1.00× | **27.6–37.1 h** |
+| **qwen3-235b-a22b-fp8** | **75 m 35 s** | **1.43×** | **≈39–53 h (predicted)** |
+
+⇒ each combo carries ~2× headroom against the 96 h `MaxTime`, and four sequential combos
+come to **≈6.6–8.8 days** wall clock. **The registered scope-down ladder (`N_RUN=0` first)
+is NOT triggered.** Note the method's one prior validation: the same extrapolation predicted
+the 32B's 20–50 h band, which landed at 27.6–37.1 h.
+
+The 1.43× also settles the MoE sizing question — 235B total but 22B active decodes at ~⅔ the
+speed of a 32B dense model, not at 235B-dense speed.
+
+### Read-off 2 — TRUNCATION: ZERO. The thinking-mode risk did not materialise
+
+This was the real gate. Qwen3-235B-A22B is a hybrid-reasoning model with thinking **on by
+default** — structurally the DeepSeek-distill budget-bound-deliberation failure mode, at 235B
+scale. Every counter is clean at the matched-8k default:
+
+| Dimension | Counters |
+|---|---|
+| turn | `parse_ok_rate 1.0`, `parse_fail_n 0`, `parse_fail_truncated 0` |
+| combat | `avg_truncation_errors 0.0`, `avg_json_parse_errors 0.0`, `avg_illegal_action_errors 0.0` |
+| synergy | `parse_ok_rate 1.0` |
+
+⇒ the registered M3b token-budget protocol (decision_log 2026-07-13) is **satisfied on the
+matched-8k default**: no raised-budget condition, no dual reporting, nothing to keep unblended.
+The qwen3 family is parse-clean at 7B, 32B and 235B; over-deliberation is an **R1-distill**
+property, not a reasoning-model property — this is the third family-level datum for that
+correction.
+
+### Read-off 3 — SCORES: sane, and not findings
+
+| Dim | n | Numbers |
+|---|---|---|
+| turn | 2 | `avg_damage_ratio 1.0`, `legal_rate 1.0` — `llm_sequence == optimal_sequence` exactly on both |
+| combat | 1 | `win_rate 1.0`, `avg_hp_ratio 1.327` |
+| synergy | 4 | `archetype_acc 0.75`, `card_pick_acc 0.75`, `removal_acc 0.25` |
+| run | 1 | `avg_floors_reached 16.0`, `avg_progress 1.0`, `survival_rate 0.0` (reached the boss, died fighting it) |
+
+Non-degenerate, nothing all-zero, JSON parsed throughout. **At n=1–4 these are instrument
+checks and must never be quoted as results.** The turn 1.0 is the documented saturation
+ceiling reappearing, not new information (`scripts/turn_saturation_check.py`, 2026-08-07).
+
+**Next:** `bash cluster/sharanga_submit_235b.sh matrix` at the default `N_RUN=5`.
+
 ## 2026-08-08 — ⚙️ Qwen3-235B-A22B-FP8 SERVES at TP=2 (FlashInfer solved); smoke pass NOT yet measured
 
 **Status: serving problem SOLVED and validated; no benchmark numbers yet.** Full rationale +

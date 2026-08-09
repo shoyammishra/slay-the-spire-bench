@@ -279,6 +279,18 @@ cell .34/.21) — the instrumentation decomposed the counts without moving them;
 provokes *longer* deliberation in the small distill, consistent with its .38 parse_ok floor.
 Caveats travel with the number: single seed, combat n=3, post-instrumentation harness.
 
+**📌 SCOPE BOUND ADDED 2026-08-09 — this is an R1-DISTILL property, not a reasoning-model
+property.** The Qwen3-235B-A22B-FP8 smoke (job 266749) is the third qwen3 rung to come back
+**completely parse-clean at the same 8000-token budget** — every truncation counter zero
+across turn, combat and synergy, joining qwen3-32b (`json_parse_errors == truncation_errors`
+but ~25× smaller than DeepSeek's) and the 7B. That matters because the 235B is a **hybrid
+reasoning model with thinking ON by default**: it is structurally the same setup that broke
+the distills, at 7× the scale, and it does not break. **Never write "reasoning models exhaust
+the budget inside `<think>`" — write "the R1 distills do."** Our own data contradicts the
+general form at three scales within one family. The mechanism is real and worth reporting;
+its scope is distillation, not deliberation as such. (Consistent with the parallel 2026-08-07
+correction that the *combat/run collapse* also belongs to the distills, not to the full 32B.)
+
 ## ✅ Paper-grade Qwen2.5-7B, 4 dimensions, 5 seeds (2026-06-13) — CURRENT valid data
 
 First complete self-hosted, multi-seed, post-audit matrix (full tables in

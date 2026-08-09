@@ -34,6 +34,16 @@
 #      budgets or use a non-thinking variant, and never blend the two.
 #   3. SCORES SANITY — non-degenerate, not all-zero, JSON actually parsed.
 #
+# ✅ SMOKE DONE + READ (job 266749, 2026-08-09) — stage 2 is cleared for this rung:
+#   1. wall 75m35s = 1.43× the 32B's 53 min ⇒ ≈39-53 h/combo, ~2× under the 96 h cap
+#      ⇒ full 4-combo matrix FITS; the N_RUN=0 scope-down is NOT needed.
+#   2. truncation counters ALL ZERO (turn/combat/synergy) ⇒ matched-8k default stands.
+#   3. scores sane at n=1-4 (instrument check only, never quotable).
+#   Full numbers: experiment_log 2026-08-09; decision: decision_log 2026-08-09.
+#   ⚠️ Do NOT wipe ~/.cache/vllm/torch_compile_cache before the matrix — the smoke
+#   populated it with a GOOD graph for exactly this serve config (the 2026-08-08
+#   wipe rule fires on a CONFIG CHANGE, and there is none between smoke and matrix).
+#
 # PREREQ: weights prefetched on the LOGIN node (~240 GB, hours — and /scratch
 # purges after 15 days idle, so re-check before every rung):
 #     conda activate slaybench
