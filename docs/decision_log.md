@@ -55,6 +55,32 @@ compiled *into* the inductor graph, and it is not established that these env var
 in the compile-cache key — a stale graph replays the old failure. Cheap insurance
 (recompile ≈ minutes) against an expensive misdiagnosis.
 
+**ADDENDUM 2026-08-09 — even a SUCCESSFULLY BUILT FlashInfer kernel is unusable here, which
+closes the "fix it" option for good.** Once `LIBRARY_PATH=/usr/lib64` let the JIT link,
+`trtllm_comm.so` and `trtllm_mnnvl_comm.so` were produced and cached. Job 265759 then failed
+at **load** time, not build time:
+
+```
+Failed to load dynamic shared library …/trtllm_mnnvl_comm.so
+/lib64/libstdc++.so.6: version `GLIBCXX_3.4.32' not found
+```
+
+The kernels are compiled by conda's g++ 15.2.0 against conda's newer libstdc++, but the
+loader resolves the **system** `/lib64/libstdc++.so.6`, which is older. Making them loadable
+would mean forcing `LD_LIBRARY_PATH=$CONDA_PREFIX/lib` for the whole vLLM process — shadowing
+system libraries globally to satisfy an optional dependency we do not need. **Not done.**
+Disabling stands as the decision, now on two independent grounds (unbuildable *and*
+unloadable). **Delete stale artifacts when they exist** — a cached broken `.so` is loadable-
+looking state that fails only at runtime:
+`rm -rf ~/.cache/flashinfer/*/*/cached_ops/trtllm_comm ~/.cache/flashinfer/*/*/cached_ops/trtllm_mnnvl_comm`
+
+**Root cause of job 265759 (my error, recorded so it is not repeated): the TP>1 serve flags
+were added to `sharanga_matrix_combo.sbatch` but NOT to `sharanga_smoke.sbatch`.** The gate
+served with a different configuration from the run it gates, which is worse than having no
+gate. Both files now derive `EXTRA_SERVE_ARGS` identically, gated on `TP_SIZE > 1`.
+**Durable rule: the smoke and the combo file must serve with byte-identical flags — if a knob
+is added to one, it goes in both, in the same commit.**
+
 ### 3. Measurements that settle earlier open questions
 
 - **Weights load in 44.55 s**; server ready in **160 s** total. The ~2 h cold-start budget

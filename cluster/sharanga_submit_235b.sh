@@ -105,7 +105,7 @@ if [ "$STAGE" = "smoke" ]; then
   JID=$(HF_REPO="$REPO" SERVED_NAME="$NAME" TP_SIZE=2 \
         GPU_MEM_UTIL="$GPU_MEM_UTIL" HEALTH_WAIT_MIN=180 \
     sbatch --parsable --job-name=slay_smoke_235b --time=06:00:00 \
-      --partition=gpu_h200_8 --gres=gpu:2 --cpus-per-task=8 --mem=250G \
+      --partition=gpu_h200_8 --gres=gpu:2 --cpus-per-task=8 --mem=290G \
       cluster/sharanga_smoke.sbatch)
   echo "235B smoke submitted: job $JID (gpu_h200_8, 2× H200, TP=2)"
   echo
@@ -133,7 +133,7 @@ for combo in "ironclad structured" "ironclad raw" "silent structured" "silent ra
         HF_REPO="$REPO" SERVED_NAME="$NAME" TP_SIZE=2 \
         GPU_MEM_UTIL="$GPU_MEM_UTIL" HEALTH_WAIT_MIN=180 \
     sbatch --parsable --job-name=slay235_${C:0:2}_${F:0:3} --time=96:00:00 \
-      --partition=gpu_h200_8 --gres=gpu:2 --cpus-per-task=8 --mem=250G \
+      --partition=gpu_h200_8 --gres=gpu:2 --cpus-per-task=8 --mem=290G \
       cluster/sharanga_matrix_combo.sbatch)
   echo "  combo ${C}/${F}: job ${JID}"
 done

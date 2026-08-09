@@ -69,6 +69,20 @@ TP_SIZE=${TP_SIZE:-1}
 # KV-cache/activation headroom. 0.90 is right for models that leave slack; the
 # 235B-FP8 rung needs ~240 GB of a 282 GB TP=2 budget, so it must run higher.
 GPU_MEM_UTIL=${GPU_MEM_UTIL:-0.90}
+# TP>1 serve flags. These MUST match sharanga_matrix_combo.sbatch — job 265759
+# failed precisely because this file had the FlashInfer env vars but NOT these two
+# flags, so the custom all-reduce path still engaged and tried to load
+# trtllm_mnnvl_comm.so. A gate that serves differently from the run it gates is
+# worse than no gate.
+#   --disable-custom-all-reduce            -> plain NCCL instead of a custom kernel
+#   pass_config.fuse_allreduce_rms=false   -> keeps the FlashInfer fused
+#                                             allreduce+RMSNorm op out of the graph
+# Both are no-ops at TP=1, so the 7B/32B gates are unaffected.
+if [ "$TP_SIZE" -gt 1 ]; then
+  EXTRA_SERVE_ARGS=${EXTRA_SERVE_ARGS:-"--disable-custom-all-reduce --compilation-config {\"pass_config\":{\"fuse_allreduce_rms\":false}}"}
+else
+  EXTRA_SERVE_ARGS=${EXTRA_SERVE_ARGS:-}
+fi
 
 cd ~/slay-bench
 
@@ -82,6 +96,7 @@ vllm serve "$MODEL_REPO" \
   --tensor-parallel-size "$TP_SIZE" \
   --max-model-len 16384 \
   --gpu-memory-utilization "$GPU_MEM_UTIL" \
+  ${EXTRA_SERVE_ARGS} \
   > "vllm_smoke_${SLURM_JOB_ID}.log" 2>&1 &
 VLLM_PID=$!
 trap 'kill $VLLM_PID 2>/dev/null || true' EXIT
