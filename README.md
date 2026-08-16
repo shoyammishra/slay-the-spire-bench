@@ -1,116 +1,124 @@
 # slay-bench
 
-A Python simulator + LLM benchmark harness for **Slay the Spire** (Ironclad character only).
-It measures how well large language models plan in a complex, stateful game across four
-distinct reasoning dimensions.
+A deterministic Python simulator and LLM benchmark for **Slay the Spire**. It measures
+planning across four horizons for Ironclad and Silent, with Acts 1–3 implemented.
 
-> **Status: pilot-grade.** Current numbers come from small samples (n=3–8) on a single seed
-> and are *directional, not statistically significant*. See [Limitations](#limitations).
+The benchmark compares two semantically matched prompt formats—compact structured JSON
+and raw English—on identical RNG seeds.
 
-## What it tests
+| Horizon | Task | Reference |
+|---|---|---|
+| Turn | Choose the best legal card sequence | Exhaustive legal-sequence search |
+| Combat | Play a complete fight | Outcome plus greedy-policy HP anchor |
+| Synergy | Identify archetype, pick and remove cards | Fixed expert-labelled fixtures |
+| Run | Traverse an act or multi-act run | Survival, progress, floors, and coherence |
 
-The harness drives an LLM through a faithful re-implementation of Slay the Spire's Act 1 and
-scores it on four dimensions:
-
-| # | Dimension | What it tests | Ground truth |
-|---|-----------|---------------|--------------|
-| 1 | **Turn-level** | Best card sequence in a single turn | Exhaustive search (≤720 permutations) |
-| 2 | **Combat-level** | Winning a full fight turn-by-turn | Greedy bot baseline |
-| 3 | **Synergy** | Archetype ID, best card pick, worst-card removal | 8 hand-crafted archetype decks |
-| 4 | **Run-level** | Surviving all 15 floors of Act 1 | Absolute (survival + progress) |
-
-Each dimension is run under **two prompt formats** — `structured` (compact JSON game state)
-and `raw` (verbose natural-English description of the same state) — given identical RNG seeds
-so the comparison is fair.
-
-## Key findings (pilot)
-
-From the synergy dimension (n=8 hand-crafted fixtures, llama-3.1-8b + llama-4-scout-17b):
-
-- **Surface patterns are easy, mechanical interactions are hard.** Models reliably name
-  Aggro (8/8) and Block (7/8) — archetypes identifiable by counting card types — but score
-  **0/8 on Exhaust**, an archetype defined by a *generator + payoff interaction* rather than a
-  card-frequency signal. Every model, in every format, mislabels Exhaust decks as "Aggro."
-- **Name-vs-play dissociation.** Models often pick the right card (62.5–100%) even for decks
-  they cannot correctly label — recognising a good *card* without recognising the *strategy*.
-- **Removal is near-random** (12.5–25%). Expert play removes a basic Strike first (basics
-  dilute draw quality as the deck improves); models instead cut situational cards.
-- **No format wins outright.** `structured` helps archetype ID; `raw` helps card-picking.
-  Format is a variable worth controlling for in any LLM-planning study.
-
-Full results: [`docs/report.html`](docs/report.html) (polished, shareable) ·
-[`docs/findings.md`](docs/findings.md) (detail) · [`docs/experiment_log.md`](docs/experiment_log.md).
+The project has a complete multi-model matrix through Qwen3-32B, statistical rigor
+analysis, and a passed Qwen3-235B smoke test. The 235B full matrix is the next registered
+experiment. See [the handoff](docs/handoff.md), [experiment log](docs/experiment_log.md),
+[findings](docs/findings.md), and [statistics report](docs/stats_report.md) for current,
+caveated results. Older HTML reports are snapshots, not live status.
 
 ## Install
 
+Python 3.10 or newer is required.
+
 ```bash
-pip install -r requirements.txt
+python -m pip install -r requirements.txt
 ```
 
-Requires Python 3.10+. To run against real models, create a `.env` file (gitignored) with:
+Hosted providers read credentials from a gitignored `.env`:
 
+```text
+GROQ_API_KEY=...
+OPENROUTER_API_KEY=...
 ```
-GROQ_API_KEY=your_groq_key
-OPENROUTER_API_KEY=your_openrouter_key   # optional
-```
+
+OpenAI-compatible local servers such as vLLM, TGI, and Ollama use `--provider local`
+and `--base-url`; they do not require a hosted-provider key.
 
 ## Usage
 
+Run the instant no-API pipeline first:
+
 ```bash
-# Mock run — instant, no API calls (verify the harness first)
 python run_benchmark.py --provider mock --model mock --format structured --seed 42
-
-# Real run — structured prompt format
-python run_benchmark.py --provider groq --model llama-3.1-8b-instant \
-    --n-turn 5 --n-combat 3 --n-synergy 8 --n-run 5 --format structured
-
-# Raw prompt format (ablation)
-python run_benchmark.py --provider groq --model llama-3.1-8b-instant \
-    --n-turn 5 --n-combat 3 --n-synergy 8 --n-run 5 --format raw
-
-# Re-run a single dimension (merges the others from the previous run on disk)
-python run_benchmark.py --provider groq --model llama-3.1-8b-instant \
-    --format structured --only synergy
 ```
 
-Each run writes to `results/` (gitignored): a `.json` of raw scores, a `.txt` ASCII report,
-and `.png` bar/radar charts.
+Run a hosted model:
 
-## Project structure
-
+```bash
+python run_benchmark.py --provider groq --model llama-3.1-8b-instant \
+  --n-turn 5 --n-combat 3 --n-synergy 8 --n-run 5 \
+  --character ironclad --format structured
 ```
+
+Run a local OpenAI-compatible server:
+
+```bash
+python run_benchmark.py --provider local --model qwen3-32b \
+  --base-url http://localhost:8000/v1 --character silent --format raw
+```
+
+Use base seeds at least 1000 apart for paper-grade multi-seed runs:
+
+```bash
+python run_benchmark.py --provider mock --model mock \
+  --seeds 42 1042 2042 3042 4042 --format structured
+```
+
+Adjacent base seeds overlap the benchmark's per-sample seed ranges and produce invalid
+variance estimates. `--only <dimension>` reruns one dimension and merges unaffected
+dimensions from the existing output. `--acts 3` enables Acts 1→3. See
+`python run_benchmark.py --help` for all options.
+
+Outputs are written under gitignored `results/` as per-seed JSON/text/PNG artifacts and
+multi-seed aggregates.
+
+## Architecture
+
+```text
+run_benchmark.py        CLI, seeds, partial reruns, output orchestration
 slay_bench/
-  cards.py          Ironclad cards with exact effects
-  enemies.py        Act 1 enemies (Cultist, Jaw Worm, slimes, ...)
-  combat.py         Turn engine: draw, play, enemy attacks, block
-  map_gen.py        Map generation, node types, path traversal
-  run_loop.py       Full-act simulation, floor by floor
-  rng.py            Java-compatible LCG, 9 independent seeded streams
-  prompt_builder.py GameState → text prompt (structured JSON or raw English)
-  benchmark.py      4-dimension benchmark harness + LLM interface
-  visualize.py      PNG charts + ASCII reports
-run_benchmark.py    CLI entry point
-tests/              Unit tests (no API calls)
-docs/               Roadmap, decisions, findings, paper draft
+  benchmark.py          providers, parsing, evaluators, aggregation
+  state.py, rng.py      state model and deterministic independent RNG streams
+  cards*.py             Ironclad and Silent card content
+  enemies*.py           Acts 1–3 enemies and encounters
+  combat.py             turn/combat state machine
+  run_loop.py           map traversal and full-run evaluation
+  prompt_builder.py     structured/raw prompt contracts
+  visualize.py          reports and figures
+tests/                  no-API regression and statistical known-answer tests
+scripts/                baselines, audits, and statistical analysis
+cluster/                Slurm serving and benchmark workflows
+docs/                   design, decisions, experiments, findings, and paper artifacts
 ```
 
-The simulator is deterministic: the same seed reproduces the same map, enemies, draws, and
-rewards every time.
+The same seed reproduces maps, encounters, draws, rewards, and evaluator fixtures. Read
+[the design document](docs/design.md) before modifying engine, prompt, scoring, or RNG
+behavior because such changes can invalidate existing benchmark rows.
 
-## Limitations
+## Validation
 
-This is a **pilot study**, not a finished benchmark:
+The suite currently contains 172 directly runnable tests:
 
-- **Small samples** (n=3–8 per dimension) — numbers are directional; no significance claimed.
-- **Single seed** (42) — multiple seeds are needed to rule out RNG artefacts.
-- **Run-level has no valid data yet** — a clean pass is blocked on free-tier API rate limits
-  (the dimension is too token-heavy for free Groq's TPM cap).
-- **Two models, one family** (both Llama). A reasoning model and a third model family are
-  needed for stronger claims.
+```bash
+python tests/test_benchmark.py
+python tests/test_combat.py
+python tests/test_run.py
+python tests/test_stats.py
+```
 
-Reaching paper-grade results requires n≥20–30, multiple seeds, mean±std reporting, and an
-additional model family — the harness is ready; the blocker is compute/credits, not code.
-See [`docs/roadmap.md`](docs/roadmap.md) for the full run matrix.
+Engine or harness changes also require mock end-to-end runs for both characters and both
+formats. Boundary results, near-zero variance, and oracle-beating scores require a
+per-sample instrument audit before publication.
+
+## Security
+
+This is a public repository. Never commit `.env`, result/Slurm logs, private cluster
+addresses or account details, SSH material, or private cluster SOP files. Committed
+cluster documentation uses placeholders; `.gitignore` protects the known sensitive
+artifact classes.
 
 ## License
 

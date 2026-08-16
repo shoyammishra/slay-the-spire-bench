@@ -9,7 +9,7 @@
 
 # ── Sharanga paper-grade matrix: TURN + COMBAT ────────────────────────────────
 # Ladder rung-1 default: qwen3-32b, BOTH characters x BOTH formats, n=20,
-# --seeds 42 1042 2042 3042 4042 (bases >=1000 apart -> real std; see CLAUDE.md).
+# --seeds 42 1042 2042 3042 4042 (bases >=1000 apart -> real std; see AGENTS.md).
 # Writes REAL matrix cells (no --run-tag on purpose):
 #   results/qwen3-32b{,_silent}_{structured,raw}_seed*.json + the
 #   _seeds42_1042_2042_3042_4042 aggregates.

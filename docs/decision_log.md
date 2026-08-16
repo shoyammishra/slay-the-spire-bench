@@ -1,5 +1,36 @@
 # Decision Log
 
+## 2026-08-16 — Codex is the sole active agent system
+
+**Problem.** The repository's accumulated operating knowledge lived in a 120 KB
+`CLAUDE.md` plus six Claude agent definitions. An initial migration copied nearly all of
+that text into `AGENTS.md`, exceeding Codex's default project-instruction budget and
+creating two competing sources of truth. Mechanical vendor substitution also changed
+scientific model names, historical provider behavior, paths, and an Anthropic URL.
+
+**Options considered.** (a) maintain synchronized Claude and Codex configurations;
+(b) delete the Claude tree and rewrite from memory; (c) distill durable guidance into a
+small Codex router, keep detailed truth in normal project docs, translate the six useful
+roles, validate parity, and retain legacy sources as an inactive archive.
+
+**Decision: (c).** `AGENTS.md` is the canonical routing and invariant layer;
+`.codex/agents/` contains the project roles; `docs/handoff.md`, design, decision and
+experiment logs, findings, source, and tests hold detailed truth. `CLAUDE.md` and
+`.claude/` are legacy evidence only and are not synchronized. No Skill, hook, MCP, or
+extra config was created because no corresponding Claude capability existed and the
+current procedures already have one clear home.
+
+**Trade-offs and limitations.** A fresh agent loads far less history automatically and
+must follow the read-first routes for task-specific detail. This is intentional: it
+avoids truncation and stale chronology in every session. Legacy files remain in the
+repository until an explicit cleanup decision, so their inactive status must remain
+clear. Scientific references to Claude/Anthropic remain when they name benchmark
+subjects, related work, APIs, or historical events.
+
+**Comparability:** documentation/agent-system change only. No source, prompt, scoring,
+RNG, fixture, or benchmark behavior changed; all existing measurements remain valid.
+The full inventory and parity plan are in `docs/codex_migration.md`.
+
 ## 2026-08-09 — 235B matrix: GO at the full scope (`N_RUN=5`), no scope-down
 
 **Context.** The 235B smoke (job 266749) answered all three registered read-offs

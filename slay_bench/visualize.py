@@ -631,7 +631,7 @@ def horizon_collapse_curve(results_dir: Path,
     plt.close(fig)
     print(f"  Horizon curve ({fmt}) : {out_path}")
 
-    # emit the normalized matrix for sanity-checking against the CLAUDE.md tables
+    # emit the normalized matrix for sanity-checking against experiment artifacts
     for (char, model), vec in sorted(printed.items()):
         cells = " ".join(f"{h}={'--' if v is None else f'{v:.3f}'}"
                          for h, v in zip(HORIZONS, vec))

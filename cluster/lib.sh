@@ -13,7 +13,8 @@
 # or by editing the defaults below.
 
 # NOTE: the installed stack is vLLM 0.6.6 + transformers 4.47.1, which does NOT
-# support the qwen3 architecture (that needs vLLM 0.8.x+ — see CLAUDE.md). So the
+# support the qwen3 architecture (that needs vLLM 0.8.x+; see the latest decision and
+# experiment logs). So the
 # default is a qwen2.5 model that runs on this stack TODAY. To serve qwen3-32b,
 # first upgrade vLLM (check CUDA-12.8 compat), then override:
 #   HF_REPO=Qwen/Qwen3-32B SERVED_NAME=qwen3-32b sbatch ...

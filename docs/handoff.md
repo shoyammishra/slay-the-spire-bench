@@ -1,8 +1,9 @@
 # Engineering Handoff — slay-bench
 
-*Written 2026-07-12 by the departing principal engineer (Claude Fable 5). The successor
-principal engineer is **Claude Opus 4.8** (`.claude/agents/principal-engineer.md`). A new
-engineer should be productive after reading this document plus the read-first list below.*
+*Written 2026-07-12 by the departing principal engineer (Claude Fable 5). Migrated to
+the Codex-native agent roster on 2026-08-16; `.codex/agents/principal-engineer.toml` is
+the active successor role. A new engineer should be productive after reading this
+document plus the read-first list below.*
 
 This document does NOT duplicate the project docs — it curates them, records the tacit
 judgment that was never written down, and defines how work is delegated from here on.
@@ -12,10 +13,10 @@ Single source of truth stays where it already lives (see §2).
 
 ## 1. Project status snapshot (2026-07-12)
 
-- **The full 5-family result matrix is COMPLETE.** 24 multi-seed aggregates
+- **Superseded snapshot:** the then-current 5-family result matrix was complete. 24 multi-seed aggregates
   (`results/*_seeds42_1042_2042_3042_4042.json`, 4 character×format combos × 6 model
   configs) are on this laptop and folded into all docs. Every remaining `—` cell in the
-  CLAUDE.md tables is *intentional*, not pending. Nothing is running on the cluster.
+  legacy result tables was *intentional*, not pending. Nothing is running on the cluster.
 - **Engine + harness are post-audit stable**: 5 full audits (2026-06-10 → 06-12) found and
   fixed ~130 bugs; **172/172 tests pass** (as of 2026-08-07); mock pipeline green for both characters × both
   formats.
@@ -31,7 +32,7 @@ Single source of truth stays where it already lives (see §2).
 
 | Order | File | What it is authoritative for |
 |---|---|---|
-| 1 | `CLAUDE.md` | Active context, current result tables, invariants, gotchas, run commands |
+| 1 | `AGENTS.md` | Active routing, current milestone, invariants, commands, safety |
 | 2 | `docs/handoff.md` | (this) judgment, delegation, backlog, risks |
 | 3 | `docs/design.md` | Architecture, interfaces, invariants in depth |
 | 4 | `docs/decision_log.md` | Why every design decision was made (rationale record) |
@@ -46,14 +47,14 @@ Single source of truth stays where it already lives (see §2).
 
 Rule: **project state goes in these files, never only in chat.** If a decision is made,
 it goes in `decision_log.md`; if a run happens, `experiment_log.md`; if a number changes,
-the CLAUDE.md tables. CLAUDE.md's Active Context is a stack — new bullets on top, old
-bullets kept as history with supersession markers (✅/⚠️/⛔).
+`docs/handoff.md` when active state changes. Detailed chronology belongs in the decision
+and experiment logs with supersession markers (✅/⚠️/⛔), not in `AGENTS.md`.
 
 ## 3. System architecture (one screen)
 
 Pure-Python Slay the Spire simulator + LLM benchmark harness. No services, no DB, no
-frontend, no deployment — a research CLI. (`CLAUDE.md` Project Structure has the full
-module map; `docs/design.md` the interfaces.)
+frontend, no deployment — a research CLI. (`AGENTS.md` has the module map;
+`docs/design.md` has the interfaces.)
 
 - **Engine** (`combat.py`, `cards*.py`, `enemies*.py`, `relics*.py`, `powers.py`,
   `map_gen.py`, `run_loop.py`, `rng.py`): deterministic game simulation. Same seed →
@@ -65,7 +66,7 @@ module map; `docs/design.md` the interfaces.)
   local (any OpenAI-compatible endpoint — this is how cluster vLLM runs work), mock.
 - **Cluster toolkit** (`cluster/`): one Slurm job = vLLM serves a model + runs
   `run_benchmark.py --provider local` against it. All the version/QOS gotchas are in
-  CLAUDE.md's cluster bullets.
+  the newest handoff, decision-log, and experiment-log entries.
 - **Output contract**: `results/<model>[_silent]_<format>_seed<N>.json/.txt/.png`
   (+ `_seeds…` aggregates for multi-seed). Overwrite-by-config, no timestamps. Gitignored.
 
@@ -178,8 +179,8 @@ chain-of-thought — is only catchable by smoke).
 ### 5.6 How to modify things safely (recipes)
 
 - **New card/relic/enemy**: follow the EventBus + on_pickup/register split
-  (Architecture Notes in CLAUDE.md); add a regression test in the matching test file;
-  run all three test files directly (no pytest); run the mock pipeline both characters ×
+  (`docs/design.md`); add a regression test in the matching test file;
+  run all four test files directly (no pytest); run the mock pipeline both characters ×
   both formats; then apply §5.1 before any real run.
 - **New synergy fixture**: obey the executable design-rule tests (added 2026-06-10) —
   unique signature ownership, on-archetype best pick, basic-card removal target; the
@@ -202,12 +203,17 @@ chain-of-thought — is only catchable by smoke).
 | 1 | ~~**Horizon-collapse curve + cross-horizon normalization** in `visualize.py`~~ — **✅ DONE 2026-07-12** (Opus 4.8 agent; reviewed against §8, all criteria met). Formulas in decision_log 2026-07-12; PNGs in `results/horizon_collapse_*.png`; note the combat-baseline deviation (greedy ≈1.0, y-axis = "0 = non-planning floor") — caption implication for P6. **Anchor correction (same day, user-caught):** run anchor is now MEASURED per character (`scripts/greedy_baseline.py` → `results/greedy_baseline_*.json`; IC .780 ≈ the old note, Silent .704 lower); Silent run edge was partly an anchor artifact (structured lifts to ≤.13, raw mistral/qwen genuinely floored); 134 tests | done | Met: normalization documented; one line per model; renders from the 24 aggregates; 133 tests pass; both caveats addressed |
 | 2 | ~~**Fable 5 lit note** into `docs/draft.md` Related Work~~ — **✅ DONE 2026-07-12** (Opus 4.8 agent; 4 insertions in draft.md + Anthropic entry in `novelty_and_related_work.md` §10) | done | Met: domain validation cited; floor-vs-ceiling complement framing; ~3×-with-memory as corroboration-only; memory = future-work only |
 | 3 | ~~**Run-level discriminability decision**~~ — **✅ DECIDED 2026-07-12** (decision_log P3 entry): **reframe run as the shared collapse floor (Option B)**; `--acts 3` = conditional appendix probe gated on M3b frontier results also flooring at 1 act, preceded by an Act-2/3 engine audit + smoke (~12h/cell; full matrix would be ~72–144 GPU-h). roadmap step 6 re-tagged | done | Met: decision + trade-offs + revisit trigger (M3b) recorded; no compute spent |
-| 4 | **M3b frontier runs** (Claude/GPT via professor's channel) — fills the frontier gap; expected to bend the collapse curve. **⚠️ Budget protocol registered 2026-07-13 (decision_log): matched-8k first, escalate only on measured truncation** — the smoke test MUST read `parse_fail_truncated`/`truncation_errors` before any full cell (the DeepSeek budget-bound confound now instrumented); reasoning APIs need their decoupled budgets configured (Claude thinking budget separate from answer tokens; OpenAI `max_completion_tokens` covers reasoning too). **Scope added 2026-07-14 (review-driven, decision_log): fold-in includes a cross-benchmark correlation** — per-model collapse points vs *published* external agent-benchmark scores (GAIA/SWE-Bench/WebArena…); we run nothing external, n≈8–10 models, reported as directional only | Opus 4.8 + user (credentials) | Same harness, same seeds, all 4 combos; provider class may need adding to `benchmark.py`; smoke truncation check ≈ 0 (or the raised-budget condition added + both reported); correlation table with the directional caveat |
+| 4 | **M3b frontier runs** (Claude/GPT via professor's channel) — fills the frontier gap; expected to bend the collapse curve. **⚠️ Budget protocol registered 2026-07-13 (decision_log): matched-8k first, escalate only on measured truncation** — the smoke test MUST read `parse_fail_truncated`/`truncation_errors` before any full cell (the DeepSeek budget-bound confound now instrumented); reasoning APIs need their decoupled budgets configured (Claude thinking budget separate from answer tokens; OpenAI `max_completion_tokens` covers reasoning too). **Scope added 2026-07-14 (review-driven, decision_log): fold-in includes a cross-benchmark correlation** — per-model collapse points vs *published* external agent-benchmark scores (GAIA/SWE-Bench/WebArena…); we run nothing external, n≈8–10 models, reported as directional only | `benchmark-operator` + user (credentials/spend) | Same harness, same seeds, all 4 combos; provider class may need adding to `benchmark.py`; smoke truncation check ≈ 0 (or the raised-budget condition added + both reported); correlation table with the directional caveat |
 | 4b | ~~**Statistical rigor pass**~~ — **✅ DONE 2026-08-07.** `scripts/stats_rigor.py` (models discovered from filenames → M3b rows join with no code change) + `tests/test_stats.py` (26 known-answer tests, **172/172 total**) + `docs/stats_report.md` (committed) + `results/stats/stats_rigor.json`. Methods/limitations: decision_log 2026-08-07 (later); numbers: experiment_log 2026-08-07 (later); wording impact: findings 📊 section. **⚠️ Registered power ceiling: exact sign-flip over 5 seed pairs ⇒ min attainable two-sided p per combo = 0.0625**, so inference rests on the pooled stratified test + sample-level McNemar. **Corrected two published claims** — "combat/run format-insensitive" (ceiling artifact; format reaches combat hp_ratio, 10/12 strata) and qwen3-32b's run lift (run-seed-matched greedy = .04/12.76, not .01/12.48). **Delivered the paper's cleanest number:** between-model η² share turn .83 / combat .89 / synergy .51 / **run .02**. **Re-run it as step 1 of the M3b fold-in.** | done | Met: reusable script (not a notebook); CIs + effect sizes on every headline claim; paired format test with p-values (+ direction test); no published mean changed |
-| 4c | **Open-model ladder, top rung: Qwen3-235B-A22B-FP8** (pre-M3b; ladder registered decision_log 2026-07-23 §1). **✅ STAGE 1 COMPLETE — smoke PASSED 2026-08-09 (batch job 266749); stage 2 cleared and NOT yet submitted.** History: prefetched + byte-verified 2026-08-07 (239.1 GB); serving solved 2026-08-08 (FlashInfer JIT structurally unbuildable ⇒ disable-set baked into both sbatch files, server up in 160 s). **Smoke read-offs, in the registered order:** wall **75m35s = 1.43× the 32B's 53 min ⇒ ≈39–53 h/combo**, ~2× under the 96 h cap ⇒ **the full 4-combo matrix FITS and the `N_RUN=0` scope-down is NOT triggered** (≈6.6–8.8 days total, since TP=2 under the 3-GPU cap forces strict sequencing); **truncation counters ALL ZERO** ⇒ matched-8k default stands, and (paper consequence) budget-bound deliberation is an **R1-distill** property, not a reasoning-model one — qwen3 is parse-clean at 7B/32B/235B; scores sane at n=1–4 (instrument check, never quotable). Numbers: experiment_log 2026-08-09; decision: decision_log 2026-08-09. **⚠️ Do NOT wipe the vLLM compile cache before the matrix** (smoke populated a good graph for this exact serve config). **NEXT: `bash cluster/sharanga_submit_235b.sh matrix`** | user (runs it) + Opus 5 (sizing/fold-in) | ~~Smoke passes with truncation ≈ 0 and wall time implying ≤96 h/combo~~ **MET**; remaining: on retrieval re-run `stats_rigor.py` (auto-discovers the new model) then fold into experiment_log/findings/tables, keeping run-level in the `N_RUN=5` floor-estimate tier (never blended with n=20) |
-| 5 | Complete qwen3-32b non-synergy dims (needs vLLM 0.8.x env) — optional | Opus 4.8 | Only if P3/P4 make the curve need it |
+| 4c | **Open-model ladder, top rung: Qwen3-235B-A22B-FP8** (pre-M3b; ladder registered decision_log 2026-07-23 §1). **✅ STAGE 1 COMPLETE — smoke PASSED 2026-08-09 (batch job 266749); stage 2 cleared and NOT yet submitted.** History: prefetched + byte-verified 2026-08-07 (239.1 GB); serving solved 2026-08-08 (FlashInfer JIT structurally unbuildable ⇒ disable-set baked into both sbatch files, server up in 160 s). **Smoke read-offs, in the registered order:** wall **75m35s = 1.43× the 32B's 53 min ⇒ ≈39–53 h/combo**, ~2× under the 96 h cap ⇒ **the full 4-combo matrix FITS and the `N_RUN=0` scope-down is NOT triggered** (≈6.6–8.8 days total, since TP=2 under the 3-GPU cap forces strict sequencing); **truncation counters ALL ZERO** ⇒ matched-8k default stands, and (paper consequence) budget-bound deliberation is an **R1-distill** property, not a reasoning-model one — qwen3 is parse-clean at 7B/32B/235B; scores sane at n=1–4 (instrument check, never quotable). Numbers: experiment_log 2026-08-09; decision: decision_log 2026-08-09. **⚠️ Do NOT wipe the vLLM compile cache before the matrix** (smoke populated a good graph for this exact serve config). **NEXT: `bash cluster/sharanga_submit_235b.sh matrix`** | user (runs it) + `benchmark-operator` (sizing/fold-in) | ~~Smoke passes with truncation ≈ 0 and wall time implying ≤96 h/combo~~ **MET**; remaining: on retrieval re-run `stats_rigor.py` (auto-discovers the new model) then fold into experiment_log/findings/tables, keeping run-level in the `N_RUN=5` floor-estimate tier (never blended with n=20) |
+| 5 | ~~Complete qwen3-32b non-synergy dimensions~~ — **✅ DONE 2026-08-07; full four-dimension matrix retrieved, audited, and folded in.** | complete | See experiment log 2026-08-07 |
 | 5b | ~~**Run the parse probe** and fold the truncation-vs-malformed answer into findings + the paper's DeepSeek framing~~ — **✅ DONE 2026-07-13.** Four cells ran (deepseek-7b IC + 14b Silent, both formats): **`parse_fail_truncated/parse_fail_n` = 1.0 in every cell** ⇒ verdict = **budget-bound deliberation** (models exhaust the 8k budget mid-`<think>`; zero malformed-but-complete outputs). Folded into experiment_log (2026-07-13), findings (probe section + finding-2 supersession), draft.md (finding 3 mechanism + §5.4), report_matrix.html. Probe caveats recorded (seed 42 only, combat n=3); diagnostic cells kept OUT of matrix tables. The **"invalid-action errors"** reporting rule for the matrix metric remains in force | done | Met: answer recorded as budget-bound with n/seed caveat; no diagnostic scores in matrix tables |
 | 6 | **Paper assembly** for a D&B-track submission; citations need venue/year completion. ~~**Scope added 2026-07-12 (found during P2): full draft-refresh pass**~~ — **✅ REFRESH SUBTASK DONE 2026-07-12** (draft.md: new matrix-accurate Abstract + superseded-claims box, "contributes" numbers updated, §4–5 results-summary skeleton added with the run-as-collapse-floor framing + horizon-figure caption language ("0 = non-planning floor"; combat = `win×min(1,hp)` so greedy ≈ 1.0), venue ladder + gaps re-ranked — no stale pilot claims remain). **Also delivered: `docs/report_matrix.html`** — standalone professor-facing results report (both horizon-collapse PNGs base64-embedded, full matrix tables, 5 findings, honest caveats, M3b ask; supersedes the pilot `docs/report.html`). **REMAINING P6 scope:** full paper assembly (Sections 1, 3–6 prose from the draft.md skeleton) + BibTeX completion — best done after P4/M3b lands. **Scope extended 2026-07-14 (review-driven, decision_log + `docs/review_2026-07-14.md` §2.3):** (a) explicit oracle-quality limitations taxonomy (turn exact → combat greedy → synergy expert → run baseline); (b) three named rebuttal arguments — difficulty≠horizon (dissociation pattern: deepseek-7b execution collapse vs matrix-2nd synergy removal, qwen3-32b bends only at synergy), run collapse ≠ context accumulation (memoryless harness, bounded prompts), budget-bound deliberation as mechanism (promote from footnote to first-class finding); (c) claim-scoping pass — every general claim reads "in this benchmark" until M3b/second-domain evidence; (d) explicit memory/tools scope-out defense (floor vs ceiling); (e) positioning vs FDG-2024/Orak LEADS the paper (the review estimates 45% of reviewers open with "already done") | Opus 4.8 (writing) + Sonnet (formatting/BibTeX mechanics) | Novelty framing follows `novelty_and_related_work.md` + §5.4 honesty rules; no stale pilot claims survive the refresh; all five 2026-07-14 scope items present; P4b numbers used wherever stats are cited |
+
+**2026-08-16 ownership supersession:** historical Opus/Sonnet labels in completed rows
+record who performed that work. For remaining work, use the Codex roles in §10:
+`paper-writer` owns judgment-bearing paper work and `docs-formatter` handles only exact
+mechanical formatting or transcription.
 
 ## 7. Risks & failure modes
 
@@ -232,7 +238,7 @@ chain-of-thought — is only catchable by smoke).
    is written down first.
 4. Security scan of the diff: no IP, no keys, no SOP contents, `.env` untouched.
 5. Docs updated in the same change: decision_log (why), experiment_log (if a run),
-   CLAUDE.md Active Context + tables (if numbers/status changed).
+   handoff/experiment/finding docs as applicable (if numbers or status changed).
 6. New behavior has a regression test; instrument changes have a degenerate-model check.
 
 ## 9. Technical debt & known limitations (accepted, documented)
@@ -240,7 +246,7 @@ chain-of-thought — is only catchable by smoke).
 - Documented design no-ops (intentional): Juzu Bracelet (event combats unimplemented),
   player REGENERATE (potions undrinkable by design), Mummified Hand permanence, string
   power keys ("Calm"/"enrage").
-- No pytest, no CI/CD — tests are three directly-run files. Fine at this scale; add
+- No pytest, no CI/CD — tests are four directly-run files. Fine at this scale; add
   GitHub Actions only if contributors appear (mind the public repo + no secrets).
 - Run-level dimension doesn't discriminate between current models (floor effect) — this
   is a *finding* to be framed, and P3's decision point.
@@ -250,23 +256,21 @@ chain-of-thought — is only catchable by smoke).
 
 ## 10. Delegation & the agent roster
 
-**Model policy (permanent, also recorded at user level in `~/.claude/CLAUDE.md`):**
-all reasoning-bearing work — architecture, research, debugging, security, performance,
-review, planning, integration, non-trivial implementation — goes to **Opus 4.8**
-(`model: opus`). **Sonnet** only for mechanical work: formatting, table transcription,
-BibTeX cleanup, boilerplate moves. Target allocation ≈ 90–95% Opus / 5–10% Sonnet.
-Never assign judgment work to Sonnet.
+**Capability policy (migrated 2026-08-16):** use a high-reasoning engineering agent for
+architecture, research, debugging, security, performance, review, planning, integration,
+and non-trivial implementation. Use the fast `docs-formatter` only for bounded mechanical
+formatting, exact transcription, BibTeX cleanup, and verbatim moves.
 
-Roster (`.claude/agents/` — committed with the repo, so it travels with the project):
+Roster (`.codex/agents/` — project-scoped Codex agents):
 
-| Agent | Model | Mission |
-|---|---|---|
-| `principal-engineer` | opus | Successor lead; owns decisions, plans, integration; enforces §5 + §8 |
-| `engine-auditor` | opus | Adversarial audits of engine/harness fidelity (the 5-audit tradition) |
-| `benchmark-operator` | opus | Runs/cluster ops: sbatch, smoke-first sizing, result retrieval + fold-in |
-| `security-reviewer` | opus | Public-repo hygiene: diff/history scans for keys, IPs, SOP content |
-| `paper-writer` | opus | draft.md, novelty framing, honesty rules (§5.4) |
-| `docs-formatter` | sonnet | Mechanical doc/table/BibTeX formatting only; escalates anything judgment-shaped |
+| Agent | Mission |
+|---|---|
+| `principal-engineer` | Successor lead; owns decisions, plans, integration; enforces §5 + §8 |
+| `engine-auditor` | Adversarial audits of engine/harness fidelity (the 5-audit tradition) |
+| `benchmark-operator` | Runs/cluster ops: sbatch, smoke-first sizing, result retrieval + fold-in |
+| `security-reviewer` | Public-repo hygiene: diff/history scans for keys, IPs, SOP content |
+| `paper-writer` | draft.md, novelty framing, honesty rules (§5.4) |
+| `docs-formatter` | Mechanical doc/table/BibTeX formatting only; escalates judgment-shaped work |
 
 This roster is right-sized on purpose: the classic org chart (frontend, infra, platform,
 release teams…) maps to nothing here — a Python research CLI has no frontend, no deploys,
