@@ -1,5 +1,30 @@
 # Findings
 
+## ⚠️ Qwen3-235B PRELIMINARY THREE-CELL NOTE (2026-08-21) — QUARANTINED FROM PAPER CLAIMS
+
+Three of four Qwen3-235B cells have been retrieved and given a preliminary artifact audit;
+Silent/raw and the Slurm stdout are still missing. The full provenance and values are in the
+latest `docs/experiment_log.md` entry. **Do not cite this section, update headline model counts,
+or regenerate paper tables/figures from it until the fourth cell and the registered statistics
+pass land.**
+
+The provisional result is scientifically useful because it rejects a simplistic “larger models
+plan farther” account. Relative to seed-matched Qwen3-32B, 235B card-pick accuracy increases by
+0.110–0.280 across all three landed cells and improves in 14/15 seed pairs. Yet removal accuracy
+falls by 0.050–0.154 in all three cells, turn/combat are already saturated, and run floors remain
+on the exact `N_RUN=5` matched greedy floor. The candidate paper claim is therefore:
+
+> In this benchmark, greater within-family capacity selectively improves some planning
+> operations rather than uniformly extending the horizon at which planning succeeds.
+
+This also reveals useful structure *within* the synergy horizon: recognizing an archetype,
+choosing an addition, and pruning a deck do not scale as one ability. The comparison is not a
+pure parameter-scaling law—Qwen3-235B-A22B-FP8 is a 22B-active MoE and Qwen3-32B is dense—and
+the claim remains provisional until Silent/raw determines whether it holds across both formats
+and characters.
+
+---
+
 ## 📊 P4b STATISTICAL RIGOR PASS (2026-08-07, zero GPU) — CIs, effect sizes, paired tests, variance decomposition
 
 Full tables: `docs/stats_report.md` (committed) + experiment_log 2026-08-07 (later); method

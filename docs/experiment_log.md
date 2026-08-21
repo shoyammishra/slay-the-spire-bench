@@ -1,5 +1,65 @@
 # Experiment Log
 
+## 2026-08-21 — ⚠️ Qwen3-235B three-cell retrieval audited; paper signal is selective, matrix still incomplete
+
+**Status: preliminary and not citation-ready.** The laptop now holds the five per-seed JSON
+files plus aggregate for Ironclad structured, Ironclad raw, and Silent structured. Silent/raw
+is still absent. Four server logs were retrieved as `vllm_combo_267035.log` through
+`vllm_combo_267038.log`; the corresponding Slurm `slay_combo_*.out` files were not retrieved.
+
+### Provenance and completion audit
+
+- Jobs 267035–267037 contain 4,101 / 3,874 / 5,438 successful HTTP 200 completions,
+  respectively, no HTTP or engine errors, and a normal shutdown sequence. Their result cells
+  each contain seeds 42/1042/2042/3042/4042 with n=20 turn, combat, and synergy samples plus
+  `N_RUN=5` per seed.
+- Job 267038's retrieved log is only a startup/live snapshot: two successful requests and no
+  shutdown. It proves that the validated TP=2 server started, not that the job or any benchmark
+  phase completed. No Silent/raw JSON is present.
+- The full matrix therefore remains 3/4 complete. Do not rerun the four-cell launcher and do
+  not fold these scores into the paper tables before the recovery procedure in the 2026-08-21
+  decision entry is complete.
+
+### Preliminary three-cell scores and Qwen3-32B deltas
+
+| Character / format | Turn | Combat win / HP ratio | Synergy archetype / pick / removal | Run floors / progress |
+|---|---:|---:|---:|---:|
+| Ironclad structured | .964 | 1.00 / 1.083 | .70 / .79 / .18 | 12.60 / .788 |
+| Ironclad raw | .977 | .99 / 1.032 | .68 / .67 / .12 | 12.00 / .750 |
+| Silent structured | .979 | 1.00 / 1.044 | .80 / .65 / .48 | 11.44 / .715 |
+
+Against seed-matched Qwen3-32B, card-pick accuracy changes by **+.256 / +.110 / +.280**
+in the three rows above and improves in **14 of 15 seed pairs**. Archetype changes by
++.094 / +.170 / +.010. Removal moves in the opposite direction in every landed cell:
+**−.154 / −.070 / −.050**. Turn changes are only +.004 / +.043 / −.021, with 91–97 of
+100 samples per cell already at damage ratio 1.0; the short-horizon instrument is saturated
+for this comparison. Combat win is also saturated at .99–1.00.
+
+Run-level remains at the registered floor-estimate tier. Against the exact `N_RUN=5`
+run-seed-matched greedy anchors, floors are 12.60 vs 12.76 (Ironclad structured), 12.00 vs
+12.76 (Ironclad raw), and 11.44 vs 11.32 (Silent structured). These are descriptive, small-n
+floor comparisons, not evidence that 235B beats or loses to greedy.
+
+### Instrument audit and interpretation boundary
+
+- Turn and combat sample records are non-duplicated across all 100 samples in each landed
+  cell. Synergy offer positions remain balanced (expert positions 34/33/33; model selections
+  range 29–40 per position), clearing the constant-position degenerate strategy.
+- The smoke's zero-truncation read-off does **not** generalize literally to the full matrix.
+  Combat records contain 17 / 47 / 12 truncation events and 2 / 14 / 1 valid-JSON illegal
+  actions in Ironclad structured / Ironclad raw / Silent structured; turn adds two truncations
+  total. All server requests still returned HTTP 200. The raw Ironclad cell is less
+  output-stable, so parse/truncation caveats must travel with its scores.
+- HP ratios above 1 are model HP divided by the greedy reference HP and can reflect better play;
+  the per-sample distribution is varied rather than the old identical-play Burning Blood
+  asymmetry. They remain subject to the final full-matrix boundary audit.
+
+**Paper implication to test after cell 4:** within the Qwen3 family, greater total capacity
+appears to improve particular deck-building operations—most clearly choosing additions—without
+uniformly improving card removal or unscaffolded run survival. This is a selective-capability
+claim, not “larger models plan farther.” Architecture is a confound: 235B is an FP8 MoE with
+22B active parameters while 32B is dense.
+
 ## 2026-08-21 — ▶ Qwen3-235B matrix recovery ACTIVE; 3/4 cells landed, Silent/raw running as job 267038
 
 **Status: in progress; not yet audited or reportable.** Remote artifact inventory shows

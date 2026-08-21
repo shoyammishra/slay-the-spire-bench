@@ -8,11 +8,13 @@ Ironclad and Silent, with Acts 1–3 implemented. The CLI entry point is
 `run_benchmark.py`; the implementation is under `slay_bench/`.
 
 The immediate research milestone is completing and retrieving the
-Qwen3-235B-A22B-FP8 full matrix. The smoke passed on 2026-08-09 and three of four
-matrix cells have aggregate artifacts on Sharanga. The remaining Silent/raw job
-`267038` is running after its stale four-day request was reduced to `23:59:00`; the
-partition's current `MaxTime` is one day. Do not rerun the four-cell launcher: preserve
-completed cells and split only unfinished Silent/raw work after this pass. Cluster
+Qwen3-235B-A22B-FP8 full matrix. The smoke passed on 2026-08-09; three of four matrix
+cells and all four vLLM logs have been pulled to the laptop. Ironclad structured/raw
+and Silent structured passed a preliminary artifact audit, but Silent/raw still has no
+result file. The retrieved job-267038 server log is only a live startup snapshot (two
+successful requests, no shutdown), and the four Slurm `slay_combo_*.out` logs were not
+retrieved. Do not rerun the four-cell launcher: preserve completed cells and split only
+unfinished Silent/raw work after its final state is known. Cluster
 submission and other paid/limited compute remain user-authorized operations. Before
 acting on project status, read the newest entries in `docs/handoff.md`,
 `docs/decision_log.md`, and `docs/experiment_log.md` because this summary can age.

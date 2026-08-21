@@ -198,6 +198,16 @@ chain-of-thought — is only catchable by smoke).
 
 ## 6. Backlog (priority order, with owners)
 
+**2026-08-21 P4c status supersession:** the laptop now has the three complete result cells
+(Ironclad structured/raw and Silent structured) and all four vLLM logs. Jobs 267035–267037
+served without HTTP/engine errors and shut down normally. The retrieved job-267038 log is only
+a live startup snapshot (two successful requests, no shutdown), Silent/raw remains absent, and
+the four Slurm `slay_combo_*.out` logs were not retrieved. A preliminary three-cell audit found
+the paper-relevant candidate signal—235B improves card picking over Qwen3-32B in 14/15 seed
+pairs but not removal or run floors—but it is quarantined from the draft/tables until the fourth
+cell and `stats_rigor.py` land. This paragraph supersedes the “job 267038 is running” wording in
+the historical P4c row below; its current state is unknown from the retrieved snapshot.
+
 | P | Task | Owner | Acceptance criteria |
 |---|---|---|---|
 | 1 | ~~**Horizon-collapse curve + cross-horizon normalization** in `visualize.py`~~ — **✅ DONE 2026-07-12** (Opus 4.8 agent; reviewed against §8, all criteria met). Formulas in decision_log 2026-07-12; PNGs in `results/horizon_collapse_*.png`; note the combat-baseline deviation (greedy ≈1.0, y-axis = "0 = non-planning floor") — caption implication for P6. **Anchor correction (same day, user-caught):** run anchor is now MEASURED per character (`scripts/greedy_baseline.py` → `results/greedy_baseline_*.json`; IC .780 ≈ the old note, Silent .704 lower); Silent run edge was partly an anchor artifact (structured lifts to ≤.13, raw mistral/qwen genuinely floored); 134 tests | done | Met: normalization documented; one line per model; renders from the 24 aggregates; 133 tests pass; both caveats addressed |

@@ -1,5 +1,35 @@
 # Decision Log
 
+## 2026-08-21 — Quarantine the three-cell 235B analysis until Silent/raw completes
+
+**Problem.** The laptop now has complete five-seed artifacts for three Qwen3-235B
+character×format cells and vLLM logs for all four original matrix jobs, but no Silent/raw
+result artifact and no Slurm `slay_combo_*.out` logs. The three landed cells already show a
+paper-relevant dissociation relative to Qwen3-32B: card-pick accuracy rises by 0.110–0.280,
+while removal falls by 0.050–0.154 and matched run floors do not improve. Folding these values
+into the draft now would mix a three-cell exploratory comparison with complete-matrix claims
+and would prevent a balanced format analysis.
+
+**Options considered.** (a) update the abstract, paper tables, horizon figures, and statistical
+report immediately; (b) ignore the retrieved evidence until the fourth cell exists; (c) record
+the provenance, audit, and provisional interpretation in the experiment log and findings, but
+quarantine it from the draft and headline tables until Silent/raw and the registered statistics
+pass land.
+
+**Decision: (c).** The three-cell evidence is durable project knowledge and should not live
+only in chat, so it is recorded as explicitly preliminary. It is not citation-ready and does
+not change the current abstract, matrix tables, horizon-collapse figures, or published counts.
+After Silent/raw completes: retrieve the Slurm stdout and final server log, run the full
+per-sample audit, rerun `scripts/stats_rigor.py`, and replace the preliminary section with a
+four-cell finding.
+
+**Trade-offs, limitations, and reversal path.** This delays a promising scale-selectivity claim
+but prevents asymmetric reporting. The 235B checkpoint is an FP8 MoE with 22B active parameters,
+whereas Qwen3-32B is dense, so the eventual wording must be “within-family capacity comparison,”
+not a pure parameter-scaling law. This is a documentation-only decision: no prompt, fixture,
+score, seed, output, or prior result is invalidated. Completion of the fourth cell automatically
+triggers reconsideration and final fold-in.
+
 ## 2026-08-21 — Recover the 235B matrix by cell/phase under Sharanga's new 24-hour cap
 
 **Problem.** The four-cell Qwen3-235B matrix was submitted when `gpu_h200_8` allowed a
