@@ -1,5 +1,29 @@
 # Experiment Log
 
+## 2026-08-21 — ▶ Qwen3-235B matrix recovery ACTIVE; 3/4 cells landed, Silent/raw running as job 267038
+
+**Status: in progress; not yet audited or reportable.** Remote artifact inventory shows
+complete five-seed aggregates for Ironclad structured, Ironclad raw, and Silent
+structured. Silent/raw has no files yet. Its queued job `267038`
+(`slay235_si_raw`, stdout `slay_combo_267038.out`) was blocked as
+`PENDING (PartitionTimeLimit)`: requested `4-00:00:00`, while `gpu_h200_8` now reports
+`MaxTime=1-00:00:00`.
+
+The user updated job `267038` in place to `23:59:00`; it is now running with the original
+validated TP=2 235B environment. This preserves the three landed cells and avoids
+resubmitting the four-cell launcher. Because the registered per-cell estimate is 39–53
+hours, this pass may be partial. The combo script saves each completed dimension and
+each completed seed, so after the job exits the next action is to inspect
+`slay_combo_267038.out` plus `results/qwen3-235b-a22b-fp8_silent_raw*`, then submit only
+the unfinished Silent/raw phases/seeds in jobs below the current 24-hour cap.
+
+**Remote artifacts observed (not yet copied or audited):** five per-seed files and one
+aggregate each for the other three character×format cells. No scores are folded into
+findings from this inventory alone. Completion still requires: finish Silent/raw; pull
+all result and Slurm/vLLM logs to the laptop; verify completion and parse/truncation
+counters per sample; rerun `scripts/stats_rigor.py`; then update findings, tables, and
+handoff with the `N_RUN=5` floor-estimate caveat.
+
 ## 2026-08-09 — ✅ Qwen3-235B-A22B-FP8 SMOKE PASSED (job 266749) — all three read-offs answered; matrix sized and FEASIBLE
 
 **Status: the rung is GO.** First complete measurement of this model. Batch job, the config

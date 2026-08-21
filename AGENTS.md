@@ -7,12 +7,15 @@ Spire. It evaluates planning at four horizons—turn, combat, synergy, and run�
 Ironclad and Silent, with Acts 1–3 implemented. The CLI entry point is
 `run_benchmark.py`; the implementation is under `slay_bench/`.
 
-The immediate research milestone is the Qwen3-235B-A22B-FP8 full matrix. Its smoke
-test passed on 2026-08-09; the matrix has not been submitted. The registered command
-is `bash cluster/sharanga_submit_235b.sh matrix`, but cluster submission and other
-paid/limited compute remain user-authorized operations. Before acting on project
-status, read the newest entries in `docs/handoff.md`, `docs/decision_log.md`, and
-`docs/experiment_log.md` because this summary can age.
+The immediate research milestone is completing and retrieving the
+Qwen3-235B-A22B-FP8 full matrix. The smoke passed on 2026-08-09 and three of four
+matrix cells have aggregate artifacts on Sharanga. The remaining Silent/raw job
+`267038` is running after its stale four-day request was reduced to `23:59:00`; the
+partition's current `MaxTime` is one day. Do not rerun the four-cell launcher: preserve
+completed cells and split only unfinished Silent/raw work after this pass. Cluster
+submission and other paid/limited compute remain user-authorized operations. Before
+acting on project status, read the newest entries in `docs/handoff.md`,
+`docs/decision_log.md`, and `docs/experiment_log.md` because this summary can age.
 
 ## Read-first routing
 

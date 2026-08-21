@@ -1,5 +1,34 @@
 # Decision Log
 
+## 2026-08-21 — Recover the 235B matrix by cell/phase under Sharanga's new 24-hour cap
+
+**Problem.** The four-cell Qwen3-235B matrix was submitted when `gpu_h200_8` allowed a
+four-day job. By retrieval time, Ironclad structured, Ironclad raw, and Silent structured
+had each produced five per-seed files plus an aggregate, but the final Silent/raw job
+`267038` remained `PENDING (PartitionTimeLimit)`: it requested `4-00:00:00` while the
+partition now reports `MaxTime=1-00:00:00`. The registered smoke estimate is 39–53 hours
+per cell, so merely changing the request to one day cannot guarantee completion.
+
+**Options considered.** (a) rerun the original four-cell launcher; (b) cancel everything
+and scope the matrix down; (c) preserve the three landed cells, make the existing
+Silent/raw job eligible at `23:59:00`, then inspect its per-dimension/per-seed saves and
+submit only the unfinished work in additional sub-day jobs.
+
+**Decision: (c).** Job `267038` was updated in place, retaining its exact validated model
+and serving environment, and is now running. After it stops, use
+`slay_combo_267038.out` and the Silent/raw result files to determine the remaining phase
+and seeds. Do not invoke `sharanga_submit_235b.sh matrix` again: its four submissions
+would recompute completed cells. Any follow-up must target only missing Silent/raw work
+and use an explicit time below the current partition maximum.
+
+**Trade-offs and limitations.** The first 24-hour pass may end during a Python phase.
+Completed dimensions and completed per-seed files persist, but a phase-level aggregate
+is written only after that phase processes all five seeds. A narrowly split follow-up is
+therefore required before the cell can be called complete. This operational recovery
+does not change prompts, scoring, seeds, token budget, serving configuration, or sample
+counts, so landed measurements remain comparable. The matrix remains incomplete and no
+235B result is reportable until retrieval and the registered per-sample audit pass.
+
 ## 2026-08-16 — Codex is the sole active agent system
 
 **Problem.** The repository's accumulated operating knowledge lived in a 120 KB
