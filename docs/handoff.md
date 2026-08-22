@@ -198,15 +198,15 @@ chain-of-thought — is only catchable by smoke).
 
 ## 6. Backlog (priority order, with owners)
 
-**2026-08-21 P4c status supersession:** the laptop now has the three complete result cells
-(Ironclad structured/raw and Silent structured) and all four vLLM logs. Jobs 267035–267037
-served without HTTP/engine errors and shut down normally. The retrieved job-267038 log is only
-a live startup snapshot (two successful requests, no shutdown), Silent/raw remains absent, and
-the four Slurm `slay_combo_*.out` logs were not retrieved. A preliminary three-cell audit found
-the paper-relevant candidate signal—235B improves card picking over Qwen3-32B in 14/15 seed
-pairs but not removal or run floors—but it is quarantined from the draft/tables until the fourth
-cell and `stats_rigor.py` land. This paragraph supersedes the “job 267038 is running” wording in
-the historical P4c row below; its current state is unknown from the retrieved snapshot.
+**2026-08-22 P4c status supersession:** job 267038's final stdout and partial artifacts are
+now on the laptop. It wall-killed at the 24-hour partition maximum after completing
+turn+combat for four seeds; seed 4042 stopped at combat 11/20, and synergy/run never started.
+The combo script now has default-preserving phase/seed resume controls. Submit three sequential
+`afterok` jobs only: A = seed-4042 turn/combat + all synergy, B = first three run seeds, C =
+last two run seeds. TP=2 jobs cannot run concurrently under the three-GPU cap. This supersedes
+both the “running” historical row and the 2026-08-21 unknown-state paragraph. The preliminary
+three-cell paper signal remains quarantined until Silent/raw, canonical aggregation, audit, and
+`stats_rigor.py` are complete.
 
 | P | Task | Owner | Acceptance criteria |
 |---|---|---|---|

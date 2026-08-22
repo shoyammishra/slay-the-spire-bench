@@ -1,5 +1,35 @@
 # Decision Log
 
+## 2026-08-22 — Split Silent/raw recovery by phase and seed under the 24-hour cap
+
+**Problem.** Job `267038` was wall-killed after `23:59:00`. Its retrieved stdout and
+JSONs prove that turn+combat completed for seeds `42`, `1042`, `2042`, and `3042`, then
+the allocation ended during combat sample 11/20 for seed `4042`. Synergy and run-level
+never started. The H200 partition still reports `MaxTime=1-00:00:00`; the final cell
+cannot fit as one validated full-combo job, and rerunning landed seeds would waste scarce
+TP=2 compute.
+
+**Options considered.** (a) rerun the fixed full-combo script repeatedly and rely on
+partial overwrites; (b) create three near-duplicate one-off sbatch files; (c) add default-
+preserving phase and seed selectors to the validated combo script, then submit a strict
+`afterok` recovery chain.
+
+**Decision: (c).** `sharanga_matrix_combo.sbatch` now accepts `PHASES` plus
+`TC_SEEDS`, `SYNERGY_SEEDS`, and `RUN_SEEDS`. Defaults remain the original three phases
+and five spaced seeds. Recovery is: A = seed-4042 turn+combat plus all-five synergy;
+B = run seeds `42 1042 2042`; C = run seeds `3042 4042`. All request `23:59:00`, 2×
+H200, TP=2, and use `afterok` dependencies A→B→C. They cannot run concurrently under
+the three-GPU per-user cap, and the dependency chain also prevents later spending after
+an upstream failure.
+
+**Trade-offs, validation, and reversal.** Subset invocations write subset aggregate
+filenames, while per-seed JSON merge behavior preserves completed dimensions. After all
+five per-seed files are complete, regenerate the canonical five-seed aggregate before
+statistics/fold-in. Bash syntax passes under Git for Windows; no API/GPU test was run
+locally. This is orchestration-only: prompts, scoring, serving flags, seeds, sample counts,
+and existing results are unchanged. Remove the selectors and conditional phase blocks to
+return to the fixed full-combo script; default behavior already remains equivalent.
+
 ## 2026-08-21 — Quarantine the three-cell 235B analysis until Silent/raw completes
 
 **Problem.** The laptop now has complete five-seed artifacts for three Qwen3-235B

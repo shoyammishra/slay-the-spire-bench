@@ -114,6 +114,39 @@ fi
 # make run-level the expensive tail (qwen3-32b ≈30–40 min/run → n=20 ≈50–67 h/combo);
 # set N_RUN=5 for a cheaper floor estimate, or N_RUN=0 to skip run-level entirely.
 N_RUN=${N_RUN:-20}
+# Resume controls. Defaults preserve the original full-combo behavior.
+PHASES=${PHASES:-turn_combat,synergy,run}
+TC_SEEDS=${TC_SEEDS:-42 1042 2042 3042 4042}
+SYNERGY_SEEDS=${SYNERGY_SEEDS:-42 1042 2042 3042 4042}
+RUN_SEEDS=${RUN_SEEDS:-42 1042 2042 3042 4042}
+
+has_phase() {
+  case ",$PHASES," in
+    *",$1,"*) return 0 ;;
+    *) return 1 ;;
+  esac
+}
+
+validate_seeds() {
+  local label=$1 seeds=$2 seed
+  if [ -z "$seeds" ]; then
+    echo "ERROR: $label is empty. Set a space-separated seed list."
+    exit 2
+  fi
+  for seed in $seeds; do
+    case "$seed" in
+      ''|*[!0-9]*) echo "ERROR: invalid $label seed: $seed"; exit 2 ;;
+    esac
+  done
+}
+
+case ",$PHASES," in
+  *,turn_combat,*|*,synergy,*|*,run,*) ;;
+  *) echo "ERROR: PHASES must include turn_combat, synergy, and/or run"; exit 2 ;;
+esac
+has_phase turn_combat && validate_seeds TC_SEEDS "$TC_SEEDS"
+has_phase synergy && validate_seeds SYNERGY_SEEDS "$SYNERGY_SEEDS"
+has_phase run && validate_seeds RUN_SEEDS "$RUN_SEEDS"
 # Unique port per job: Slurm can co-schedule several single-GPU jobs onto one
 # 8-GPU H200 node, so a hardcoded :8000 would let two concurrent combos collide.
 PORT=${PORT:-$(( 10000 + SLURM_JOB_ID % 40000 ))}
@@ -178,30 +211,40 @@ FAILED=0
 # Cheapest-first within the combo: turn+combat → synergy → run. Each is its own
 # python process that saves the merged JSON on completion, so a wall-kill during
 # the (longest) run dimension still leaves turn+combat+synergy on disk.
-echo "=== [$CHAR/$FMT] turn+combat (n=20, 5 seeds) ==="
-if ! python run_benchmark.py --provider local --base-url "$BASE" \
-    --model "$SERVED_NAME" --character "$CHAR" --format "$FMT" \
-    --only turn combat --n-turn 20 --n-combat 20 \
-    --seeds 42 1042 2042 3042 4042; then
-  echo "!!!! DIM FAILED (continuing): turn+combat $SERVED_NAME $CHAR $FMT !!!!"; FAILED=1
+if has_phase turn_combat; then
+  echo "=== [$CHAR/$FMT] turn+combat (n=20, seeds=$TC_SEEDS) ==="
+  if ! python run_benchmark.py --provider local --base-url "$BASE" \
+      --model "$SERVED_NAME" --character "$CHAR" --format "$FMT" \
+      --only turn combat --n-turn 20 --n-combat 20 \
+      --seeds $TC_SEEDS; then
+    echo "!!!! DIM FAILED (continuing): turn+combat $SERVED_NAME $CHAR $FMT !!!!"; FAILED=1
+  fi
+else
+  echo "=== [$CHAR/$FMT] turn+combat SKIPPED (PHASES=$PHASES) ==="
 fi
 
-echo "=== [$CHAR/$FMT] synergy (n=20, 5 seeds) ==="
-if ! python run_benchmark.py --provider local --base-url "$BASE" \
-    --model "$SERVED_NAME" --character "$CHAR" --format "$FMT" \
-    --only synergy --n-synergy 20 \
-    --seeds 42 1042 2042 3042 4042; then
-  echo "!!!! DIM FAILED (continuing): synergy $SERVED_NAME $CHAR $FMT !!!!"; FAILED=1
+if has_phase synergy; then
+  echo "=== [$CHAR/$FMT] synergy (n=20, seeds=$SYNERGY_SEEDS) ==="
+  if ! python run_benchmark.py --provider local --base-url "$BASE" \
+      --model "$SERVED_NAME" --character "$CHAR" --format "$FMT" \
+      --only synergy --n-synergy 20 \
+      --seeds $SYNERGY_SEEDS; then
+    echo "!!!! DIM FAILED (continuing): synergy $SERVED_NAME $CHAR $FMT !!!!"; FAILED=1
+  fi
+else
+  echo "=== [$CHAR/$FMT] synergy SKIPPED (PHASES=$PHASES) ==="
 fi
 
-if [ "$N_RUN" -gt 0 ]; then
-  echo "=== [$CHAR/$FMT] run-level (n=$N_RUN, 5 seeds) — longest, last ==="
+if has_phase run && [ "$N_RUN" -gt 0 ]; then
+  echo "=== [$CHAR/$FMT] run-level (n=$N_RUN, seeds=$RUN_SEEDS) — longest, last ==="
   if ! python run_benchmark.py --provider local --base-url "$BASE" \
       --model "$SERVED_NAME" --character "$CHAR" --format "$FMT" \
       --only run --n-run "$N_RUN" \
-      --seeds 42 1042 2042 3042 4042; then
+      --seeds $RUN_SEEDS; then
     echo "!!!! DIM FAILED (continuing): run-level $SERVED_NAME $CHAR $FMT !!!!"; FAILED=1
   fi
+elif ! has_phase run; then
+  echo "=== [$CHAR/$FMT] run-level SKIPPED (PHASES=$PHASES) ==="
 else
   echo "=== [$CHAR/$FMT] run-level SKIPPED (N_RUN=0) ==="
 fi
@@ -210,4 +253,4 @@ if [ "${FAILED}" -ne 0 ]; then
   echo "=== combo $SERVED_NAME $CHAR $FMT finished WITH FAILURES — grep 'DIM FAILED' above ==="
   exit 1
 fi
-echo "=== combo $SERVED_NAME $CHAR $FMT COMPLETE (all four dimensions) ==="
+echo "=== combo $SERVED_NAME $CHAR $FMT COMPLETE (phases=$PHASES) ==="

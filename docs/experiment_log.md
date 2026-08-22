@@ -1,5 +1,23 @@
 # Experiment Log
 
+## 2026-08-22 — ⏱ Qwen3-235B Silent/raw job 267038 wall-killed; partial results retrieved and recovery split registered
+
+**Status: incomplete but recoverable.** Job `267038` ran for the partition maximum and
+was cancelled at the time limit. The laptop now has its Slurm stdout, vLLM log, and four
+per-seed JSONs. Direct JSON inspection confirms:
+
+- seeds `42`, `1042`, `2042`, `3042`: turn and combat present; synergy and run absent;
+- seed `4042`: no JSON; stdout ends during combat sample 11/20 after completing all 20
+  turn samples and the first 10 combat samples;
+- no Silent/raw aggregate exists, and neither synergy nor run-level started.
+
+The recovery instrument is `cluster/sharanga_matrix_combo.sbatch` with new
+default-preserving phase/seed selectors. Registered chain: A reruns turn+combat only for
+`4042` and synergy for all five seeds; B runs `N_RUN=5` for `42 1042 2042`; C runs it
+for `3042 4042`. Each requests 2× H200 for `23:59:00`, and B/C use `afterok`
+dependencies. No recovery job has been submitted as part of this repository change;
+cluster compute remains user-authorized.
+
 ## 2026-08-21 — ⚠️ Qwen3-235B three-cell retrieval audited; paper signal is selective, matrix still incomplete
 
 **Status: preliminary and not citation-ready.** The laptop now holds the five per-seed JSON
