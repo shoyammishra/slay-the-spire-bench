@@ -9,8 +9,11 @@ complete.
 from __future__ import annotations
 
 import copy
-from dataclasses import asdict, dataclass
-from typing import Dict, Iterable, List, Optional, Tuple
+import hashlib
+import json
+from dataclasses import asdict, dataclass, fields, is_dataclass
+from enum import Enum
+from typing import Any, Dict, Iterable, List, Optional, Tuple
 
 from .enums import CardType
 from .prompt_builder import combat_state_raw, combat_state_structured, system_prompt
@@ -41,6 +44,8 @@ class HorizonOracleResult:
     worst_value: float
     optimal_actions: List[ControlledAction]
     action_values: Dict[str, float]
+    search_calls: int = 0
+    cache_hits: int = 0
 
 
 @dataclass
@@ -56,6 +61,162 @@ class HorizonModelScore:
     optimal_value: float
     regret: Optional[float]
     normalized_quality: Optional[float]
+
+
+@dataclass
+class ControlledFixture:
+    """Tamper-evident recipe for regenerating one frozen combat state.
+
+    Engine states contain callbacks and class instances that are unsafe to treat as
+    a long-lived JSON serialization contract.  A fixture therefore persists the
+    deterministic construction recipe plus a digest of the complete regenerated
+    state.  Loading fails closed if engine changes alter that state.
+    """
+
+    version: str
+    fixture_id: str
+    character: str
+    seed: int
+    enemy_ids: List[str]
+    deck_names: List[str]
+    player_hp: int
+    prefix_actions: List[ControlledAction]
+    state_digest: str
+
+    @classmethod
+    def from_dict(cls, payload: Dict[str, Any]) -> "ControlledFixture":
+        """Restore a fixture from its public JSON representation."""
+        values = dict(payload)
+        values["prefix_actions"] = [
+            action if isinstance(action, ControlledAction)
+            else ControlledAction(**action)
+            for action in values.get("prefix_actions", [])
+        ]
+        return cls(**values)
+
+
+def _canonical_value(value: Any, seen: Optional[set[int]] = None) -> Any:
+    """Convert engine state to stable JSON data for fixture integrity hashing."""
+    if seen is None:
+        seen = set()
+    if value is None or isinstance(value, (bool, int, float, str)):
+        return value
+    if isinstance(value, Enum):
+        return {"enum": f"{value.__class__.__module__}.{value.__class__.__qualname__}",
+                "value": value.value}
+    if callable(value):
+        fn = getattr(value, "__func__", value)
+        return {"callable": f"{getattr(fn, '__module__', '')}."
+                            f"{getattr(fn, '__qualname__', repr(fn))}"}
+    if isinstance(value, dict):
+        pairs = [(_canonical_value(k, seen), _canonical_value(v, seen))
+                 for k, v in value.items()]
+        return {"mapping": sorted(pairs, key=lambda pair: json.dumps(
+            pair[0], sort_keys=True, separators=(",", ":")))}
+    if isinstance(value, (list, tuple)):
+        return [_canonical_value(item, seen) for item in value]
+    if isinstance(value, set):
+        items = [_canonical_value(item, seen) for item in value]
+        return {"set": sorted(items, key=lambda item: json.dumps(
+            item, sort_keys=True, separators=(",", ":")))}
+
+    object_id = id(value)
+    if object_id in seen:
+        return {"cycle": f"{value.__class__.__module__}.{value.__class__.__qualname__}"}
+    seen.add(object_id)
+    try:
+        if is_dataclass(value):
+            attrs = {field.name: getattr(value, field.name) for field in fields(value)}
+            # Runtime attributes on enemies/cards are decision-relevant too.
+            attrs.update({k: v for k, v in vars(value).items() if k not in attrs})
+        elif hasattr(value, "__dict__"):
+            attrs = dict(vars(value))
+        else:
+            return repr(value)
+        # EventBus listeners are reconstructed by the recipe. Bound callbacks
+        # otherwise create cycles and encode process-specific object identities.
+        attrs.pop("bus", None)
+        attrs.pop("_listeners", None)
+        return {
+            "class": f"{value.__class__.__module__}.{value.__class__.__qualname__}",
+            "attrs": {key: _canonical_value(attrs[key], seen)
+                      for key in sorted(attrs)},
+        }
+    finally:
+        seen.remove(object_id)
+
+
+def state_digest(state) -> str:
+    """SHA-256 of all decision-relevant state, including hidden piles and RNG."""
+    payload = json.dumps(_canonical_value(state), sort_keys=True,
+                         separators=(",", ":"), ensure_ascii=True)
+    return hashlib.sha256(payload.encode("utf-8")).hexdigest()
+
+
+def create_fixture(character: str, seed: int, enemy_ids: Iterable[str],
+                   prefix_actions: Iterable[ControlledAction] = (),
+                   fixture_id: Optional[str] = None,
+                   deck_names: Optional[Iterable[str]] = None,
+                   player_hp: Optional[int] = None) -> Tuple[ControlledFixture, Any]:
+    """Build a fixture recipe and its frozen state without model involvement."""
+    from . import new_game, start_combat
+    from .cards import make_card_for
+    from .combat import is_combat_over
+    from .enemies import make_enemy
+
+    enemy_ids = list(enemy_ids)
+    state = new_game(seed, character)
+    if deck_names is not None:
+        state.player.deck = [make_card_for(character, name) for name in deck_names]
+    deck_names = [card.id for card in state.player.deck]
+    if player_hp is not None:
+        if not 1 <= player_hp <= state.player.max_hp:
+            raise ValueError("fixture player_hp must be within [1, max_hp]")
+        state.player.hp = player_hp
+    initial_player_hp = state.player.hp
+    enemies = [make_enemy(enemy_id, state.rng.hp_rng) for enemy_id in enemy_ids]
+    start_combat(state, enemies)
+    actions = [
+        action if isinstance(action, ControlledAction)
+        else ControlledAction(**action)
+        for action in prefix_actions
+    ]
+    for action in actions:
+        if is_combat_over(state):
+            raise ValueError("fixture prefix reaches a terminal combat early")
+        state = transition(state, action)
+    if is_combat_over(state):
+        raise ValueError("fixture state is terminal")
+    if fixture_id is None:
+        encounter = "-".join(enemy_ids).lower()
+        fixture_id = f"{character}-{seed}-{encounter}-{len(actions)}"
+    fixture = ControlledFixture(
+        version=CONTROLLED_HORIZON_VERSION,
+        fixture_id=fixture_id,
+        character=character,
+        seed=seed,
+        enemy_ids=enemy_ids,
+        deck_names=deck_names,
+        player_hp=initial_player_hp,
+        prefix_actions=actions,
+        state_digest=state_digest(state),
+    )
+    return fixture, state
+
+
+def load_fixture(fixture: ControlledFixture):
+    """Regenerate a fixture and reject version or state drift."""
+    if fixture.version != CONTROLLED_HORIZON_VERSION:
+        raise ValueError(f"unsupported fixture version {fixture.version!r}")
+    rebuilt, state = create_fixture(
+        fixture.character, fixture.seed, fixture.enemy_ids,
+        fixture.prefix_actions, fixture.fixture_id,
+        fixture.deck_names, fixture.player_hp)
+    if rebuilt.state_digest != fixture.state_digest:
+        raise ValueError(
+            f"fixture {fixture.fixture_id} state drift: "
+            f"expected {fixture.state_digest}, got {rebuilt.state_digest}")
+    return state
 
 
 def _action_key(action: ControlledAction) -> str:
@@ -116,7 +277,8 @@ def terminal_utility(state, initial_player_hp: int, initial_enemy_hp: int) -> fl
 
 
 def exact_action_values(state, horizon: int,
-                        node_budget: int = 2_000_000) -> HorizonOracleResult:
+                        node_budget: int = 2_000_000,
+                        memoize: bool = True) -> HorizonOracleResult:
     """Exhaustively value every first action for exactly ``horizon`` transitions.
 
     Search truncation is never reported as an oracle: exceeding ``node_budget``
@@ -129,17 +291,29 @@ def exact_action_values(state, horizon: int,
     initial_player_hp = state.player.hp
     initial_enemy_hp = sum(max(0, enemy.hp) for enemy in state.combat.enemies)
     nodes = 0
+    calls = 0
+    cache_hits = 0
+    cache: Dict[Tuple[int, str], float] = {}
 
     def value(node, depth: int) -> float:
-        nonlocal nodes
+        nonlocal nodes, calls, cache_hits
+        calls += 1
+        key = (depth, state_digest(node)) if memoize else None
+        if key is not None and key in cache:
+            cache_hits += 1
+            return cache[key]
         nodes += 1
         if nodes > node_budget:
             raise OracleBudgetExceeded(
                 f"controlled-horizon oracle exceeded {node_budget} nodes at H={horizon}")
         if depth == 0 or is_combat_over(node):
-            return terminal_utility(node, initial_player_hp, initial_enemy_hp)
-        return max(value(transition(node, action), depth - 1)
-                   for action in legal_actions(node))
+            result = terminal_utility(node, initial_player_hp, initial_enemy_hp)
+        else:
+            result = max(value(transition(node, action), depth - 1)
+                         for action in legal_actions(node))
+        if key is not None:
+            cache[key] = result
+        return result
 
     action_values = {
         _action_key(action): value(transition(state, action), horizon - 1)
@@ -160,6 +334,8 @@ def exact_action_values(state, horizon: int,
         worst_value=worst,
         optimal_actions=optimal,
         action_values=action_values,
+        search_calls=calls,
+        cache_hits=cache_hits,
     )
 
 

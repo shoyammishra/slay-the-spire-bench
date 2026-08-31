@@ -1,5 +1,57 @@
 # Experiment Log
 
+## 2026-08-31 — Controlled-H fixture/oracle pilot: exact but no treatment strength
+
+**No model, API, GPU, or cluster inference ran.** This was a compute-free main-track
+instrument-development pass. `scripts/controlled_horizon_pilot.py` now creates
+deterministic model-blind fixture recipes, regenerates each state through the engine,
+checks a SHA-256 digest over visible and hidden combat state, evaluates
+H={1,2,4,8}, and records the registered degenerate and H-mismatched baselines.
+`slay_bench/controlled_horizon.py` now supports those tamper-evident recipes.
+
+The first completed audit used one opening Cultist state per character with starter
+decks. Both fixtures remained exact under the 2,000,000-node ceiling. Before
+memoization, H=8 expanded 172,555 nodes in 87.40 s for Ironclad and 454,235 nodes in
+256.80 s for Silent; all four H values across both fixtures took 345.29 s. The local
+schema-2.0 artifacts are `results/controlled_h_pilot_2_fixtures.json` and
+`results/controlled_h_pilot_2_audit.json` (ignored by git, as intended).
+
+The scientific gate was a **STOP**:
+
+- 0/2 fixtures had disjoint H=1 and H=8 optimal first-action sets;
+- the conservative H=1-mismatched oracle retained quality 1.0 at H=8 in both states;
+- treatment strength was 0%, below the preregistered 20% minimum;
+- prompt normalization confirmed that only H changed, and both exact-oracle controls
+  remained at quality 1.0.
+
+This is evidence that repeated-card starter openings are a poor controlled-H fixture
+family, not evidence that models are horizon-insensitive. No model pilot is authorized
+from this result.
+
+A semantics-preserving transposition cache was then added to the exact oracle. On the
+same two H=8 states it reproduced best values 41 (Ironclad) and 33 (Silent), reducing
+Ironclad from 172,555 raw expansions / 87.40 s to 14,360 unique expansions, 7,394
+cache hits, and 18.98 s; Silent fell from 454,235 / 256.80 s to 59,342 unique
+expansions, 31,287 cache hits, and 86.05 s. A focused H=4 regression compares the
+memoized and full trees exactly. This improves sizing but does not cure missing
+treatment strength.
+
+An exploratory generator for varied ten-card decks, HP strata, turns 1–3, and
+single/multi-enemy encounters was implemented next. Its first two-fixture audit was
+stopped at the user's request before the first row completed; it produced no result
+and must not be treated as a failed or passed gate. The script currently writes its
+combined audit only at completion, so per-fixture checkpointing is required before
+resuming a longer pass. The exploratory generator is not the frozen preregistration
+or the final 200-fixture release.
+
+Verification after stopping: all four direct test files passed (**183/183**: benchmark
+58, combat 62, run 36, stats 27). Four no-API mock commands initially failed before
+sampling because nested `--out-dir` parents did not exist and the CLI uses non-recursive
+`mkdir`; after creating the common parent, the exact commands passed for Ironclad and
+Silent in structured and raw formats. Outputs are isolated under
+`results/controlled_h_verification/`. This did not exercise the interrupted rich-state
+H=8 pass; that remains explicitly pending.
+
 ## 2026-08-30 — Compute-free adversarial instrument audit and controlled-H smoke
 
 **No API, GPU, or cluster compute was used.** `scripts/instrument_diagnostics.py`

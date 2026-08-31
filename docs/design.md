@@ -6,6 +6,24 @@
 > policy. See `research_audit/CONSTRUCT_VALIDITY.md` and
 > `slay_bench/controlled_horizon.py` for the versioned same-state intervention.
 
+## Controlled-H fixture and oracle boundary
+
+`controlled-decision-horizon-v1` uses deterministic replay recipes rather than a
+second general-purpose `GameState` deserializer. A recipe records character, seed,
+enemy IDs, initial deck, initial HP, and the exact action prefix. Regeneration must
+match its SHA-256 digest over visible state, hidden piles, enemy runtime state, player
+runtime state, and all RNG streams. EventBus callback objects are excluded from the
+digest because `start_combat` reconstructs them; adding fixture-specific relic or
+listener topology requires a new cached-versus-full-tree audit.
+
+The exact oracle memoizes `(remaining depth, state digest)` cells. `nodes_expanded`
+therefore counts unique expanded cells; `search_calls` counts all recursive visits and
+`cache_hits` reports reused cells. Search still fails closed on the declared unique-node
+budget. `scripts/controlled_horizon_pilot.py` owns model-blind fixture generation,
+prompt/action invariance checks, oracle sizing, ties/spans, and degenerate/H-mismatched
+baseline gates. Its varied-deck generator is exploratory as of 2026-08-31 and is not a
+frozen preregistration or final fixture release.
+
 ## Architecture Overview
 
 ```

@@ -36,8 +36,8 @@ Official call: <https://ptaworkshop.github.io/call-for-papers.html>
 
 Heterogeneous decision tasks reveal operation-specific language-model competence;
 they do not identify a single planning horizon. In Slay-Bench, the clearest matched
-capacity gain is card selection, while an adversarial audit exposes shortcut labels
-and invalidates the former cross-task horizon interpretation.
+model-family comparison is a card-selection gain, while an adversarial audit exposes
+shortcut labels and invalidates the former cross-task horizon interpretation.
 
 Current title:
 
@@ -51,8 +51,8 @@ Current title:
 3. Seven-configuration profile with the Qwen3-235B/32B card-pick comparison.
 4. Shortcut audit: removal-v1 constant answer and synergy dictionary lookup.
 5. Consequence: retire cross-task scalars and horizon curves.
-6. Same-state controlled-H protocol as the next experiment, with model results
-   explicitly labeled **PENDING EXPERIMENT**.
+6. Same-state controlled-H protocol as an audit-derived methodological specification;
+   the text and caption explicitly claim no model-level horizon result.
 
 The workshop paper must not claim nested horizons, a general planning score,
 full-run autonomous control, simulator faithfulness, or controlled-H model evidence.

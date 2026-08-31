@@ -1139,7 +1139,8 @@ def test_controlled_horizon_holds_state_and_action_contract_fixed():
     before_hand = [c.name for c in state.combat.hand]
     h1 = exact_action_values(state, 1, node_budget=1000)
     assert h1.version == CONTROLLED_HORIZON_VERSION and h1.exact
-    assert h1.nodes_expanded == len(legal_actions(state))
+    assert h1.search_calls == len(legal_actions(state))
+    assert h1.nodes_expanded <= h1.search_calls  # equivalent duplicate cards cache
     assert [c.name for c in state.combat.hand] == before_hand  # oracle does not mutate
     assert h1.optimal_actions
 
@@ -1158,6 +1159,60 @@ def test_controlled_horizon_holds_state_and_action_contract_fixed():
     transition(state, best)
     assert [c.name for c in state.combat.hand] == before_hand
     print("[PASS] controlled-horizon v1 changes only H and uses an exact oracle")
+
+
+def test_controlled_horizon_fixture_recipe_is_deterministic_and_fails_on_drift():
+    """Released recipes reproduce hidden state, not only visible prompt bytes."""
+    from dataclasses import asdict, replace
+    from slay_bench.controlled_horizon import (
+        ControlledAction, ControlledFixture, create_fixture, load_fixture, state_digest)
+
+    fixture, state = create_fixture(
+        "ironclad", 42000, ("Cultist",),
+        (ControlledAction("end_turn"),), "fixture-integrity-smoke")
+    rebuilt = load_fixture(fixture)
+    assert state_digest(state) == fixture.state_digest == state_digest(rebuilt)
+    assert [card.name for card in state.combat.hand] == [
+        card.name for card in rebuilt.combat.hand]
+    assert [rng.seed for rng in vars(state.rng).values()] == [
+        rng.seed for rng in vars(rebuilt.rng).values()]
+    json_roundtrip = ControlledFixture.from_dict(json.loads(json.dumps(asdict(fixture))))
+    assert state_digest(load_fixture(json_roundtrip)) == fixture.state_digest
+
+    tampered = replace(fixture, state_digest="0" * 64)
+    try:
+        load_fixture(tampered)
+        assert False, "digest drift must fail closed"
+    except ValueError as exc:
+        assert "state drift" in str(exc)
+    print("[PASS] controlled-H fixture recipes are deterministic and tamper-evident")
+
+
+def test_controlled_horizon_pilot_generator_is_model_blind_and_deterministic():
+    from scripts.controlled_horizon_pilot import generate_fixtures
+
+    first = generate_fixtures(2)
+    second = generate_fixtures(2)
+    assert len(first) == len(second) == 4
+    assert [fixture.state_digest for fixture in first] == [
+        fixture.state_digest for fixture in second]
+    assert {fixture.character for fixture in first} == {"ironclad", "silent"}
+    assert all(fixture.version == "controlled-decision-horizon-v1"
+               for fixture in first)
+    print("[PASS] controlled-H pilot generator is deterministic and model-blind")
+
+
+def test_controlled_horizon_memoized_oracle_matches_full_tree():
+    from slay_bench.controlled_horizon import create_fixture, exact_action_values
+
+    _fixture, state = create_fixture("ironclad", 42000, ("Cultist",))
+    full = exact_action_values(state, 4, node_budget=5000, memoize=False)
+    memo = exact_action_values(state, 4, node_budget=5000, memoize=True)
+    assert memo.action_values == full.action_values
+    assert memo.optimal_actions == full.optimal_actions
+    assert memo.nodes_expanded <= full.nodes_expanded
+    assert memo.cache_hits > 0
+    print("[PASS] controlled-H memoized oracle matches the full search tree")
 
 
 def test_turn_oracle_persists_exactness_and_fails_closed_on_budget():
@@ -1255,6 +1310,9 @@ if __name__ == "__main__":
         test_invalid_cross_task_visuals_fail_closed,
         test_synergy_dictionary_shortcut_solves_all_fixed_fixtures,
         test_controlled_horizon_holds_state_and_action_contract_fixed,
+        test_controlled_horizon_fixture_recipe_is_deterministic_and_fails_on_drift,
+        test_controlled_horizon_pilot_generator_is_model_blind_and_deterministic,
+        test_controlled_horizon_memoized_oracle_matches_full_tree,
         test_turn_oracle_persists_exactness_and_fails_closed_on_budget,
         test_compute_free_turn_oracle_audit_reports_bounds,
     ]

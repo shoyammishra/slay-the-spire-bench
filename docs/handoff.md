@@ -17,14 +17,15 @@ Single source of truth stays where it already lives (see §2).
   non-archival PTA at NeurIPS 2026 workshop submission due **2026-09-05 AoE**, alongside
   an ICML 2027 main-track build centered on the controlled-H intervention. The
   workshop paper reports the existing operation profile and instrument audit; it must
-  label controlled-H model results PENDING EXPERIMENT. `docs/submission_plan.md` is the
+  state explicitly that it claims no controlled-H model result. `docs/submission_plan.md` is the
   authoritative schedule and gate list. If the workshop PDF is not review-clean by
   2026-09-04, fall back to an ICLR 2027 workshop rather than submit a rushed paper.
 
 - **PTA manuscript build (2026-08-31):** `paper/pta2026/` now contains the anonymized
   NeurIPS-2026 source, primary-source bibliography, reproducible native-unit operation
   profile, and controlled-H schematic. The compiled paper uses exactly four content
-  pages plus references and keeps all controlled-H model results PENDING EXPERIMENT.
+  pages plus references. Controlled-H is presented as an audit-derived protocol, with
+  the text and caption explicitly excluding model-level horizon evidence.
   The official PTA call says its submissions do not need the NeurIPS paper checklist,
   so the workshop build omits it. The release build passed claim/citation review,
   compilation, all-page visual QA, PDF metadata/anonymity checks, and a targeted
@@ -38,7 +39,14 @@ Single source of truth stays where it already lives (see §2).
 - **P0 implementation:** future result schema 2.0 records provenance and per-dimension
   merge sources; a compute-free dictionary policy solves 120/120 fixed synergy cases;
   `controlled-decision-horizon-v1` infrastructure is implemented and smoke-tested.
-  No model inference has run; all controlled-H results are PENDING EXPERIMENT.
+  No model inference has run; controlled-H remains instrument work, not model evidence.
+- **Controlled-H pilot update (2026-08-31):** a deterministic fixture-recipe and
+  exact-oracle gate now exists in `scripts/controlled_horizon_pilot.py`. The completed
+  two-state starter-deck audit was exact but had 0/2 horizon-sensitive states and took
+  345.29 s before memoization, so it is a scientific STOP, not a model pilot. A
+  transposition cache reproduced the same H=8 values while reducing the two H=8 runs
+  to 18.98 s and 86.05 s. An exploratory varied-deck generator exists but its first run
+  was stopped before producing a row. No API/GPU/cluster/model inference ran.
 
 - **Active supersession (2026-08-30):** the open-model matrix now has 28 canonical
   aggregates (7 configurations × 2 characters × 2 formats), including the complete
@@ -244,6 +252,19 @@ chain-of-thought — is only catchable by smoke).
    before any paid or cluster inference.
 4. Complete the registered multi-family evidence, conformance checks, agency ablation,
    and trace release for the ICML 2027 internal freeze on 2027-01-15.
+
+**Controlled-H resume point (2026-08-31):**
+
+1. Add per-fixture atomic checkpointing to `scripts/controlled_horizon_pilot.py`; the
+   current combined write loses completed in-memory rows on interruption.
+2. Re-run the focused/full-tree oracle equivalence checks, then a one-fixture-per-
+   character varied-deck sizing pass with explicit wall-time and node ceilings.
+3. Audit whether the model-blind varied state family produces disjoint H=1/H=8 optimal
+   sets and makes the H=1-mismatched control lose. Do not optimize for model failures.
+4. Freeze generator/filter/strata and the exactness audit before creating the 200
+   fixtures. Only then run the cheap 30-fixture model pilot and power simulation.
+5. Keep all paid/API/cluster/model calls stopped until the gates pass and the user
+   authorizes the concrete run.
 
 The older numbered table below is retained as project history. Any row that depends on
 the retired cross-task horizon construct is superseded by this critical path and the

@@ -177,15 +177,15 @@ def draw() -> None:
 def draw_controlled_h() -> None:
     from matplotlib.patches import FancyArrowPatch, FancyBboxPatch
 
-    fig, ax = plt.subplots(figsize=(5.5, 1.18))
+    fig, ax = plt.subplots(figsize=(5.5, 1.08))
     ax.set_xlim(0, 1)
     ax.set_ylim(0, 1)
     ax.axis("off")
 
     boxes = [
-        (0.01, 0.22, 0.25, 0.58, "Frozen fixture", "state $s$, legal actions $A$\nobjective $U$\nresponse contract"),
-        (0.34, 0.22, 0.25, 0.58, "Single intervention", "$H \\in \\{1,2,4,8\\}$\nonly prompt byte changed"),
-        (0.67, 0.22, 0.32, 0.58, "Paired estimand", "exact $q_H(a)$ for each first action\npaired $H=1$ vs. $H=8$ change"),
+        (0.01, 0.12, 0.29, 0.74, "Frozen fixture", "observation of state $s$\nlegal actions $A$, objective $U$\nsimulator + response contract"),
+        (0.37, 0.12, 0.24, 0.74, "Vary only horizon", "$H \\in \\{1,2,4,8\\}$\nall other factors fixed"),
+        (0.68, 0.12, 0.31, 0.74, "Paired estimand", "exact $q_H(a)$ for every action\nwithin-fixture quality change\n$H=1$ vs. $H=8$"),
     ]
     colors = ["#e9f2f8", "#fff0e8", "#eaf4ea"]
     edges = ["#4d7ea8", "#c76a3d", "#4d8a57"]
@@ -196,12 +196,10 @@ def draw_controlled_h() -> None:
         ax.text(x + w / 2, y + h * 0.70, title, ha="center", va="center",
                 fontsize=7.1, fontweight="bold", color="#222222")
         ax.text(x + w / 2, y + h * 0.37, body, ha="center", va="center",
-                fontsize=6.0, color="#333333", linespacing=1.18)
-    for start, end in [((0.272, 0.51), (0.328, 0.51)), ((0.602, 0.51), (0.658, 0.51))]:
+                fontsize=5.9, color="#333333", linespacing=1.18)
+    for start, end in [((0.312, 0.49), (0.358, 0.49)), ((0.622, 0.49), (0.668, 0.49))]:
         ax.add_patch(FancyArrowPatch(start, end, arrowstyle="-|>", mutation_scale=9,
                                      linewidth=1.0, color="#555555"))
-    ax.text(0.5, 0.04, "MODEL RESULTS: PENDING EXPERIMENT", ha="center", va="bottom",
-            fontsize=6.5, fontweight="bold", color="#a33d2a")
     fig.savefig(OUT / "controlled_h_protocol.pdf", bbox_inches="tight", pad_inches=0.01)
     fig.savefig(OUT / "controlled_h_protocol.png", dpi=300, bbox_inches="tight", pad_inches=0.01)
     plt.close(fig)

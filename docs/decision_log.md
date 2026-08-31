@@ -1,5 +1,69 @@
 # Decision Log
 
+## 2026-08-31 — Present controlled-H as an audit-derived protocol, not a missing climax
+
+**Problem.** The PTA manuscript's completed result is the adversarial instrument
+falsification, but the abstract, Section 5 title, and Figure 2 visually emphasized
+`PENDING EXPERIMENT`. Although scientifically honest, that presentation made the
+unevaluated controlled-H intervention look like the paper's missing main result rather
+than a methodological consequence of the completed audit.
+
+**Options considered.** (a) remove controlled-H entirely; (b) retain repeated pending
+labels and the warning banner; or (c) keep one explicit evidence boundary in the text
+and caption, present Figure 2 as a protocol specification, and make the falsification
+plus necessity test the intellectual climax.
+
+**Decision: (c).** The paper now states that model evaluation under controlled-H is
+outside its evidence and claims no model-level horizon result. Figure 2 contains only
+the frozen-fixture, H-intervention, exact-value, and paired-estimand design. The abstract
+ends on the completed 40/40 and 120/120 falsifications and the audit ladder. The Qwen3
+comparison is described as a selective card-choice gain under an architecture-changing
+comparison, not a scaling result. No numerical result changed.
+
+**Trade-offs, invalidation, and reversal.** The controlled protocol receives less
+visual urgency, but the paper reads as a complete instrument-audit contribution without
+hiding its evidentiary boundary. This presentation does not authorize model inference,
+does not turn the two-fixture compute-free gate into model evidence, and does not restore
+any retired planning claim. Reintroduce a model-result figure only after the registered
+same-state treatment, exactness, power, and replication gates pass.
+
+## 2026-08-31 — Keep controlled-H inference stopped after the first fixture gate
+
+**Problem.** The ICML track needs at least 200 model-blind same-state fixtures with
+exact H={1,2,4,8} values and nontrivial treatment strength. The existing implementation
+had only a one-state smoke, no fixture serialization contract, and an exhaustive search
+whose wall time was unknown outside that smoke.
+
+**Options considered.** (a) run a cheap model immediately on starter-combat states;
+(b) generate the full 200 starter states and hope sensitivity emerges; (c) first build
+a tamper-evident fixture/oracle gate, measure exactness, treatment strength, baselines,
+and cost on a tiny model-blind sample, then redesign the state family if it fails.
+
+**Decision: (c).** Fixture JSON stores a deterministic engine replay recipe plus a
+SHA-256 digest of the regenerated visible and hidden state; drift fails closed. The
+compute-free pilot records complete action values, ties, oracle spans, node counts,
+wall time, prompt invariance, and uniform/end-turn/first-card/immediate/one-step/
+H-mismatched/exact baselines. Search uses a semantics-preserving transposition cache;
+a full-tree comparison test guards the optimization. The node counter now means unique
+expanded `(state, depth)` cells, while `search_calls` and `cache_hits` preserve the
+complete sizing audit.
+
+The two starter-opening fixtures were exact but had 0/2 disjoint H=1/H=8 optima and
+an H=1-mismatched quality of 1.0 at H=8. Therefore starter openings fail the treatment-
+strength gate and no model inference follows. Varied-deck/HP/turn/enemy generation is
+exploratory until its selection rule, wall-time ceiling, checkpointing, and oracle audit
+are preregistered. Resume with compute-free fixtures only.
+
+**Trade-offs, invalidation, and reversal.** Replay recipes are less portable than a
+general engine-state deserializer, but they make engine drift explicit and avoid a
+fragile duplicate serialization layer. Digest-based caching is valid for the current
+fixture family because callbacks are reconstructed deterministically; broadened relic
+or listener state requires another cached-versus-full-tree audit. No historical result
+is invalidated and no controlled-H model evidence now exists. Reverse the inference
+STOP only after the model-blind fixture set passes exactness, at least 20% treatment
+strength, H-mismatch loss, prompt/action controls, wall-time feasibility, and power
+gates.
+
 ## 2026-08-31 — Build the PTA short paper around instrument falsification and native-unit profiles
 
 **Problem.** The repository contains enough evidence for a bounded workshop paper but
