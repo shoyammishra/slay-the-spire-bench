@@ -1,5 +1,11 @@
 # slay-bench: Novelty, Related Work, and Generalizability
 
+> **2026-08-30 supersession:** direct 2024–2026 prior work and corrected novelty are in
+> `research_audit/RELATED_WORK_2026.md`. Slay-Bench is not the first LLM Slay the Spire
+> benchmark, synergy study, or long-horizon Slay agent. Its current defensible
+> contribution is deterministic operation profiling plus a pending controlled-H
+> protocol.
+
 *Prepared for review discussion (2026-06-09). Purpose: (1) position slay-bench against existing planning/game/Slay-the-Spire work, (2) give an honest assessment of top-tier-conference viability, (3) lay out a generalizability story and candidate games to broaden the benchmark.*
 
 ---

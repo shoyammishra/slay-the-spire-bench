@@ -341,6 +341,9 @@ class TurnScore:
     sample_seed: Optional[int] = None          # the seed this sample was generated from
     fail_raw_excerpt: str = ""                 # bounded head+tail of the raw completion
                                                # on JSON-parse failure ("" otherwise)
+    oracle_nodes_expanded: int = 0
+    oracle_node_budget: int = 20000
+    oracle_exact: bool = True
 
     @property
     def damage_ratio(self) -> float:
@@ -493,7 +496,8 @@ def _simulate_play_sequence(state_snapshot, sequence: List[int]) -> Tuple[int, b
     return (initial_enemy_hp - final_enemy_hp, True)
 
 
-def _exhaustive_best_sequence(state_snapshot) -> Tuple[int, List[int]]:
+def _exhaustive_best_sequence(state_snapshot, node_budget: int = 20000,
+                              return_audit: bool = False):
     """
     Exhaustive search for the damage-maximizing play sequence.
     Returns (best_damage, best_sequence) with indices into the initial hand.
@@ -515,16 +519,24 @@ def _exhaustive_best_sequence(state_snapshot) -> Tuple[int, List[int]]:
     hand0 = list(base.combat.hand)
 
     best = {"dmg": 0, "seq": []}
-    budget = [20000]
+    budget = [node_budget]
+    nodes = [0]
+    exhausted = [False]
 
     def dfs(s, hand_map, seq):
         dmg = initial_hp - sum(e.hp for e in s.combat.enemies if e.hp > 0)
         if dmg > best["dmg"]:
             best["dmg"], best["seq"] = dmg, list(seq)
-        if is_combat_over(s) or budget[0] <= 0:
+        if is_combat_over(s):
+            return
+        if budget[0] <= 0:
+            exhausted[0] = True
             return
         tried = set()
         for i, card in enumerate(hand_map):
+            if budget[0] <= 0:
+                exhausted[0] = True
+                break
             if i in seq or card is None:
                 continue
             key = (card.name, card.upgraded, card.effective_cost())
@@ -537,6 +549,7 @@ def _exhaustive_best_sequence(state_snapshot) -> Tuple[int, List[int]]:
                 continue
             tried.add(key)
             budget[0] -= 1
+            nodes[0] += 1
             # Copy state and hand_map together so the index→card identity
             # mapping survives into the child state.
             s2, hm2 = copy.deepcopy((s, hand_map))
@@ -545,6 +558,12 @@ def _exhaustive_best_sequence(state_snapshot) -> Tuple[int, List[int]]:
             dfs(s2, hm2, seq + [i])
 
     dfs(base, hand0, [])
+    if return_audit:
+        return best["dmg"], best["seq"], {
+            "nodes_expanded": nodes[0],
+            "node_budget": node_budget,
+            "exact": not exhausted[0],
+        }
     return best["dmg"], best["seq"]
 
 
@@ -604,7 +623,8 @@ class TurnEvaluator:
             llm_legal = False
 
         # Optimal via exhaustive search
-        opt_dmg, opt_seq = _exhaustive_best_sequence(snapshot)
+        opt_dmg, opt_seq, oracle_audit = _exhaustive_best_sequence(
+            snapshot, return_audit=True)
 
         # Illegal sequence: credit partial damage but cap ratio at 0 so it
         # doesn't artificially inflate the score for a sequence that cheated.
@@ -623,6 +643,9 @@ class TurnEvaluator:
             fail_truncated_think=fail_truncated_think,
             fail_raw_len=fail_raw_len,
             fail_raw_excerpt=fail_raw_excerpt,
+            oracle_nodes_expanded=oracle_audit["nodes_expanded"],
+            oracle_node_budget=oracle_audit["node_budget"],
+            oracle_exact=oracle_audit["exact"],
         )
 
 
@@ -1593,6 +1616,9 @@ class BenchmarkResult:
                                         if s.fail_json_parse
                                         and (s.fail_finish_reason == "length"
                                              or s.fail_truncated_think)),
+            "oracle_inexact_n": sum(1 for s in self.turn_scores if not s.oracle_exact),
+            "oracle_max_nodes_expanded": max(
+                (s.oracle_nodes_expanded for s in self.turn_scores), default=0),
             # Per-sample records (2026-07-13, additive — synergy "samples"
             # pattern): the parse probe left no per-sample evidence on disk.
             "samples": [
@@ -1603,6 +1629,9 @@ class BenchmarkResult:
                     "damage_ratio": round(s.damage_ratio, 4),
                     "llm_sequence": s.llm_sequence,
                     "optimal_sequence": s.optimal_sequence,
+                    "oracle_nodes_expanded": s.oracle_nodes_expanded,
+                    "oracle_node_budget": s.oracle_node_budget,
+                    "oracle_exact": s.oracle_exact,
                     "fail_json_parse": s.fail_json_parse,
                     "fail_finish_reason": s.fail_finish_reason,
                     "fail_truncated_think": s.fail_truncated_think,

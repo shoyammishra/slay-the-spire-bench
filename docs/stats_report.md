@@ -10,7 +10,7 @@
 - **Hard ceiling:** 2^5 = 32 sign assignments ⇒ the smallest attainable two-sided p per combo is **0.0625**. No single combo can reach p<0.05. Per-combo rows are descriptive; inference comes from the pooled stratified test and from sample-level McNemar.
 - Synergy is additionally tested at the **sample level** (McNemar exact) because structured and raw saw byte-identical fixtures — verified below.
 - Multiplicity: **Holm–Bonferroni** within each metric family.
-- Format *insensitivity* is tested as **equivalence** (TOST via the 90% bootstrap CI, margin ±0.05 = one sample in 20), never inferred from a non-significant test.
+- Format *insensitivity* is tested as **equivalence** only for Bernoulli/rate metrics (90% bootstrap CI, margin ±0.05 = one item in 20). HP ratio and progress have no registered SESOI and are not tested for equivalence.
 - Boundary cells get **Clopper–Pearson** exact intervals (a bootstrap of a constant vector reports zero width, which is not certainty).
 - **Removal quarantine:** every synergy fixture has `Strike` as its expert removal target, so a constant `Strike` answer scores 100%. Raw observations remain in result JSONs for audit, but removal is excluded from descriptive headline tables, format tests, McNemar, variance, and composites pending a full-fixture redesign and re-baseline.
 
@@ -24,31 +24,32 @@
 | Claim | Verdict | Key evidence |
 |---|---|---|
 | **C1** synergy removal accuracy measures strategic pruning | `QUARANTINED` | degenerate constant-policy audit over the fixed-fixture harness |
-| **C2-archetype** structured beats raw on synergy archetype across the matrix | `SUPPORTED-MAGNITUDE-ONLY` | stratified sign-flip permutation (magnitude) + exact sign test on per-stratum direction, 14 model x character strata; pooled_mean_diff=0.035; p_pooled=0.0137 |
+| **C2-archetype** structured beats raw on synergy archetype across the matrix | `SUPPORTED-MAGNITUDE-ONLY` | stratified sign-flip permutation (magnitude) + exact sign test on per-stratum direction, 14 model x character strata; pooled_mean_diff=0.035; p_pooled=0.0142 |
 | **C2-card_pick** structured beats raw on synergy card_pick across the matrix | `SUPPORTED-MAGNITUDE-ONLY` | stratified sign-flip permutation (magnitude) + exact sign test on per-stratum direction, 14 model x character strata; pooled_mean_diff=0.0717; p_pooled=0.0005 |
 | **C3-combat-win_rate** combat win_rate is insensitive to prompt format | `PARTIAL — holds for most combos, fails for a named subgroup` | TOST via 90% bootstrap CI, margin +/-0.05; combos_equivalent=10; combos_tested=14 |
-| **C3-combat-hp_ratio** combat hp_ratio is insensitive to prompt format | `NOT-SUPPORTED-AS-STATED` | TOST via 90% bootstrap CI, margin +/-0.05; combos_equivalent=5; combos_tested=14 |
-| **C3-run-progress** run progress is insensitive to prompt format | `NOT-SUPPORTED-AS-STATED` | TOST via 90% bootstrap CI, margin +/-0.05; combos_equivalent=3; combos_tested=10 |
-| **C7-win_rate** prompt format reaches the COMBAT horizon (structured > raw on win_rate) | `SUPPORTED` | stratified permutation + sign test over 14 strata; pooled_mean_diff=0.0479; p_pooled=0.0002 |
-| **C7-hp_ratio** prompt format reaches the COMBAT horizon (structured > raw on hp_ratio) | `SUPPORTED` | stratified permutation + sign test over 14 strata; pooled_mean_diff=0.0593; p_pooled=0.0001 |
-| **C8** the turn-level format effect has no consistent direction (it is a model property) | `SUPPORTED` | stratified permutation (magnitude) vs sign test (direction); pooled_mean_diff=-0.0644; p_pooled=0.0005 |
-| **C4** run-level is a shared collapse floor (on par with greedy) | `SUPPORTED-WITH-NUANCE` | run-seed-matched paired comparison against the measured greedy anchor; combos_tested=21 |
+| **C3-combat-hp_ratio** combat hp_ratio is insensitive to prompt format | `NOT-ASSESSED-NO-SESOI` | descriptive paired estimates only; combos_tested=14 |
+| **C3-run-progress** run progress is insensitive to prompt format | `NOT-ASSESSED-NO-SESOI` | descriptive paired estimates only; combos_tested=10 |
+| **C7-win_rate** within the combat task, structured > raw on win_rate | `SUPPORTED` | stratified permutation + sign test over 14 strata; pooled_mean_diff=0.0479; p_pooled=0.0001 |
+| **C7-hp_ratio** within the combat task, structured > raw on hp_ratio | `SUPPORTED` | stratified permutation + sign test over 14 strata; pooled_mean_diff=0.0593; p_pooled=0.0001 |
+| **C8** the turn-level format effect has no consistent direction (it is a model property) | `SUPPORTED` | stratified permutation (magnitude) vs sign test (direction); pooled_mean_diff=-0.0644; p_pooled=0.0006 |
+| **C4** hybrid-policy Act-1 outcomes are on par with greedy | `SUPPORTED-WITH-NUANCE` | run-seed-matched paired comparison against the measured greedy anchor; combos_tested=21 |
 | **C5** qwen3-32b/Ironclad/structured is the first model to rise off the run floor | `UNDERPOWERED` | run-seed-matched paired test + exact binomial CI on survival; survival_cp95=[0.0255, 0.3122]; survival_p_exact=0.75 |
-| **C6** between-model variance is large at reasoning horizons, small at survival horizons | `SUPPORTED` | eta^2 shares from representative balanced metrics: turn damage, combat win, synergy archetype, and run floors; model-variance share turn 0.86, combat 0.90, synergy(archetype) 0.63, run 0.02 |
+| **C6** between-model variance is large at reasoning horizons, small at survival horizons | `NOT-IDENTIFIED` | descriptive eta^2 shares only; the run row has a different three-model cohort and every task uses a different scale; model-variance share turn 0.86, combat 0.90, synergy(archetype) 0.63, run 0.02 |
 
 - **C1 caveat:** every fixture has expert_remove_name='Strike', so an always-Strike policy scores 100%; removal is excluded from all inferential and composite analyses until redesigned fixtures are fully re-baselined
 - **C2-archetype caveat:** pooled magnitude is significant but the DIRECTION is not consistent across models (sign test n.s.) -- report as a model-dependent effect, not a general one
 - **C2-card_pick caveat:** pooled magnitude is significant but the DIRECTION is not consistent across models (sign test n.s.) -- report as a model-dependent effect, not a general one
 - **C3-combat-win_rate caveat:** combos listed in not_equivalent are NOT shown to differ -- equivalence simply cannot be concluded for them at this margin and n=5; the claim must be scoped to the combos that pass
-- **C3-combat-hp_ratio caveat:** combos listed in not_equivalent are NOT shown to differ -- equivalence simply cannot be concluded for them at this margin and n=5; the claim must be scoped to the combos that pass
-- **C3-run-progress caveat:** combos listed in not_equivalent are NOT shown to differ -- equivalence simply cannot be concluded for them at this margin and n=5; the claim must be scoped to the combos that pass
-- **C7-win_rate caveat:** if SUPPORTED this CORRECTS the standing claim that combat outcomes are format-insensitive; check whether the effect is carried by the R1 distills before generalising
-- **C7-win_rate ceiling check:** every combo whose effect exceeds the equivalence margin sits BELOW the combat ceiling => the old 'combat is format-insensitive' reading was a CEILING ARTIFACT: models that win every fight leave format nothing to move (material strata: deepseek-r1-distill-14b/ironclad (+0.190), deepseek-r1-distill-14b/silent (+0.230), deepseek-r1-distill-7b/ironclad (+0.080), deepseek-r1-distill-7b/silent (+0.140))
-- **C7-hp_ratio caveat:** if SUPPORTED this CORRECTS the standing claim that combat outcomes are format-insensitive; check whether the effect is carried by the R1 distills before generalising
-- **C7-hp_ratio ceiling check:** some ceiling-saturated combos also move materially -- do not attribute the effect to the ceiling alone (material strata: deepseek-r1-distill-14b/ironclad (+0.194), deepseek-r1-distill-14b/silent (+0.178), deepseek-r1-distill-7b/silent (+0.097), mistral-7b/silent (+0.112), qwen3-235b-a22b-fp8/ironclad (+0.051), qwen3-235b-a22b-fp8/silent (+0.055), qwen3-32b/silent (+0.064))
+- **C3-combat-hp_ratio caveat:** No domain-justified smallest effect of interest is registered for this non-rate metric; a null test cannot establish insensitivity.
+- **C3-run-progress caveat:** No domain-justified smallest effect of interest is registered for this non-rate metric; a null test cannot establish insensitivity.
+- **C7-win_rate caveat:** this corrects the standing claim that combat outcomes are format-insensitive; it is a task-specific association, not evidence that format 'reaches' a planning horizon
+- **C7-win_rate ceiling check:** every combo whose effect exceeds the 0.05 display threshold sits BELOW the combat ceiling => the old 'combat is format-insensitive' reading was a CEILING ARTIFACT: models that win every fight leave format nothing to move; 0.05 is a descriptive display threshold here, not a non-rate SESOI (material strata: deepseek-r1-distill-14b/ironclad (+0.190), deepseek-r1-distill-14b/silent (+0.230), deepseek-r1-distill-7b/ironclad (+0.080), deepseek-r1-distill-7b/silent (+0.140))
+- **C7-hp_ratio caveat:** this corrects the standing claim that combat outcomes are format-insensitive; it is a task-specific association, not evidence that format 'reaches' a planning horizon
+- **C7-hp_ratio ceiling check:** some ceiling-saturated combos also move materially -- do not attribute the effect to the ceiling alone; 0.05 is a descriptive display threshold here, not a non-rate SESOI (material strata: deepseek-r1-distill-14b/ironclad (+0.194), deepseek-r1-distill-14b/silent (+0.178), deepseek-r1-distill-7b/silent (+0.097), mistral-7b/silent (+0.112), qwen3-235b-a22b-fp8/ironclad (+0.051), qwen3-235b-a22b-fp8/silent (+0.055), qwen3-32b/silent (+0.064))
 - **C8 caveat:** the pooled MAGNITUDE favours raw and is significant, but the direction splits across models -- so the honest statement is 'format matters, its sign is model-specific', NOT 'raw beats structured at turn level'
-- **C4 caveat:** nuance the paper must carry: SURVIVAL is floored for everyone, but FLOORS/PROGRESS show small seed-consistent lifts over the matched greedy anchor for some combos (~0.5-1.3 floors). 'On par, not beating' is right for survival; for floors say 'within ~1 floor of greedy'. n=5 seed pairs => p_min = 0.0625, so none of these can reach alpha=0.05 by construction.
+- **C4 caveat:** nuance the paper must carry: SURVIVAL is floored for everyone, but FLOORS/PROGRESS show small seed-consistent lifts over the matched greedy anchor for some combos (~0.5-1.3 floors). 'On par, not beating' is right for survival; for floors say 'within ~1 floor of greedy'. n=5 seed pairs => p_min = 0.0625, so none of these can reach alpha=0.05 by construction. This task is a hybrid scripted rollout, not a full-agent or horizon measure.
 - **C5 caveat:** CORRECTION the docs must absorb: the published gap compares the model's 25 runs against greedy's 100-run anchor (survival .01, 12.48 floors). On the SAME 25 run seeds greedy scores higher than its global anchor, so the honest gap is smaller than published. Registered phrasing ('signal, not a win') stands and is now quantified: with 5 seed pairs p_min = 0.0625, so this cannot reach alpha=0.05 by construction; confirming it needs N_RUN=20.
+- **C6 caveat:** Do not compare these shares as evidence of horizon collapse. A controlled same-task H intervention is required.
 
 ## 2. Format ablation — pooled across the matrix (the paired test that had never been run)
 
@@ -56,19 +57,19 @@ Stratified sign-flip permutation over model × character strata; statistic = unw
 
 | Dim | Metric | strata | pairs | mean diff (S−R) | p (magnitude) | S>R | R>S | tie | p (direction) | reading |
 |---|---|---|---|---|---|---|---|---|---|---|
-| turn | dmg_ratio | 14 | 70 | -0.0644 | 0.0005 | 6 | 8 | 0 | 0.7905 | model-specific |
-| turn | legal_rate | 14 | 70 | -0.0471 | 0.0130 | 7 | 6 | 1 | 1.0000 | model-specific |
+| turn | dmg_ratio | 14 | 70 | -0.0644 | 0.0006 | 6 | 8 | 0 | 0.7905 | model-specific |
+| turn | legal_rate | 14 | 70 | -0.0471 | 0.0144 | 7 | 6 | 1 | 1.0000 | model-specific |
 | turn | parse_ok | 14 | 70 | 0.0000 | 1.0000 | 4 | 3 | 7 | 1.0000 | no evidence |
-| combat | win_rate | 14 | 70 | 0.0479 | 0.0002 | 7 | 0 | 7 | 0.0156 | general effect |
+| combat | win_rate | 14 | 70 | 0.0479 | 0.0001 | 7 | 0 | 7 | 0.0156 | general effect |
 | combat | hp_ratio | 14 | 70 | 0.0593 | 0.0001 | 12 | 2 | 0 | 0.0129 | general effect |
 | combat | invalid_action_errors | 14 | 70 | -0.9400 | 0.0001 | 2 | 12 | 0 | 0.0129 | general effect |
-| synergy | archetype | 14 | 70 | 0.0350 | 0.0137 | 9 | 5 | 0 | 0.4240 | model-specific |
+| synergy | archetype | 14 | 70 | 0.0350 | 0.0142 | 9 | 5 | 0 | 0.4240 | model-specific |
 | synergy | card_pick | 14 | 70 | 0.0717 | 0.0005 | 10 | 4 | 0 | 0.1796 | model-specific |
-| synergy | parse_ok | 14 | 70 | 0.0279 | 0.0098 | 3 | 2 | 9 | 1.0000 | model-specific |
-| run | survival | 10 | 50 | 0.0180 | 0.0994 | 4 | 3 | 3 | 1.0000 | no evidence |
-| run | floors | 10 | 50 | 0.4450 | 0.0077 | 7 | 3 | 0 | 0.3438 | model-specific |
-| run | progress | 10 | 50 | 0.0278 | 0.0081 | 7 | 3 | 0 | 0.3438 | model-specific |
-| run | draft_coherence | 10 | 50 | -0.0034 | 0.6733 | 4 | 6 | 0 | 0.7539 | no evidence |
+| synergy | parse_ok | 14 | 70 | 0.0279 | 0.0090 | 3 | 2 | 9 | 1.0000 | model-specific |
+| run | survival | 10 | 50 | 0.0180 | 0.1006 | 4 | 3 | 3 | 1.0000 | no evidence |
+| run | floors | 10 | 50 | 0.4450 | 0.0074 | 7 | 3 | 0 | 0.3438 | model-specific |
+| run | progress | 10 | 50 | 0.0278 | 0.0075 | 7 | 3 | 0 | 0.3438 | model-specific |
+| run | draft_coherence | 10 | 50 | -0.0034 | 0.6780 | 4 | 6 | 0 | 0.7539 | no evidence |
 
 ## 3. Format ablation — synergy at the sample level (McNemar exact, fixture-matched)
 
@@ -76,55 +77,55 @@ The strongest valid test available: same fixture, same offer position, both form
 
 | Model | Char | Metric | pairs | dropped | structured [95% CI] | raw [95% CI] | risk diff | b/c | p | p (Holm) |
 |---|---|---|---|---|---|---|---|---|---|---|
-| deepseek-r1-distill-14b | ironclad | archetype | 93 | 7 | 0.495 [0.378, 0.604] | 0.516 [0.402, 0.633] | -0.021 | 13/15 | 0.8506 | 1.0000 |
-| deepseek-r1-distill-14b | ironclad | card_pick | 93 | 7 | 0.548 [0.375, 0.698] | 0.602 [0.432, 0.750] | -0.054 | 15/20 | 0.4996 | 1.0000 |
-| deepseek-r1-distill-14b | silent | archetype | 99 | 1 | 0.596 [0.500, 0.690] | 0.657 [0.551, 0.758] | -0.061 | 8/14 | 0.2863 | 1.0000 |
-| deepseek-r1-distill-14b | silent | card_pick | 99 | 1 | 0.687 [0.582, 0.786] | 0.606 [0.490, 0.720] | 0.081 | 29/21 | 0.3222 | 1.0000 |
-| deepseek-r1-distill-7b | ironclad | archetype | 62 | 38 | 0.274 [0.167, 0.391] | 0.452 [0.313, 0.600] | -0.177 | 4/15 | 0.0192 | 0.1921 |
-| deepseek-r1-distill-7b | ironclad | card_pick | 62 | 38 | 0.694 [0.508, 0.851] | 0.565 [0.410, 0.727] | 0.129 | 19/11 | 0.2005 | 1.0000 |
-| deepseek-r1-distill-7b | silent | archetype | 63 | 37 | 0.413 [0.217, 0.591] | 0.302 [0.183, 0.426] | 0.111 | 16/9 | 0.2295 | 1.0000 |
-| deepseek-r1-distill-7b | silent | card_pick | 63 | 37 | 0.413 [0.224, 0.614] | 0.460 [0.317, 0.594] | -0.048 | 13/16 | 0.7111 | 1.0000 |
-| llama-3.1-8b | ironclad | archetype | 100 | 0 | 0.510 [0.410, 0.610] | 0.410 [0.310, 0.510] | 0.100 | 14/4 | 0.0309 | 0.2779 |
-| llama-3.1-8b | ironclad | card_pick | 100 | 0 | 0.690 [0.590, 0.790] | 0.610 [0.490, 0.730] | 0.080 | 25/17 | 0.2800 | 1.0000 |
+| deepseek-r1-distill-14b | ironclad | archetype | 93 | 7 | 0.495 [0.376, 0.608] | 0.516 [0.404, 0.633] | -0.021 | 13/15 | 0.8506 | 1.0000 |
+| deepseek-r1-distill-14b | ironclad | card_pick | 93 | 7 | 0.548 [0.375, 0.701] | 0.602 [0.433, 0.755] | -0.054 | 15/20 | 0.4996 | 1.0000 |
+| deepseek-r1-distill-14b | silent | archetype | 99 | 1 | 0.596 [0.500, 0.690] | 0.657 [0.556, 0.750] | -0.061 | 8/14 | 0.2863 | 1.0000 |
+| deepseek-r1-distill-14b | silent | card_pick | 99 | 1 | 0.687 [0.582, 0.788] | 0.606 [0.485, 0.720] | 0.081 | 29/21 | 0.3222 | 1.0000 |
+| deepseek-r1-distill-7b | ironclad | archetype | 62 | 38 | 0.274 [0.167, 0.387] | 0.452 [0.312, 0.603] | -0.177 | 4/15 | 0.0192 | 0.1921 |
+| deepseek-r1-distill-7b | ironclad | card_pick | 62 | 38 | 0.694 [0.509, 0.851] | 0.565 [0.410, 0.732] | 0.129 | 19/11 | 0.2005 | 1.0000 |
+| deepseek-r1-distill-7b | silent | archetype | 63 | 37 | 0.413 [0.217, 0.594] | 0.302 [0.182, 0.424] | 0.111 | 16/9 | 0.2295 | 1.0000 |
+| deepseek-r1-distill-7b | silent | card_pick | 63 | 37 | 0.413 [0.227, 0.613] | 0.460 [0.317, 0.597] | -0.048 | 13/16 | 0.7111 | 1.0000 |
+| llama-3.1-8b | ironclad | archetype | 100 | 0 | 0.510 [0.410, 0.610] | 0.410 [0.320, 0.510] | 0.100 | 14/4 | 0.0309 | 0.2779 |
+| llama-3.1-8b | ironclad | card_pick | 100 | 0 | 0.690 [0.590, 0.790] | 0.610 [0.480, 0.730] | 0.080 | 25/17 | 0.2800 | 1.0000 |
 | llama-3.1-8b | silent | archetype | 100 | 0 | 0.720 [0.630, 0.810] | 0.610 [0.510, 0.710] | 0.110 | 11/0 | 0.0010 | 0.0118 |
 | llama-3.1-8b | silent | card_pick | 100 | 0 | 0.490 [0.350, 0.630] | 0.570 [0.460, 0.680] | -0.080 | 10/18 | 0.1849 | 1.0000 |
 | mistral-7b | ironclad | archetype | 100 | 0 | 0.330 [0.240, 0.430] | 0.450 [0.350, 0.550] | -0.120 | 2/14 | 0.0042 | 0.0460 |
-| mistral-7b | ironclad | card_pick | 100 | 0 | 0.580 [0.480, 0.680] | 0.360 [0.260, 0.460] | 0.220 | 31/9 | 0.0007 | 0.0088 |
+| mistral-7b | ironclad | card_pick | 100 | 0 | 0.580 [0.470, 0.680] | 0.360 [0.260, 0.460] | 0.220 | 31/9 | 0.0007 | 0.0088 |
 | mistral-7b | silent | archetype | 100 | 0 | 0.340 [0.240, 0.440] | 0.430 [0.330, 0.530] | -0.090 | 4/13 | 0.0490 | 0.3923 |
-| mistral-7b | silent | card_pick | 100 | 0 | 0.560 [0.450, 0.660] | 0.200 [0.120, 0.300] | 0.360 | 41/5 | 0.0000 | 0.0000 |
+| mistral-7b | silent | card_pick | 100 | 0 | 0.560 [0.450, 0.670] | 0.200 [0.110, 0.300] | 0.360 | 41/5 | 0.0000 | 0.0000 |
 | qwen2.5-7b | ironclad | archetype | 100 | 0 | 0.370 [0.280, 0.470] | 0.250 [0.170, 0.340] | 0.120 | 12/0 | 0.0005 | 0.0064 |
-| qwen2.5-7b | ironclad | card_pick | 100 | 0 | 0.470 [0.360, 0.590] | 0.270 [0.170, 0.370] | 0.200 | 37/17 | 0.0091 | 0.1088 |
-| qwen2.5-7b | silent | archetype | 100 | 0 | 0.600 [0.510, 0.690] | 0.420 [0.320, 0.520] | 0.180 | 20/2 | 0.0001 | 0.0017 |
-| qwen2.5-7b | silent | card_pick | 100 | 0 | 0.530 [0.410, 0.650] | 0.450 [0.350, 0.560] | 0.080 | 28/20 | 0.3123 | 1.0000 |
+| qwen2.5-7b | ironclad | card_pick | 100 | 0 | 0.470 [0.360, 0.580] | 0.270 [0.170, 0.370] | 0.200 | 37/17 | 0.0091 | 0.1088 |
+| qwen2.5-7b | silent | archetype | 100 | 0 | 0.600 [0.500, 0.690] | 0.420 [0.320, 0.520] | 0.180 | 20/2 | 0.0001 | 0.0017 |
+| qwen2.5-7b | silent | card_pick | 100 | 0 | 0.530 [0.410, 0.640] | 0.450 [0.350, 0.560] | 0.080 | 28/20 | 0.3123 | 1.0000 |
 | qwen3-235b-a22b-fp8 | ironclad | archetype | 100 | 0 | 0.700 [0.610, 0.790] | 0.680 [0.580, 0.780] | 0.020 | 10/8 | 0.8145 | 1.0000 |
-| qwen3-235b-a22b-fp8 | ironclad | card_pick | 100 | 0 | 0.790 [0.700, 0.870] | 0.670 [0.540, 0.790] | 0.120 | 23/11 | 0.0576 | 0.6337 |
-| qwen3-235b-a22b-fp8 | silent | archetype | 100 | 0 | 0.800 [0.690, 0.900] | 0.790 [0.690, 0.870] | 0.010 | 10/9 | 1.0000 | 1.0000 |
-| qwen3-235b-a22b-fp8 | silent | card_pick | 100 | 0 | 0.650 [0.550, 0.750] | 0.640 [0.530, 0.740] | 0.010 | 16/15 | 1.0000 | 1.0000 |
-| qwen3-32b | ironclad | archetype | 99 | 1 | 0.606 [0.485, 0.722] | 0.505 [0.394, 0.620] | 0.101 | 21/11 | 0.1102 | 0.7713 |
-| qwen3-32b | ironclad | card_pick | 99 | 1 | 0.535 [0.412, 0.657] | 0.556 [0.434, 0.677] | -0.020 | 21/23 | 0.8804 | 1.0000 |
-| qwen3-32b | silent | archetype | 100 | 0 | 0.790 [0.680, 0.900] | 0.710 [0.600, 0.810] | 0.080 | 18/10 | 0.1849 | 1.0000 |
+| qwen3-235b-a22b-fp8 | ironclad | card_pick | 100 | 0 | 0.790 [0.700, 0.870] | 0.670 [0.540, 0.780] | 0.120 | 23/11 | 0.0576 | 0.6337 |
+| qwen3-235b-a22b-fp8 | silent | archetype | 100 | 0 | 0.800 [0.690, 0.900] | 0.790 [0.700, 0.870] | 0.010 | 10/9 | 1.0000 | 1.0000 |
+| qwen3-235b-a22b-fp8 | silent | card_pick | 100 | 0 | 0.650 [0.550, 0.740] | 0.640 [0.540, 0.740] | 0.010 | 16/15 | 1.0000 | 1.0000 |
+| qwen3-32b | ironclad | archetype | 99 | 1 | 0.606 [0.480, 0.722] | 0.505 [0.390, 0.620] | 0.101 | 21/11 | 0.1102 | 0.7713 |
+| qwen3-32b | ironclad | card_pick | 99 | 1 | 0.535 [0.414, 0.657] | 0.556 [0.434, 0.673] | -0.020 | 21/23 | 0.8804 | 1.0000 |
+| qwen3-32b | silent | archetype | 100 | 0 | 0.790 [0.670, 0.900] | 0.710 [0.600, 0.810] | 0.080 | 18/10 | 0.1849 | 1.0000 |
 | qwen3-32b | silent | card_pick | 100 | 0 | 0.370 [0.260, 0.480] | 0.430 [0.300, 0.560] | -0.060 | 13/19 | 0.3771 | 1.0000 |
 
 ## 4. Format ablation — per combo, seed-matched (all dimensions)
 
-Exact sign-flip p; **minimum attainable p = 0.0625** at 5 pairs. `equiv` = TOST verdict at ±0.05.
+Exact sign-flip p; **minimum attainable p = 0.0625** at 5 pairs. `equiv` = TOST verdict at ±0.05 for rates; `n/a` means no registered SESOI.
 
 | Dim | Metric | Model | Char | n | S mean | R mean | diff | 95% CI | p | p(Holm) | d_z | equiv |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|
-| turn | dmg_ratio | deepseek-r1-distill-14b | ironclad | 5 | 0.823 | 0.754 | 0.0694 | [-0.035, 0.167] | 0.3125 | 1.0000 | 0.53 | incon. |
-| turn | dmg_ratio | deepseek-r1-distill-14b | silent | 5 | 0.839 | 0.721 | 0.1176 | [0.030, 0.195] | 0.1250 | 1.0000 | 1.11 | incon. |
-| turn | dmg_ratio | deepseek-r1-distill-7b | ironclad | 5 | 0.343 | 0.427 | -0.0835 | [-0.170, 0.003] | 0.2500 | 1.0000 | -0.74 | incon. |
-| turn | dmg_ratio | deepseek-r1-distill-7b | silent | 5 | 0.261 | 0.334 | -0.0735 | [-0.104, -0.043] | 0.0625 | 0.8750 | -1.84 | incon. |
-| turn | dmg_ratio | llama-3.1-8b | ironclad | 5 | 0.487 | 0.711 | -0.2240 | [-0.264, -0.195] | 0.0625 | 0.8750 | -4.99 | incon. |
-| turn | dmg_ratio | llama-3.1-8b | silent | 5 | 0.472 | 0.810 | -0.3379 | [-0.394, -0.278] | 0.0625 | 0.8750 | -4.81 | incon. |
-| turn | dmg_ratio | mistral-7b | ironclad | 5 | 0.177 | 0.416 | -0.2395 | [-0.283, -0.186] | 0.0625 | 0.8750 | -3.95 | incon. |
-| turn | dmg_ratio | mistral-7b | silent | 5 | 0.200 | 0.394 | -0.1941 | [-0.271, -0.134] | 0.0625 | 0.8750 | -2.14 | incon. |
-| turn | dmg_ratio | qwen2.5-7b | ironclad | 5 | 0.701 | 0.664 | 0.0369 | [-0.041, 0.119] | 0.5625 | 1.0000 | 0.35 | incon. |
-| turn | dmg_ratio | qwen2.5-7b | silent | 5 | 0.663 | 0.681 | -0.0175 | [-0.039, 0.004] | 0.3750 | 1.0000 | -0.62 | yes |
-| turn | dmg_ratio | qwen3-235b-a22b-fp8 | ironclad | 5 | 0.964 | 0.977 | -0.0121 | [-0.039, 0.021] | 0.5000 | 1.0000 | -0.30 | yes |
-| turn | dmg_ratio | qwen3-235b-a22b-fp8 | silent | 5 | 0.979 | 0.959 | 0.0200 | [-0.029, 0.086] | 0.7500 | 1.0000 | 0.28 | incon. |
-| turn | dmg_ratio | qwen3-32b | ironclad | 5 | 0.960 | 0.933 | 0.0265 | [0.011, 0.055] | 0.0625 | 0.8750 | 0.84 | incon. |
-| turn | dmg_ratio | qwen3-32b | silent | 5 | 1.000 | 0.990 | 0.0100 | [0.000, 0.030] | 1.0000 | 1.0000 | 0.45 | yes |
+| turn | dmg_ratio | deepseek-r1-distill-14b | ironclad | 5 | 0.823 | 0.754 | 0.0694 | [-0.035, 0.167] | 0.3125 | 1.0000 | 0.53 | n/a |
+| turn | dmg_ratio | deepseek-r1-distill-14b | silent | 5 | 0.839 | 0.721 | 0.1176 | [0.029, 0.195] | 0.1250 | 1.0000 | 1.11 | n/a |
+| turn | dmg_ratio | deepseek-r1-distill-7b | ironclad | 5 | 0.343 | 0.427 | -0.0835 | [-0.170, 0.003] | 0.2500 | 1.0000 | -0.74 | n/a |
+| turn | dmg_ratio | deepseek-r1-distill-7b | silent | 5 | 0.261 | 0.334 | -0.0735 | [-0.104, -0.043] | 0.0625 | 0.8750 | -1.84 | n/a |
+| turn | dmg_ratio | llama-3.1-8b | ironclad | 5 | 0.487 | 0.711 | -0.2240 | [-0.264, -0.195] | 0.0625 | 0.8750 | -4.99 | n/a |
+| turn | dmg_ratio | llama-3.1-8b | silent | 5 | 0.472 | 0.810 | -0.3379 | [-0.394, -0.278] | 0.0625 | 0.8750 | -4.81 | n/a |
+| turn | dmg_ratio | mistral-7b | ironclad | 5 | 0.177 | 0.416 | -0.2395 | [-0.283, -0.191] | 0.0625 | 0.8750 | -3.95 | n/a |
+| turn | dmg_ratio | mistral-7b | silent | 5 | 0.200 | 0.394 | -0.1941 | [-0.271, -0.134] | 0.0625 | 0.8750 | -2.14 | n/a |
+| turn | dmg_ratio | qwen2.5-7b | ironclad | 5 | 0.701 | 0.664 | 0.0369 | [-0.041, 0.117] | 0.5625 | 1.0000 | 0.35 | n/a |
+| turn | dmg_ratio | qwen2.5-7b | silent | 5 | 0.663 | 0.681 | -0.0175 | [-0.039, 0.004] | 0.3750 | 1.0000 | -0.62 | n/a |
+| turn | dmg_ratio | qwen3-235b-a22b-fp8 | ironclad | 5 | 0.964 | 0.977 | -0.0121 | [-0.039, 0.021] | 0.5000 | 1.0000 | -0.30 | n/a |
+| turn | dmg_ratio | qwen3-235b-a22b-fp8 | silent | 5 | 0.979 | 0.959 | 0.0200 | [-0.029, 0.086] | 0.7500 | 1.0000 | 0.28 | n/a |
+| turn | dmg_ratio | qwen3-32b | ironclad | 5 | 0.960 | 0.933 | 0.0265 | [0.011, 0.055] | 0.0625 | 0.8750 | 0.84 | n/a |
+| turn | dmg_ratio | qwen3-32b | silent | 5 | 1.000 | 0.990 | 0.0100 | [0.000, 0.030] | 1.0000 | 1.0000 | 0.45 | n/a |
 | combat | win_rate | deepseek-r1-distill-14b | ironclad | 5 | 0.920 | 0.730 | 0.1900 | [0.080, 0.300] | 0.1250 | 1.0000 | 1.33 | incon. |
 | combat | win_rate | deepseek-r1-distill-14b | silent | 5 | 0.570 | 0.340 | 0.2300 | [0.110, 0.340] | 0.1250 | 1.0000 | 1.47 | incon. |
 | combat | win_rate | deepseek-r1-distill-7b | ironclad | 5 | 0.270 | 0.190 | 0.0800 | [-0.040, 0.200] | 0.3125 | 1.0000 | 0.51 | incon. |
@@ -139,20 +140,20 @@ Exact sign-flip p; **minimum attainable p = 0.0625** at 5 pairs. `equiv` = TOST 
 | combat | win_rate | qwen3-235b-a22b-fp8 | silent | 5 | 1.000 | 0.990 | 0.0100 | [0.000, 0.030] | 1.0000 | 1.0000 | 0.45 | yes |
 | combat | win_rate | qwen3-32b | ironclad | 5 | 1.000 | 1.000 | 0.0000 | [0.000, 0.000] | 1.0000 | 1.0000 | - | yes |
 | combat | win_rate | qwen3-32b | silent | 5 | 1.000 | 0.990 | 0.0100 | [0.000, 0.030] | 1.0000 | 1.0000 | 0.45 | yes |
-| combat | hp_ratio | deepseek-r1-distill-14b | ironclad | 5 | 0.747 | 0.554 | 0.1936 | [0.041, 0.340] | 0.1250 | 0.8750 | 0.99 | incon. |
-| combat | hp_ratio | deepseek-r1-distill-14b | silent | 5 | 0.392 | 0.214 | 0.1777 | [0.066, 0.282] | 0.0625 | 0.8750 | 1.26 | incon. |
-| combat | hp_ratio | deepseek-r1-distill-7b | ironclad | 5 | 0.105 | 0.077 | 0.0278 | [-0.041, 0.102] | 0.5625 | 1.0000 | 0.31 | incon. |
-| combat | hp_ratio | deepseek-r1-distill-7b | silent | 5 | 0.145 | 0.048 | 0.0974 | [0.058, 0.139] | 0.0625 | 0.8750 | 1.81 | incon. |
-| combat | hp_ratio | llama-3.1-8b | ironclad | 5 | 1.035 | 1.037 | -0.0020 | [-0.017, 0.013] | 0.8750 | 1.0000 | -0.10 | yes |
-| combat | hp_ratio | llama-3.1-8b | silent | 5 | 1.010 | 1.007 | 0.0031 | [-0.016, 0.016] | 0.7500 | 1.0000 | 0.14 | yes |
-| combat | hp_ratio | mistral-7b | ironclad | 5 | 1.041 | 1.009 | 0.0327 | [0.009, 0.060] | 0.0625 | 0.8750 | 0.99 | incon. |
-| combat | hp_ratio | mistral-7b | silent | 5 | 1.015 | 0.903 | 0.1120 | [0.101, 0.123] | 0.0625 | 0.8750 | 7.52 | incon. |
-| combat | hp_ratio | qwen2.5-7b | ironclad | 5 | 1.042 | 1.065 | -0.0233 | [-0.038, -0.009] | 0.0625 | 0.8750 | -1.28 | yes |
-| combat | hp_ratio | qwen2.5-7b | silent | 5 | 1.024 | 1.007 | 0.0168 | [0.004, 0.037] | 0.0625 | 0.8750 | 0.78 | yes |
-| combat | hp_ratio | qwen3-235b-a22b-fp8 | ironclad | 5 | 1.083 | 1.032 | 0.0514 | [0.014, 0.089] | 0.0625 | 0.8750 | 1.07 | incon. |
-| combat | hp_ratio | qwen3-235b-a22b-fp8 | silent | 5 | 1.044 | 0.989 | 0.0551 | [0.021, 0.086] | 0.1250 | 0.8750 | 1.34 | incon. |
-| combat | hp_ratio | qwen3-32b | ironclad | 5 | 1.075 | 1.051 | 0.0239 | [0.006, 0.042] | 0.1250 | 0.8750 | 1.01 | yes |
-| combat | hp_ratio | qwen3-32b | silent | 5 | 1.059 | 0.995 | 0.0640 | [0.010, 0.103] | 0.1250 | 0.8750 | 1.04 | incon. |
+| combat | hp_ratio | deepseek-r1-distill-14b | ironclad | 5 | 0.747 | 0.554 | 0.1936 | [0.036, 0.341] | 0.1250 | 0.8750 | 0.99 | n/a |
+| combat | hp_ratio | deepseek-r1-distill-14b | silent | 5 | 0.392 | 0.214 | 0.1777 | [0.066, 0.282] | 0.0625 | 0.8750 | 1.26 | n/a |
+| combat | hp_ratio | deepseek-r1-distill-7b | ironclad | 5 | 0.105 | 0.077 | 0.0278 | [-0.044, 0.099] | 0.5625 | 1.0000 | 0.31 | n/a |
+| combat | hp_ratio | deepseek-r1-distill-7b | silent | 5 | 0.145 | 0.048 | 0.0974 | [0.058, 0.141] | 0.0625 | 0.8750 | 1.81 | n/a |
+| combat | hp_ratio | llama-3.1-8b | ironclad | 5 | 1.035 | 1.037 | -0.0020 | [-0.017, 0.013] | 0.8750 | 1.0000 | -0.10 | n/a |
+| combat | hp_ratio | llama-3.1-8b | silent | 5 | 1.010 | 1.007 | 0.0031 | [-0.016, 0.016] | 0.7500 | 1.0000 | 0.14 | n/a |
+| combat | hp_ratio | mistral-7b | ironclad | 5 | 1.041 | 1.009 | 0.0327 | [0.009, 0.060] | 0.0625 | 0.8750 | 0.99 | n/a |
+| combat | hp_ratio | mistral-7b | silent | 5 | 1.015 | 0.903 | 0.1120 | [0.101, 0.123] | 0.0625 | 0.8750 | 7.52 | n/a |
+| combat | hp_ratio | qwen2.5-7b | ironclad | 5 | 1.042 | 1.065 | -0.0233 | [-0.038, -0.009] | 0.0625 | 0.8750 | -1.28 | n/a |
+| combat | hp_ratio | qwen2.5-7b | silent | 5 | 1.024 | 1.007 | 0.0168 | [0.004, 0.037] | 0.0625 | 0.8750 | 0.78 | n/a |
+| combat | hp_ratio | qwen3-235b-a22b-fp8 | ironclad | 5 | 1.083 | 1.032 | 0.0514 | [0.014, 0.089] | 0.0625 | 0.8750 | 1.07 | n/a |
+| combat | hp_ratio | qwen3-235b-a22b-fp8 | silent | 5 | 1.044 | 0.989 | 0.0551 | [0.021, 0.086] | 0.1250 | 0.8750 | 1.34 | n/a |
+| combat | hp_ratio | qwen3-32b | ironclad | 5 | 1.075 | 1.051 | 0.0239 | [0.006, 0.042] | 0.1250 | 0.8750 | 1.01 | n/a |
+| combat | hp_ratio | qwen3-32b | silent | 5 | 1.059 | 0.995 | 0.0640 | [0.010, 0.103] | 0.1250 | 0.8750 | 1.04 | n/a |
 | synergy | archetype | deepseek-r1-distill-14b | ironclad | 5 | 0.485 | 0.504 | -0.0195 | [-0.101, 0.062] | 0.6250 | 1.0000 | -0.18 | incon. |
 | synergy | archetype | deepseek-r1-distill-14b | silent | 5 | 0.600 | 0.656 | -0.0558 | [-0.090, -0.017] | 0.1250 | 1.0000 | -1.12 | incon. |
 | synergy | archetype | deepseek-r1-distill-7b | ironclad | 5 | 0.381 | 0.430 | -0.0496 | [-0.066, -0.033] | 0.0625 | 0.8750 | -2.33 | incon. |
@@ -165,7 +166,7 @@ Exact sign-flip p; **minimum attainable p = 0.0625** at 5 pairs. `equiv` = TOST 
 | synergy | archetype | qwen2.5-7b | silent | 5 | 0.600 | 0.420 | 0.1800 | [0.160, 0.200] | 0.0625 | 0.8750 | 6.57 | incon. |
 | synergy | archetype | qwen3-235b-a22b-fp8 | ironclad | 5 | 0.700 | 0.680 | 0.0200 | [-0.040, 0.070] | 0.7500 | 1.0000 | 0.26 | incon. |
 | synergy | archetype | qwen3-235b-a22b-fp8 | silent | 5 | 0.800 | 0.790 | 0.0100 | [-0.060, 0.080] | 1.0000 | 1.0000 | 0.11 | incon. |
-| synergy | archetype | qwen3-32b | ironclad | 5 | 0.606 | 0.510 | 0.0963 | [-0.034, 0.195] | 0.2500 | 1.0000 | 0.64 | incon. |
+| synergy | archetype | qwen3-32b | ironclad | 5 | 0.606 | 0.510 | 0.0963 | [-0.034, 0.206] | 0.2500 | 1.0000 | 0.64 | incon. |
 | synergy | archetype | qwen3-32b | silent | 5 | 0.790 | 0.710 | 0.0800 | [-0.000, 0.160] | 0.2500 | 1.0000 | 0.77 | incon. |
 | synergy | card_pick | deepseek-r1-distill-14b | ironclad | 5 | 0.531 | 0.566 | -0.0351 | [-0.079, 0.009] | 0.5000 | 1.0000 | -0.59 | incon. |
 | synergy | card_pick | deepseek-r1-distill-14b | silent | 5 | 0.680 | 0.605 | 0.0747 | [0.055, 0.095] | 0.0625 | 0.8750 | 2.99 | incon. |
@@ -177,30 +178,30 @@ Exact sign-flip p; **minimum attainable p = 0.0625** at 5 pairs. `equiv` = TOST 
 | synergy | card_pick | mistral-7b | silent | 5 | 0.560 | 0.200 | 0.3600 | [0.330, 0.390] | 0.0625 | 0.8750 | 8.61 | incon. |
 | synergy | card_pick | qwen2.5-7b | ironclad | 5 | 0.470 | 0.270 | 0.2000 | [0.130, 0.270] | 0.0625 | 0.8750 | 2.14 | incon. |
 | synergy | card_pick | qwen2.5-7b | silent | 5 | 0.530 | 0.450 | 0.0800 | [0.050, 0.140] | 0.0625 | 0.8750 | 1.19 | incon. |
-| synergy | card_pick | qwen3-235b-a22b-fp8 | ironclad | 5 | 0.790 | 0.670 | 0.1200 | [0.030, 0.230] | 0.1250 | 1.0000 | 0.96 | incon. |
+| synergy | card_pick | qwen3-235b-a22b-fp8 | ironclad | 5 | 0.790 | 0.670 | 0.1200 | [0.030, 0.220] | 0.1250 | 1.0000 | 0.96 | incon. |
 | synergy | card_pick | qwen3-235b-a22b-fp8 | silent | 5 | 0.650 | 0.640 | 0.0100 | [-0.060, 0.090] | 1.0000 | 1.0000 | 0.11 | incon. |
 | synergy | card_pick | qwen3-32b | ironclad | 5 | 0.534 | 0.560 | -0.0258 | [-0.167, 0.090] | 0.8750 | 1.0000 | -0.16 | incon. |
-| synergy | card_pick | qwen3-32b | silent | 5 | 0.370 | 0.430 | -0.0600 | [-0.180, 0.050] | 0.6250 | 1.0000 | -0.39 | incon. |
-| run | floors | llama-3.1-8b | ironclad | 5 | 13.370 | 13.760 | -0.3900 | [-0.770, -0.090] | 0.1250 | 1.0000 | -0.85 | incon. |
-| run | floors | llama-3.1-8b | silent | 5 | 11.420 | 11.340 | 0.0800 | [-0.180, 0.390] | 0.7500 | 1.0000 | 0.22 | incon. |
-| run | floors | mistral-7b | ironclad | 5 | 12.720 | 12.830 | -0.1100 | [-0.560, 0.410] | 0.6875 | 1.0000 | -0.17 | incon. |
-| run | floors | mistral-7b | silent | 5 | 11.630 | 11.040 | 0.5900 | [0.290, 0.910] | 0.0625 | 0.6250 | 1.48 | incon. |
-| run | floors | qwen2.5-7b | ironclad | 5 | 12.810 | 13.360 | -0.5500 | [-1.380, 0.280] | 0.3750 | 1.0000 | -0.53 | incon. |
-| run | floors | qwen2.5-7b | silent | 5 | 11.850 | 10.860 | 0.9900 | [0.630, 1.370] | 0.0625 | 0.6250 | 2.07 | incon. |
-| run | floors | qwen3-235b-a22b-fp8 | ironclad | 5 | 12.600 | 12.000 | 0.6000 | [0.120, 1.160] | 0.1250 | 1.0000 | 0.93 | incon. |
-| run | floors | qwen3-235b-a22b-fp8 | silent | 5 | 11.440 | 10.680 | 0.7600 | [0.280, 1.320] | 0.1250 | 1.0000 | 1.16 | incon. |
-| run | floors | qwen3-32b | ironclad | 5 | 13.240 | 12.200 | 1.0400 | [-0.360, 2.520] | 0.3125 | 1.0000 | 0.55 | incon. |
-| run | floors | qwen3-32b | silent | 5 | 11.560 | 10.120 | 1.4400 | [-0.360, 3.280] | 0.3750 | 1.0000 | 0.61 | incon. |
-| run | progress | llama-3.1-8b | ironclad | 5 | 0.836 | 0.860 | -0.0244 | [-0.049, -0.006] | 0.1250 | 1.0000 | -0.85 | yes |
-| run | progress | llama-3.1-8b | silent | 5 | 0.714 | 0.709 | 0.0050 | [-0.011, 0.024] | 0.7500 | 1.0000 | 0.22 | yes |
-| run | progress | mistral-7b | ironclad | 5 | 0.795 | 0.802 | -0.0069 | [-0.035, 0.028] | 0.6875 | 1.0000 | -0.17 | yes |
-| run | progress | mistral-7b | silent | 5 | 0.727 | 0.690 | 0.0369 | [0.018, 0.057] | 0.0625 | 0.6250 | 1.48 | incon. |
-| run | progress | qwen2.5-7b | ironclad | 5 | 0.801 | 0.835 | -0.0344 | [-0.086, 0.018] | 0.3750 | 1.0000 | -0.53 | incon. |
-| run | progress | qwen2.5-7b | silent | 5 | 0.741 | 0.679 | 0.0619 | [0.039, 0.086] | 0.0625 | 0.6250 | 2.07 | incon. |
-| run | progress | qwen3-235b-a22b-fp8 | ironclad | 5 | 0.787 | 0.750 | 0.0375 | [0.007, 0.072] | 0.1250 | 1.0000 | 0.93 | incon. |
-| run | progress | qwen3-235b-a22b-fp8 | silent | 5 | 0.715 | 0.667 | 0.0475 | [0.018, 0.083] | 0.1250 | 1.0000 | 1.16 | incon. |
-| run | progress | qwen3-32b | ironclad | 5 | 0.828 | 0.762 | 0.0650 | [-0.022, 0.163] | 0.3125 | 1.0000 | 0.55 | incon. |
-| run | progress | qwen3-32b | silent | 5 | 0.723 | 0.632 | 0.0900 | [-0.022, 0.203] | 0.3750 | 1.0000 | 0.61 | incon. |
+| synergy | card_pick | qwen3-32b | silent | 5 | 0.370 | 0.430 | -0.0600 | [-0.190, 0.050] | 0.6250 | 1.0000 | -0.39 | incon. |
+| run | floors | llama-3.1-8b | ironclad | 5 | 13.370 | 13.760 | -0.3900 | [-0.780, -0.090] | 0.1250 | 1.0000 | -0.85 | n/a |
+| run | floors | llama-3.1-8b | silent | 5 | 11.420 | 11.340 | 0.0800 | [-0.180, 0.390] | 0.7500 | 1.0000 | 0.22 | n/a |
+| run | floors | mistral-7b | ironclad | 5 | 12.720 | 12.830 | -0.1100 | [-0.560, 0.440] | 0.6875 | 1.0000 | -0.17 | n/a |
+| run | floors | mistral-7b | silent | 5 | 11.630 | 11.040 | 0.5900 | [0.290, 0.910] | 0.0625 | 0.6250 | 1.48 | n/a |
+| run | floors | qwen2.5-7b | ironclad | 5 | 12.810 | 13.360 | -0.5500 | [-1.380, 0.280] | 0.3750 | 1.0000 | -0.53 | n/a |
+| run | floors | qwen2.5-7b | silent | 5 | 11.850 | 10.860 | 0.9900 | [0.630, 1.370] | 0.0625 | 0.6250 | 2.07 | n/a |
+| run | floors | qwen3-235b-a22b-fp8 | ironclad | 5 | 12.600 | 12.000 | 0.6000 | [0.120, 1.160] | 0.1250 | 1.0000 | 0.93 | n/a |
+| run | floors | qwen3-235b-a22b-fp8 | silent | 5 | 11.440 | 10.680 | 0.7600 | [0.280, 1.320] | 0.1250 | 1.0000 | 1.16 | n/a |
+| run | floors | qwen3-32b | ironclad | 5 | 13.240 | 12.200 | 1.0400 | [-0.440, 2.600] | 0.3125 | 1.0000 | 0.55 | n/a |
+| run | floors | qwen3-32b | silent | 5 | 11.560 | 10.120 | 1.4400 | [-0.360, 3.280] | 0.3750 | 1.0000 | 0.61 | n/a |
+| run | progress | llama-3.1-8b | ironclad | 5 | 0.836 | 0.860 | -0.0244 | [-0.049, -0.006] | 0.1250 | 1.0000 | -0.85 | n/a |
+| run | progress | llama-3.1-8b | silent | 5 | 0.714 | 0.709 | 0.0050 | [-0.011, 0.024] | 0.7500 | 1.0000 | 0.22 | n/a |
+| run | progress | mistral-7b | ironclad | 5 | 0.795 | 0.802 | -0.0069 | [-0.035, 0.028] | 0.6875 | 1.0000 | -0.17 | n/a |
+| run | progress | mistral-7b | silent | 5 | 0.727 | 0.690 | 0.0369 | [0.018, 0.057] | 0.0625 | 0.6250 | 1.48 | n/a |
+| run | progress | qwen2.5-7b | ironclad | 5 | 0.801 | 0.835 | -0.0344 | [-0.086, 0.018] | 0.3750 | 1.0000 | -0.53 | n/a |
+| run | progress | qwen2.5-7b | silent | 5 | 0.741 | 0.679 | 0.0619 | [0.039, 0.086] | 0.0625 | 0.6250 | 2.07 | n/a |
+| run | progress | qwen3-235b-a22b-fp8 | ironclad | 5 | 0.787 | 0.750 | 0.0375 | [0.007, 0.072] | 0.1250 | 1.0000 | 0.93 | n/a |
+| run | progress | qwen3-235b-a22b-fp8 | silent | 5 | 0.715 | 0.667 | 0.0475 | [0.018, 0.083] | 0.1250 | 1.0000 | 1.16 | n/a |
+| run | progress | qwen3-32b | ironclad | 5 | 0.828 | 0.762 | 0.0650 | [-0.022, 0.163] | 0.3125 | 1.0000 | 0.55 | n/a |
+| run | progress | qwen3-32b | silent | 5 | 0.723 | 0.632 | 0.0900 | [-0.022, 0.205] | 0.3750 | 1.0000 | 0.61 | n/a |
 
 *(Non-headline metrics — legal_rate, parse_ok, invalid-action errors, draft coherence — are in the JSON artifact.)*
 
@@ -230,17 +231,17 @@ Balanced model × character × format design with the 5 seeds as replicates, so 
 
 | Model | Char | Fmt | Metric | runs/seed | model | greedy (matched) | diff | 95% CI | p | d_z |
 |---|---|---|---|---|---|---|---|---|---|---|
-| deepseek-r1-distill-14b | ironclad | structured | floors | 20 | 9.750 | 12.480 | -2.7300 | [-3.500, -1.930] | 0.0625 | -2.58 |
+| deepseek-r1-distill-14b | ironclad | structured | floors | 20 | 9.750 | 12.480 | -2.7300 | [-3.510, -1.960] | 0.0625 | -2.58 |
 | deepseek-r1-distill-14b | ironclad | structured | progress | 20 | 0.609 | 0.780 | -0.1706 | [-0.219, -0.122] | 0.0625 | -2.58 |
 | deepseek-r1-distill-14b | ironclad | structured | survival | 20 | 0.010 | 0.010 | 0.0000 | [-0.030, 0.030] | 1.0000 | 0.00 |
 | llama-3.1-8b | ironclad | structured | floors | 20 | 13.370 | 12.480 | 0.8900 | [0.400, 1.390] | 0.0625 | 1.39 |
 | llama-3.1-8b | ironclad | structured | progress | 20 | 0.836 | 0.780 | 0.0556 | [0.025, 0.087] | 0.0625 | 1.39 |
 | llama-3.1-8b | ironclad | structured | survival | 20 | 0.010 | 0.010 | 0.0000 | [-0.030, 0.030] | 1.0000 | 0.00 |
-| llama-3.1-8b | ironclad | raw | floors | 20 | 13.760 | 12.480 | 1.2800 | [0.699, 1.770] | 0.0625 | 1.85 |
-| llama-3.1-8b | ironclad | raw | progress | 20 | 0.860 | 0.780 | 0.0800 | [0.042, 0.113] | 0.0625 | 1.85 |
+| llama-3.1-8b | ironclad | raw | floors | 20 | 13.760 | 12.480 | 1.2800 | [0.670, 1.770] | 0.0625 | 1.85 |
+| llama-3.1-8b | ironclad | raw | progress | 20 | 0.860 | 0.780 | 0.0800 | [0.042, 0.111] | 0.0625 | 1.85 |
 | llama-3.1-8b | ironclad | raw | survival | 20 | 0.030 | 0.010 | 0.0200 | [0.000, 0.040] | 0.5000 | 0.73 |
-| llama-3.1-8b | silent | structured | floors | 20 | 11.420 | 11.260 | 0.1600 | [-0.230, 0.570] | 0.6250 | 0.31 |
-| llama-3.1-8b | silent | structured | progress | 20 | 0.714 | 0.704 | 0.0100 | [-0.014, 0.036] | 0.6250 | 0.31 |
+| llama-3.1-8b | silent | structured | floors | 20 | 11.420 | 11.260 | 0.1600 | [-0.230, 0.580] | 0.6250 | 0.31 |
+| llama-3.1-8b | silent | structured | progress | 20 | 0.714 | 0.704 | 0.0100 | [-0.016, 0.036] | 0.6250 | 0.31 |
 | llama-3.1-8b | silent | structured | survival | 20 | 0.000 | 0.000 | 0.0000 | [0.000, 0.000] | 1.0000 | - |
 | llama-3.1-8b | silent | raw | floors | 20 | 11.340 | 11.260 | 0.0800 | [-0.140, 0.320] | 0.6250 | 0.27 |
 | llama-3.1-8b | silent | raw | progress | 20 | 0.709 | 0.704 | 0.0050 | [-0.009, 0.020] | 0.6250 | 0.27 |
@@ -255,16 +256,16 @@ Balanced model × character × format design with the 5 seeds as replicates, so 
 | mistral-7b | silent | structured | progress | 20 | 0.727 | 0.704 | 0.0231 | [-0.009, 0.056] | 0.3125 | 0.55 |
 | mistral-7b | silent | structured | survival | 20 | 0.010 | 0.000 | 0.0100 | [0.000, 0.030] | 1.0000 | 0.45 |
 | mistral-7b | silent | raw | floors | 20 | 11.040 | 11.260 | -0.2200 | [-0.760, 0.360] | 0.5625 | -0.31 |
-| mistral-7b | silent | raw | progress | 20 | 0.690 | 0.704 | -0.0137 | [-0.048, 0.022] | 0.5625 | -0.31 |
+| mistral-7b | silent | raw | progress | 20 | 0.690 | 0.704 | -0.0137 | [-0.048, 0.021] | 0.5625 | -0.31 |
 | mistral-7b | silent | raw | survival | 20 | 0.010 | 0.000 | 0.0100 | [0.000, 0.030] | 1.0000 | 0.45 |
 | qwen2.5-7b | ironclad | structured | floors | 20 | 12.810 | 12.480 | 0.3300 | [-0.470, 1.230] | 0.6250 | 0.30 |
 | qwen2.5-7b | ironclad | structured | progress | 20 | 0.801 | 0.780 | 0.0206 | [-0.029, 0.076] | 0.6250 | 0.30 |
 | qwen2.5-7b | ironclad | structured | survival | 20 | 0.030 | 0.010 | 0.0200 | [0.000, 0.040] | 0.5000 | 0.73 |
-| qwen2.5-7b | ironclad | raw | floors | 20 | 13.360 | 12.480 | 0.8800 | [0.190, 1.410] | 0.1250 | 1.09 |
+| qwen2.5-7b | ironclad | raw | floors | 20 | 13.360 | 12.480 | 0.8800 | [0.200, 1.420] | 0.1250 | 1.09 |
 | qwen2.5-7b | ironclad | raw | progress | 20 | 0.835 | 0.780 | 0.0550 | [0.012, 0.089] | 0.1250 | 1.09 |
 | qwen2.5-7b | ironclad | raw | survival | 20 | 0.000 | 0.010 | -0.0100 | [-0.030, 0.000] | 1.0000 | -0.45 |
-| qwen2.5-7b | silent | structured | floors | 20 | 11.850 | 11.260 | 0.5900 | [0.160, 1.030] | 0.1250 | 1.05 |
-| qwen2.5-7b | silent | structured | progress | 20 | 0.741 | 0.704 | 0.0369 | [0.010, 0.064] | 0.1250 | 1.05 |
+| qwen2.5-7b | silent | structured | floors | 20 | 11.850 | 11.260 | 0.5900 | [0.160, 1.020] | 0.1250 | 1.05 |
+| qwen2.5-7b | silent | structured | progress | 20 | 0.741 | 0.704 | 0.0369 | [0.009, 0.063] | 0.1250 | 1.05 |
 | qwen2.5-7b | silent | structured | survival | 20 | 0.000 | 0.000 | 0.0000 | [0.000, 0.000] | 1.0000 | - |
 | qwen2.5-7b | silent | raw | floors | 20 | 10.860 | 11.260 | -0.4000 | [-0.910, 0.110] | 0.3750 | -0.61 |
 | qwen2.5-7b | silent | raw | progress | 20 | 0.679 | 0.704 | -0.0250 | [-0.057, 0.007] | 0.3750 | -0.61 |
@@ -283,15 +284,15 @@ Balanced model × character × format design with the 5 seeds as replicates, so 
 | qwen3-235b-a22b-fp8 | silent | raw | survival | 5 | 0.000 | 0.000 | 0.0000 | [0.000, 0.000] | 1.0000 | - |
 | qwen3-32b | ironclad | structured | floors | 5 | 13.240 | 12.760 | 0.4800 | [-0.680, 1.640] | 0.5625 | 0.32 |
 | qwen3-32b | ironclad | structured | progress | 5 | 0.828 | 0.797 | 0.0300 | [-0.043, 0.102] | 0.5625 | 0.32 |
-| qwen3-32b | ironclad | structured | survival | 5 | 0.120 | 0.040 | 0.0800 | [-0.080, 0.280] | 0.7500 | 0.35 |
+| qwen3-32b | ironclad | structured | survival | 5 | 0.120 | 0.040 | 0.0800 | [-0.080, 0.240] | 0.7500 | 0.35 |
 | qwen3-32b | ironclad | raw | floors | 5 | 12.200 | 12.760 | -0.5600 | [-1.640, 0.520] | 0.5000 | -0.41 |
-| qwen3-32b | ironclad | raw | progress | 5 | 0.762 | 0.797 | -0.0350 | [-0.100, 0.033] | 0.5000 | -0.41 |
+| qwen3-32b | ironclad | raw | progress | 5 | 0.762 | 0.797 | -0.0350 | [-0.102, 0.033] | 0.5000 | -0.41 |
 | qwen3-32b | ironclad | raw | survival | 5 | 0.000 | 0.040 | -0.0400 | [-0.120, 0.000] | 1.0000 | -0.45 |
-| qwen3-32b | silent | structured | floors | 5 | 11.560 | 11.320 | 0.2400 | [-0.960, 1.240] | 0.7500 | 0.17 |
-| qwen3-32b | silent | structured | progress | 5 | 0.723 | 0.708 | 0.0150 | [-0.060, 0.075] | 0.7500 | 0.17 |
+| qwen3-32b | silent | structured | floors | 5 | 11.560 | 11.320 | 0.2400 | [-0.962, 1.200] | 0.7500 | 0.17 |
+| qwen3-32b | silent | structured | progress | 5 | 0.723 | 0.708 | 0.0150 | [-0.060, 0.077] | 0.7500 | 0.17 |
 | qwen3-32b | silent | structured | survival | 5 | 0.000 | 0.000 | 0.0000 | [0.000, 0.000] | 1.0000 | - |
-| qwen3-32b | silent | raw | floors | 5 | 10.120 | 11.320 | -1.2000 | [-2.600, 0.160] | 0.1875 | -0.68 |
-| qwen3-32b | silent | raw | progress | 5 | 0.632 | 0.708 | -0.0750 | [-0.168, 0.007] | 0.1875 | -0.68 |
+| qwen3-32b | silent | raw | floors | 5 | 10.120 | 11.320 | -1.2000 | [-2.680, 0.160] | 0.1875 | -0.68 |
+| qwen3-32b | silent | raw | progress | 5 | 0.632 | 0.708 | -0.0750 | [-0.168, 0.003] | 0.1875 | -0.68 |
 | qwen3-32b | silent | raw | survival | 5 | 0.000 | 0.000 | 0.0000 | [0.000, 0.000] | 1.0000 | - |
 
 ## 7. Boundary cells — exact (Clopper–Pearson) intervals

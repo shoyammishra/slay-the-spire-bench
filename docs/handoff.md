@@ -13,6 +13,15 @@ Single source of truth stays where it already lives (see §2).
 
 ## 1. Project status snapshot (2026-07-12)
 
+- **Construct supersession (2026-08-30):** a repository-wide adversarial research
+  audit rejects the four-task “planning horizon” interpretation. The tasks are now
+  operation profiles; the horizon curve, radar, and overall scalar fail closed.
+  `docs/research_audit/` contains the 15-file review/rebuild package.
+- **P0 implementation:** future result schema 2.0 records provenance and per-dimension
+  merge sources; a compute-free dictionary policy solves 120/120 fixed synergy cases;
+  `controlled-decision-horizon-v1` infrastructure is implemented and smoke-tested.
+  No model inference has run; all controlled-H results are PENDING EXPERIMENT.
+
 - **Active supersession (2026-08-30):** the open-model matrix now has 28 canonical
   aggregates (7 configurations × 2 characters × 2 formats), including the complete
   Qwen3-235B rung. Its strongest relative gain over Qwen3-32B is card selection
@@ -25,7 +34,7 @@ Single source of truth stays where it already lives (see §2).
   configs) are on this laptop and folded into all docs. Every remaining `—` cell in the
   legacy result tables was *intentional*, not pending. Nothing is running on the cluster.
 - **Engine + harness are post-audit stable**: 5 full audits (2026-06-10 → 06-12) found and
-  fixed ~130 bugs; **174/174 tests pass** (as of 2026-08-30); mock pipeline green for both characters × both
+  fixed ~130 bugs; **180/180 tests pass** (as of 2026-08-30); mock pipeline green for both characters × both
   formats.
 - **The two D&B-blocking gaps from the novelty review are closed** (≥3 model families +
   a reasoning model).
@@ -220,7 +229,7 @@ and three-cell quarantine are historical only.
 | 2 | ~~**Fable 5 lit note** into `docs/draft.md` Related Work~~ — **✅ DONE 2026-07-12** (Opus 4.8 agent; 4 insertions in draft.md + Anthropic entry in `novelty_and_related_work.md` §10) | done | Met: domain validation cited; floor-vs-ceiling complement framing; ~3×-with-memory as corroboration-only; memory = future-work only |
 | 3 | ~~**Run-level discriminability decision**~~ — **✅ DECIDED 2026-07-12** (decision_log P3 entry): **reframe run as the shared collapse floor (Option B)**; `--acts 3` = conditional appendix probe gated on M3b frontier results also flooring at 1 act, preceded by an Act-2/3 engine audit + smoke (~12h/cell; full matrix would be ~72–144 GPU-h). roadmap step 6 re-tagged | done | Met: decision + trade-offs + revisit trigger (M3b) recorded; no compute spent |
 | 4 | **M3b frontier runs** (Claude/GPT via professor's channel) — fills the frontier gap; expected to bend the collapse curve. **⚠️ Budget protocol registered 2026-07-13 (decision_log): matched-8k first, escalate only on measured truncation** — the smoke test MUST read `parse_fail_truncated`/`truncation_errors` before any full cell (the DeepSeek budget-bound confound now instrumented); reasoning APIs need their decoupled budgets configured (Claude thinking budget separate from answer tokens; OpenAI `max_completion_tokens` covers reasoning too). **Scope added 2026-07-14 (review-driven, decision_log): fold-in includes a cross-benchmark correlation** — per-model collapse points vs *published* external agent-benchmark scores (GAIA/SWE-Bench/WebArena…); we run nothing external, n≈8–10 models, reported as directional only | `benchmark-operator` + user (credentials/spend) | Same harness, same seeds, all 4 combos; provider class may need adding to `benchmark.py`; smoke truncation check ≈ 0 (or the raised-budget condition added + both reported); correlation table with the directional caveat |
-| 4b | ~~**Statistical rigor pass**~~ — **✅ REFRESHED 2026-08-30.** `scripts/stats_rigor.py` now discovers 7 configurations/28 cells and verifies 70/70 structured/raw fixture pairings. `tests/test_stats.py` has 27 known-answer tests (**174/174 repository total**). Removal-v1 is quarantined from every inferential surface and composite. Current between-model η² shares on the representative metrics are turn damage .865 / combat win .896 / synergy archetype .629 / **run floors .021**; the run estimate remains restricted to the three balanced `N_RUN=20` models. **⚠️ Power ceiling:** five seed pairs imply min attainable two-sided per-combo p=.0625, so inference uses pooled strata and sample-level tests. | done | Met: reusable script; CIs + effect sizes; paired tests; removal quarantine enforced; Qwen3-235B folded in without blending run tiers |
+| 4b | ~~**Statistical rigor pass**~~ — **✅ REFRESHED 2026-08-30.** `scripts/stats_rigor.py` discovers 7 configurations/28 cells and verifies 70/70 structured/raw fixture pairings. `tests/test_stats.py` has 27 known-answer tests (**180/180 repository total**). Removal-v1 is quarantined. The old cross-task η² horizon claim is `NOT-IDENTIFIED`: run uses only three balanced `N_RUN=20` models and every task/scale differs. **⚠️ Power ceiling:** five seed pairs imply min attainable two-sided per-combo p=.0625. | done | Met: reusable script; CIs + effect sizes; paired tests; removal quarantine enforced; Qwen3-235B folded in without blending run tiers |
 | 4c | ~~**Open-model ladder, top rung: Qwen3-235B-A22B-FP8**~~ — **✅ COMPLETE 2026-08-30.** All four cells, 20 per-seed artifacts, and 400/400/400/100 observations recovered and audited. Silent/raw's canonical null run block was reaggregated correctly. Relative to Qwen3-32B, card pick improves in all four cells and 19/20 seed pairs; other horizons are mixed or saturated. Parse/truncation counts, matched-greedy floor comparisons, MoE-vs-dense caveat, and missing-original-stdout limitation are recorded in the 2026-08-30 experiment/decision entries. | complete | Met: no landed work recomputed; exact sample inventory and seed audit; canonical aggregate; statistics/figures/docs refreshed; run remains `N_RUN=5` floor-estimate tier |
 | 4d | **Removal-v2 redesign and synergy re-baseline** — only if strategic pruning is needed as a paper claim. Version the instrument; vary/balance expert targets and candidate positions; persist target metadata; demonstrate constant-answer chance baselines; then rerun all synergy cells because the prompt is joint. Never mix v1 and v2. | `engine-auditor` + `benchmark-operator` + user (compute) | Design decision and degenerate tests before spend; exact-stack smoke; full versioned matrix; statistics and figures regenerated |
 | 5 | ~~Complete qwen3-32b non-synergy dimensions~~ — **✅ DONE 2026-08-07; full four-dimension matrix retrieved, audited, and folded in.** | complete | See experiment log 2026-08-07 |
@@ -243,12 +252,12 @@ mechanical formatting or transcription.
   batch any remaining GPU work.
 - **Fake-precision risk**: n=20 × 5 seeds is paper-grade for this scope, but any new
   claim needs its own power check (12.5pp steps at n=8 was the old trap).
-- **No CI** (see §9): the 174 tests only run when someone runs them. Run all four files
+- **No CI** (see §9): the 180 tests only run when someone runs them. Run all four files
   before every commit.
 
 ## 8. Review checklist (no merge without)
 
-1. All 4 test files pass (**174 tests**: benchmark 49, combat 62, run 36, stats 27), run
+1. All 4 test files pass (**180 tests**: benchmark 55, combat 62, run 36, stats 27), run
    directly with `PYTHONIOENCODING=utf-8`.
 2. Mock pipeline green: both characters × both formats.
 3. §5.1 classification done: does this change invalidate data? If yes, re-baseline plan

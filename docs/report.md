@@ -1,5 +1,9 @@
 # slay-bench — Project Report
 
+> **Historical report — not current research claims.** The 2026-08-30 adversarial
+> audit retired cross-task horizon, radar, and overall-score interpretations. See
+> `research_audit/ADVERSARIAL_REVIEW.md`.
+
 **Date:** 2026-06-07  
 **Status:** Pilot complete; paper-grade runs in progress  
 **Branch:** synergy-rework  

@@ -1,16 +1,40 @@
-# Draft
+# Draft — adversarially rebuilt thesis
+
+> **2026-08-30 supersession.** The earlier “four nested horizons” manuscript is not
+> submission-ready and is retained below only as historical drafting evidence. The
+> four tasks do not constitute a controlled horizon intervention. The authoritative
+> rebuild is `docs/research_audit/MANUSCRIPT_REBUILD_PLAN.md`; claims are governed by
+> `docs/research_audit/CLAIMS_MATRIX.md`. No horizon curve, radar, overall score,
+> “faithful simulator,” or default “full-run strategic control” claim may be restored.
 
 ## Working Title
-**slay-bench: Where Does LLM Planning Collapse? A Multi-Horizon Decomposition in a Roguelike Environment**
+**Slay-Bench: Diagnosing Operation-Specific LLM Decision Competence in a Deterministic Deck-Building Simulator**
 
-## Abstract (refreshed 2026-08-30 — seven-configuration audited matrix)
+## Abstract (rebuilt 2026-08-30)
 
-We present slay-bench, a benchmark that decomposes large-language-model planning ability into four nested horizons — single-turn card sequencing, full-combat tactics, deck-synergy judgment, and full-run survival — inside one faithful Slay the Spire simulator (Ironclad and Silent). Each horizon uses a distinct reference: exhaustive turn optimum, a greedy combat baseline, hand-crafted archetype and best-pick fixtures, and an empirically measured greedy run floor. We evaluate seven model configurations from five families (Qwen2.5-7B, Llama-3.1-8B, Mistral-7B, Qwen3-32B, Qwen3-235B-A22B-FP8, and DeepSeek-R1-Distill 14B/7B) over five spaced seeds under seed-matched structured-JSON and natural-English prompts. Three findings. (1) **Inter-model variance concentrates before the run horizon**: on representative metrics, between-model variance shares are .865 for turn damage, .896 for combat win, .629 for synergy archetype, and .021 for run floors, where the balanced models converge on the measured greedy floor. (2) **Capacity gains are operation-selective**: relative to seed-matched Qwen3-32B, Qwen3-235B improves card-pick accuracy by .110–.280 in all four cells and 19/20 seed pairs, but turn, combat, and run effects are mixed or saturated rather than a uniform horizon extension. (3) **Prompt-format effects depend on the operation**: structured prompts produce a general combat-HP advantage, while turn and valid synergy effects vary by model/character. A degenerate-strategy audit invalidated the original removal metric—all expert targets were `Strike`—so we quarantine it rather than report a pruning claim. All results use an audited harness with measured baselines and 174 regression tests.
+Game environments offer verifiable outcomes, but benchmark labels such as “planning”
+often conflate lookahead with task, interface, and control surface. We present
+Slay-Bench, a deterministic Slay the Spire simulator and diagnostic suite covering two
+characters, two prompt encodings, and four decision operations: immediate-damage
+sequencing, short-combat execution, fixed-deck taxonomy/card selection, and
+hybrid-policy Act-1 rollout. Seven model configurations on matched seeds do not support
+a single cross-task planning score. Instead, model and format effects are
+operation-specific. The clearest matched comparison is Qwen3-235B-A22B-FP8 versus
+Qwen3-32B: card selection improves in all four character/format cells and 19/20 seed
+pairs without a uniform corresponding gain on the other operations. Act-1 survival is
+on par with a scripted greedy policy. An adversarial audit shows that a non-planning
+card-name lookup solves every fixed synergy fixture, bounding those scores as
+recognition rather than forward planning. We release compute-free diagnostics and a
+versioned same-state decision-horizon protocol; model results for that protocol are
+**PENDING EXPERIMENT**.
 
 > ⛔ **Superseded claims — do not reintroduce:** any removal-v1 capability or format
 > claim (including “structured ≥ raw for 5 of 6 models”) is invalid because a constant
 > `Strike` answer scores 100%. Also superseded: “Qwen3-32B is synergy-only” and “the
 > open-model result stops at 32B.” Raw removal fields remain provenance diagnostics only.
+
+> **Historical material below this line is superseded.** It is intentionally preserved
+> to show which claims were invalidated; do not use it for submission text.
 
 ## Sections (outline)
 1. Introduction

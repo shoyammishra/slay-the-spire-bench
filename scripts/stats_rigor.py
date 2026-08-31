@@ -48,11 +48,11 @@ METHOD CHOICES (rationale in docs/decision_log.md 2026-08-07)
     cluster-safe seed-level permutation test; disagreements are printed explicitly.
   * Multiplicity: Holm-Bonferroni within each family (a family = one metric
     across the discovered combos).
-  * A non-significant result is NEVER reported as "no effect". Format
-    insensitivity is tested as EQUIVALENCE (TOST via the 90% bootstrap CI of
-    the paired difference) against a pre-declared margin of 0.05 -- the
-    measurement granularity of the instrument, since one sample in 20 moves any
-    rate by exactly 0.05.
+  * A non-significant result is NEVER reported as "no effect". For Bernoulli/rate
+    metrics only, format insensitivity is tested as EQUIVALENCE (TOST via the 90%
+    bootstrap CI) against a margin of 0.05 -- one item in 20. Non-rate metrics
+    such as HP ratio and progress have no registered domain SESOI, so equivalence
+    is not assessed for them.
   * Bootstrap: percentile method, 10,000 resamples, fixed RNG seed (numbers are
     reproducible). Seed-level CIs resample 5 values and are labelled COARSE.
     Synergy accuracies use a hierarchical bootstrap (resample seeds, then
@@ -106,7 +106,11 @@ CHARACTERS = ("ironclad", "silent")
 BOOT_DEFAULT = 10000
 RNG_SEED = 20260807          # fixed => reproducible CIs
 ALPHA = 0.05                 # 95% CIs
-EQUIV_MARGIN = 0.05          # see module docstring: 1 sample in 20
+EQUIV_MARGIN = 0.05          # only for 20-item Bernoulli/rate metrics
+RATE_EQUIV_KEYS = {
+    "legal_rate", "parse_ok_rate", "win_rate", "archetype_acc",
+    "card_pick_acc", "survival_rate",
+}
 
 # Quarantined observations remain in the immutable result JSONs for audit, but
 # must not enter descriptive headline tables, format inference, boundary claims,
@@ -666,7 +670,8 @@ def analysis_format_paired(cells: Dict, models: Sequence[str],
                     diffs = [a - b for a, b in zip(sv, rv)]
                     test = exact_sign_flip_p(diffs)
                     ci = bootstrap_mean_ci(diffs, rng, boot)
-                    eq = equivalence_test(diffs, EQUIV_MARGIN, rng, boot)
+                    eq = (equivalence_test(diffs, EQUIV_MARGIN, rng, boot)
+                          if key in RATE_EQUIV_KEYS else {"verdict": "not_assessed"})
                     row = {
                         "dimension": dim, "metric": disp, "key": key,
                         "model": model, "character": ch,
@@ -679,6 +684,8 @@ def analysis_format_paired(cells: Dict, models: Sequence[str],
                         "p_floor": round(test.get("p_floor", float("nan")), 4),
                         "dz": None if math.isnan(cohens_dz(diffs)) else round(cohens_dz(diffs), 3),
                         "equivalence": eq["verdict"],
+                        "equivalence_margin": (EQUIV_MARGIN
+                                               if key in RATE_EQUIV_KEYS else None),
                         "favours": ("structured" if mean(diffs) > 0 else
                                     ("raw" if mean(diffs) < 0 else "tie"))
                         if higher_better else
@@ -1009,8 +1016,22 @@ def analysis_headline_claims(cells: Dict, models: Sequence[str], desc: List[Dict
                 if r["dimension"] == dim and r["key"] == key]
         if not rows:
             continue
-        eq = [r for r in rows if r["equivalence"] == "equivalent"]
-        frac = len(eq) / len(rows)
+        assessed = [r for r in rows if r["equivalence"] != "not_assessed"]
+        if not assessed:
+            claims.append({
+                "id": f"C3-{dim}-{disp}",
+                "claim": f"{dim} {disp} is insensitive to prompt format",
+                "verdict": "NOT-ASSESSED-NO-SESOI",
+                "combos_equivalent": None, "combos_tested": len(rows),
+                "margin": None, "not_equivalent": [],
+                "note": ("No domain-justified smallest effect of interest is "
+                         "registered for this non-rate metric; a null test cannot "
+                         "establish insensitivity."),
+                "evidence": "descriptive paired estimates only",
+            })
+            continue
+        eq = [r for r in assessed if r["equivalence"] == "equivalent"]
+        frac = len(eq) / len(assessed)
         if frac == 1.0:
             verdict = "SUPPORTED"
         elif frac >= 2 / 3:
@@ -1021,7 +1042,7 @@ def analysis_headline_claims(cells: Dict, models: Sequence[str], desc: List[Dict
             "id": f"C3-{dim}-{disp}",
             "claim": f"{dim} {disp} is insensitive to prompt format",
             "verdict": verdict,
-            "combos_equivalent": len(eq), "combos_tested": len(rows),
+            "combos_equivalent": len(eq), "combos_tested": len(assessed),
             "margin": EQUIV_MARGIN,
             "not_equivalent": [f"{r['model']}/{r['character']}" for r in rows
                                if r["equivalence"] != "equivalent"],
@@ -1032,8 +1053,8 @@ def analysis_headline_claims(cells: Dict, models: Sequence[str], desc: List[Dict
             "evidence": f"TOST via 90% bootstrap CI, margin +/-{EQUIV_MARGIN}",
         })
 
-    # C7 -- the format effect reaches the COMBAT horizon (correction candidate to
-    # the standing "combat is format-insensitive on outcome" claim).
+    # C7 -- within-task combat format effect.  This must not be promoted to a
+    # horizon statement because no controlled horizon variable exists here.
     for key, disp in (("win_rate", "win_rate"), ("avg_hp_ratio", "hp_ratio")):
         p = next((x for x in fmt_res["pooled"]
                   if x["dimension"] == "combat" and x["key"] == key), None)
@@ -1041,7 +1062,7 @@ def analysis_headline_claims(cells: Dict, models: Sequence[str], desc: List[Dict
             continue
         rows = [r for r in fmt_res["per_combo"]
                 if r["dimension"] == "combat" and r["key"] == key]
-        # Which combos actually move by more than the equivalence margin, and are
+        # Which combos move by more than the descriptive 0.05 display threshold, and are
         # they the ones that sit BELOW the combat ceiling? If so, "format-
         # insensitive" was a ceiling artifact, not a property of the horizon.
         material = [r for r in rows if abs(r["mean_diff"]) > EQUIV_MARGIN]
@@ -1060,17 +1081,19 @@ def analysis_headline_claims(cells: Dict, models: Sequence[str], desc: List[Dict
         claims.append({
             "material_strata": [f"{r['model']}/{r['character']} ({r['mean_diff']:+.3f})"
                                 for r in material],
+            "materiality_threshold": EQUIV_MARGIN,
             "n_at_combat_ceiling": len(at_ceiling),
             "n_material_among_ceiling_models": len(material_at_ceiling),
             "ceiling_artifact_note": (
-                "every combo whose effect exceeds the equivalence margin sits BELOW "
+                "every combo whose effect exceeds the 0.05 display threshold sits BELOW "
                 "the combat ceiling => the old 'combat is format-insensitive' reading "
                 "was a CEILING ARTIFACT: models that win every fight leave format "
                 "nothing to move" if material and not material_at_ceiling else
                 "some ceiling-saturated combos also move materially -- do not attribute "
-                "the effect to the ceiling alone"),
+                "the effect to the ceiling alone") +
+                "; 0.05 is a descriptive display threshold here, not a non-rate SESOI",
             "id": f"C7-{disp}",
-            "claim": f"prompt format reaches the COMBAT horizon (structured > raw on {disp})",
+            "claim": f"within the combat task, structured > raw on {disp}",
             "verdict": ("SUPPORTED" if p["p_pooled"] < ALPHA and p["mean_diff"] > 0
                         and p["direction_consistent"] else
                         ("SUPPORTED-MAGNITUDE-ONLY" if p["p_pooled"] < ALPHA and p["mean_diff"] > 0
@@ -1079,9 +1102,9 @@ def analysis_headline_claims(cells: Dict, models: Sequence[str], desc: List[Dict
             "p_sign_test": p["p_sign_test"],
             "strata_favouring_structured": p["n_favour_structured"],
             "strata_favouring_raw": p["n_favour_raw"],
-            "note": ("if SUPPORTED this CORRECTS the standing claim that combat "
-                     "outcomes are format-insensitive; check whether the effect is "
-                     "carried by the R1 distills before generalising"),
+            "note": ("this corrects the standing claim that combat outcomes are "
+                     "format-insensitive; it is a task-specific association, not "
+                     "evidence that format 'reaches' a planning horizon"),
             "evidence": ("stratified permutation + sign test over "
                          f"{p['n_strata']} strata"),
         })
@@ -1106,7 +1129,7 @@ def analysis_headline_claims(cells: Dict, models: Sequence[str], desc: List[Dict
             "evidence": "stratified permutation (magnitude) vs sign test (direction)",
         })
 
-    # C4 -- run-level is a shared collapse floor (models cluster at greedy).
+    # C4 -- hybrid-policy Act-1 outcomes cluster near the scripted greedy policy.
     floors = [r for r in run_rows if r["metric"] == "floors"]
     surv_rows = [r for r in run_rows if r["metric"] == "survival"]
     if floors:
@@ -1115,7 +1138,7 @@ def analysis_headline_claims(cells: Dict, models: Sequence[str], desc: List[Dict
         below = [r for r in floors if r["mean_diff"] < 0 and r["p_exact"] <= r["p_floor"] + 1e-9]
         surv_lift = [r for r in surv_rows if r["mean_diff"] > 0.02]
         claims.append({
-            "id": "C4", "claim": "run-level is a shared collapse floor (on par with greedy)",
+            "id": "C4", "claim": "hybrid-policy Act-1 outcomes are on par with greedy",
             "verdict": "SUPPORTED-WITH-NUANCE",
             "combos_tested": len(floors),
             "combos_above_greedy_on_floors_all_seeds": [
@@ -1129,7 +1152,8 @@ def analysis_headline_claims(cells: Dict, models: Sequence[str], desc: List[Dict
                      "greedy anchor for some combos (~0.5-1.3 floors). 'On par, not "
                      "beating' is right for survival; for floors say 'within ~1 floor of "
                      "greedy'. n=5 seed pairs => p_min = 0.0625, so none of these can "
-                     "reach alpha=0.05 by construction."),
+                     "reach alpha=0.05 by construction. This task is a hybrid scripted "
+                     "rollout, not a full-agent or horizon measure."),
             "evidence": "run-seed-matched paired comparison against the measured greedy anchor",
         })
 
@@ -1173,7 +1197,10 @@ def analysis_headline_claims(cells: Dict, models: Sequence[str], desc: List[Dict
             "evidence": "run-seed-matched paired test + exact binomial CI on survival",
         })
 
-    # C6 -- models separate at reasoning horizons and converge at survival horizons.
+    # C6 -- legacy cross-task "horizon" claim.  Eta^2 is scale- and cohort-specific:
+    # the run row uses only the three balanced N_RUN=20 models while the other rows
+    # use seven, and the tasks change construct/oracle/action space.  Preserve the
+    # descriptive shares, but fail closed on the causal/latent-horizon inference.
     sep = {}
     for dim in ("turn", "combat", "synergy", "run"):
         key = {"turn": "dmg_ratio", "combat": "win_rate",
@@ -1189,11 +1216,12 @@ def analysis_headline_claims(cells: Dict, models: Sequence[str], desc: List[Dict
         claims.append({
             "id": "C6",
             "claim": "between-model variance is large at reasoning horizons, small at survival horizons",
-            "verdict": "SUPPORTED" if sep.get("turn", {}).get("share_model", 0) >
-                       sep.get("run", {}).get("share_model", 1) else "NOT-SUPPORTED",
+            "verdict": "NOT-IDENTIFIED",
             "model_variance_share_by_dimension": sep,
-            "evidence": ("eta^2 shares from representative balanced metrics: turn damage, "
-                         "combat win, synergy archetype, and run floors"),
+            "evidence": ("descriptive eta^2 shares only; the run row has a different "
+                         "three-model cohort and every task uses a different scale"),
+            "note": ("Do not compare these shares as evidence of horizon collapse. "
+                     "A controlled same-task H intervention is required."),
         })
     return claims
 
@@ -1237,9 +1265,10 @@ def render_markdown(res: Dict) -> str:
     L.append("- Synergy is additionally tested at the **sample level** (McNemar exact) "
              "because structured and raw saw byte-identical fixtures — verified below.")
     L.append("- Multiplicity: **Holm–Bonferroni** within each metric family.")
-    L.append(f"- Format *insensitivity* is tested as **equivalence** (TOST via the 90% "
-             f"bootstrap CI, margin ±{EQUIV_MARGIN} = one sample in 20), never inferred "
-             f"from a non-significant test.")
+    L.append(f"- Format *insensitivity* is tested as **equivalence** only for "
+             f"Bernoulli/rate metrics (90% bootstrap CI, margin ±{EQUIV_MARGIN} = "
+             f"one item in 20). HP ratio and progress have no registered SESOI and "
+             f"are not tested for equivalence.")
     L.append("- Boundary cells get **Clopper–Pearson** exact intervals (a bootstrap of a "
              "constant vector reports zero width, which is not certainty).")
     L.append("- **Removal quarantine:** every synergy fixture has `Strike` as its expert "
@@ -1332,7 +1361,8 @@ def render_markdown(res: Dict) -> str:
     L.append("## 4. Format ablation — per combo, seed-matched (all dimensions)")
     L.append("")
     L.append(f"Exact sign-flip p; **minimum attainable p = 0.0625** at 5 pairs. "
-             f"`equiv` = TOST verdict at ±{EQUIV_MARGIN}.")
+             f"`equiv` = TOST verdict at ±{EQUIV_MARGIN} for rates; `n/a` means "
+             f"no registered SESOI.")
     L.append("")
     L.append("| Dim | Metric | Model | Char | n | S mean | R mean | diff | 95% CI | p | p(Holm) | d_z | equiv |")
     L.append("|---|---|---|---|---|---|---|---|---|---|---|---|---|")
@@ -1343,7 +1373,7 @@ def render_markdown(res: Dict) -> str:
                  f"{r['n_pairs']} | {_fmt(r['structured_mean'])} | {_fmt(r['raw_mean'])} | "
                  f"{_fmt(r['mean_diff'],4)} | [{_fmt(r['ci95_lo'],3)}, {_fmt(r['ci95_hi'],3)}] | "
                  f"{_fmt(r['p_exact'],4)} | {_fmt(r.get('p_holm'),4)} | {_fmt(r['dz'],2)} | "
-                 f"{'yes' if r['equivalence']=='equivalent' else 'incon.'} |")
+                 f"{('yes' if r['equivalence']=='equivalent' else ('n/a' if r['equivalence']=='not_assessed' else 'incon.'))} |")
     L.append("")
     L.append("*(Non-headline metrics — legal_rate, parse_ok, invalid-action errors, "
              "draft coherence — are in the JSON artifact.)*")
@@ -1479,7 +1509,8 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
             "generated": datetime.date.today().isoformat(),
             "script": "scripts/stats_rigor.py",
             "boot": args.boot, "rng_seed": RNG_SEED, "alpha": ALPHA,
-            "equivalence_margin": EQUIV_MARGIN,
+            "rate_equivalence_margin": EQUIV_MARGIN,
+            "rate_equivalence_keys": sorted(RATE_EQUIV_KEYS),
             "seed_bases": SEED_BASES,
             "n_models": len(models), "models": list(models),
             "n_cells": len(cells),

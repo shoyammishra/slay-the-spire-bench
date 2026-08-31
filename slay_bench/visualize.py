@@ -106,28 +106,16 @@ def write_text_report(summary: Dict[str, Any], out_path: Path) -> None:
         a("  (not evaluated)")
     a("")
 
-    # Overall score
-    scores = []
-    if t:   scores.append(t["avg_damage_ratio"] or 0)
-    if c:   scores.append(c["win_rate"] or 0)
-    if s:
-        sub = [v for v in [s.get("archetype_acc"), s.get("card_pick_acc")]
-               if v is not None]
-        if sub: scores.append(sum(sub) / len(sub))
-    if r:   scores.append(r["survival_rate"] or 0)
-
-    if scores:
-        overall = sum(scores) / len(scores)
-        a("=" * 60)
-        a(f"  OVERALL SCORE  : {_bar(overall, 30)}  {_pct(overall)}  {_rating(overall)}")
-        a("=" * 60)
+    a("=" * 60)
+    a("  NO OVERALL SCORE: tasks have non-commensurate constructs and scales.")
+    a("=" * 60)
 
     out_path.write_text("\n".join(lines), encoding="utf-8")
 
 
 # ── PNG charts ────────────────────────────────────────────────────────────────
 
-def write_charts(summary: Dict[str, Any], out_path: Path) -> None:
+def write_charts(summary: Dict[str, Any], out_path: Path) -> bool:
     """Write a 2×2 PNG chart grid from a benchmark summary dict."""
     try:
         import matplotlib
@@ -137,7 +125,7 @@ def write_charts(summary: Dict[str, Any], out_path: Path) -> None:
         import numpy as np
     except ImportError:
         print("  [warn] matplotlib not installed — skipping charts. pip install matplotlib")
-        return
+        return False
 
     fig, axes = plt.subplots(2, 2, figsize=(12, 9))
     fig.patch.set_facecolor("#1a1a2e")
@@ -246,70 +234,16 @@ def write_charts(summary: Dict[str, Any], out_path: Path) -> None:
     plt.tight_layout(rect=[0, 0.05, 1, 0.95])
     fig.savefig(out_path, dpi=150, bbox_inches="tight", facecolor=fig.get_facecolor())
     plt.close(fig)
+    return True
 
 
 # ── Radar / spider chart (overall summary) ────────────────────────────────────
 
 def write_radar(summary: Dict[str, Any], out_path: Path) -> None:
-    """Write a radar chart summarising all 4 dimensions in a single PNG."""
-    try:
-        import matplotlib
-        matplotlib.use("Agg")
-        import matplotlib.pyplot as plt
-        import numpy as np
-    except ImportError:
-        return
-
-    t = summary.get("turn") or {}
-    c = summary.get("combat") or {}
-    s = summary.get("synergy") or {}
-    r = summary.get("run") or {}
-
-    def _avg(*vals):
-        v = [x for x in vals if x is not None]
-        return sum(v) / len(v) if v else 0.0
-
-    labels = ["Turn\nDamage", "Combat\nWin Rate", "Synergy\nAccuracy",
-              "Run\nSurvival", "HP\nConservation"]
-    values = [
-        _avg(t.get("avg_damage_ratio")),
-        _avg(c.get("win_rate")),
-        _avg(s.get("archetype_acc"), s.get("card_pick_acc")),
-        _avg(r.get("survival_rate"), r.get("avg_progress")),
-        _avg(c.get("avg_hp_ratio"), r.get("avg_hp_fraction")),
-    ]
-    # Radar axes are fixed 0–1; hp_ratio >1 would spill outside the chart
-    values = [min(1.0, v) for v in values]
-
-    N = len(labels)
-    angles = [n / float(N) * 2 * np.pi for n in range(N)]
-    angles += angles[:1]
-    values_plot = values + values[:1]
-
-    fig, ax = plt.subplots(figsize=(6, 6), subplot_kw=dict(polar=True))
-    fig.patch.set_facecolor("#1a1a2e")
-    ax.set_facecolor("#16213e")
-
-    ax.plot(angles, values_plot, color="#4ade80", linewidth=2)
-    ax.fill(angles, values_plot, color="#4ade80", alpha=0.25)
-
-    ax.set_xticks(angles[:-1])
-    ax.set_xticklabels(labels, color="#e2e8f0", size=9)
-    ax.set_ylim(0, 1)
-    ax.set_yticks([0.2, 0.4, 0.6, 0.8, 1.0])
-    ax.set_yticklabels(["20%","40%","60%","80%","100%"],
-                       color="#94a3b8", size=7)
-    ax.grid(color="#334155", linewidth=0.8)
-    ax.spines["polar"].set_color("#334155")
-
-    overall = sum(values) / len(values)
-    ax.set_title(
-        f"{summary['model']}\n{summary['prompt_format']} · seed {summary.get('seeds') or summary.get('seed', '?')}\n"
-        f"Overall: {overall*100:.1f}%",
-        color="white", size=10, fontweight="bold", pad=18)
-
-    fig.savefig(out_path, dpi=150, bbox_inches="tight", facecolor=fig.get_facecolor())
-    plt.close(fig)
+    """Fail closed: a radar implies commensurability the instrument does not have."""
+    raise RuntimeError(
+        "Radar output retired: turn, combat, synergy, and run scores measure "
+        "different constructs on different scales. Use the task-profile grid.")
 
 
 # ── Entry point ───────────────────────────────────────────────────────────────
@@ -317,24 +251,20 @@ def write_radar(summary: Dict[str, Any], out_path: Path) -> None:
 def save_all(summary: Dict[str, Any], stem: str, out_dir: Path) -> None:
     """
     Given a summary dict and a stem name (e.g. '20260607_llama_structured_seed42'),
-    write three files into out_dir:
+    write two files into out_dir:
       <stem>.txt   — human-readable report
       <stem>.png   — 2×2 bar chart grid
-      <stem>_radar.png — spider chart
     """
     out_dir.mkdir(parents=True, exist_ok=True)
 
     txt_path   = out_dir / f"{stem}.txt"
     bars_path  = out_dir / f"{stem}.png"
-    radar_path = out_dir / f"{stem}_radar.png"
 
     write_text_report(summary, txt_path)
-    write_charts(summary, bars_path)
-    write_radar(summary, radar_path)
+    chart_written = write_charts(summary, bars_path)
 
     print(f"  Report : {txt_path}")
-    print(f"  Chart  : {bars_path}")
-    print(f"  Radar  : {radar_path}")
+    print(f"  Chart  : {bars_path}" if chart_written else "  Chart  : skipped")
 
 
 # ── Horizon-collapse curve + cross-horizon normalization ──────────────────────
@@ -530,13 +460,11 @@ _MODEL_COLORS = [
 def horizon_collapse_curve(results_dir: Path,
                            out_path: Path,
                            fmt: str = "structured") -> None:
-    """Render the horizon-collapse curve for one prompt format.
-
-    Two panels (Ironclad / Silent). x-axis = planning horizon (turn→combat→synergy→run),
-    y-axis = normalized "vs-baseline" score (0 = non-planning floor, 1 = perfect). One
-    line per model; gaps (unevaluated dimensions) break the line rather than interpolate.
-    Reads only the on-disk multi-seed aggregates — no engine/harness state touched.
-    """
+    """Retired: the four tasks do not form a controlled horizon intervention."""
+    raise RuntimeError(
+        "Horizon-collapse curves are invalid for this instrument: task, action "
+        "space, oracle, supervision, and score all change together. Report a "
+        "non-connected task profile instead.")
     try:
         import matplotlib
         matplotlib.use("Agg")

@@ -1055,6 +1055,144 @@ def test_per_sample_diagnostics_persisted():
     print("[PASS] per-sample turn/combat diagnostics persisted in serialized summary")
 
 
+def test_result_provenance_and_legacy_merge_are_explicit():
+    """New artifacts disclose protocol metadata and legacy partial merges."""
+    import argparse
+    import tempfile
+    from pathlib import Path
+    from run_benchmark import _attach_provenance, _merge_existing
+
+    args = argparse.Namespace(
+        provider="mock", model="mock", fmt="structured", character="ironclad",
+        seeds=None, seed=42, n_turn=1, n_combat=0, n_synergy=0, n_run=0,
+        temperature=0.0, acts=1, llm_routing=False)
+    current = _attach_provenance(
+        {"turn": {"n": 1}, "combat": None, "synergy": None, "run": None}, args)
+    assert current["result_schema_version"] == "2.0"
+    assert current["provenance"]["provider"] == "mock"
+    assert current["provenance"]["max_tokens"] == 8000
+    assert current["provenance"]["base_seeds"] == [42]
+    assert current["provenance"]["requested_base_seeds"] == [42]
+    assert current["provenance"]["endpoint_persisted"] is False
+    assert current["dimension_sources"]["turn"]["source"] == "current_invocation"
+    args.seeds = [42, 1042]
+    child = _attach_provenance({"turn": None, "combat": None, "synergy": None,
+                                "run": None}, args, artifact_seeds=[1042])
+    assert child["provenance"]["base_seeds"] == [1042]
+    assert child["provenance"]["requested_base_seeds"] == [42, 1042]
+
+    with tempfile.TemporaryDirectory() as tmp:
+        path = Path(tmp) / "legacy.json"
+        path.write_text(json.dumps({"turn": None, "combat": {"n": 3},
+                                    "synergy": None, "run": None}))
+        merged = _merge_existing(path, current)
+    assert merged["dimension_sources"]["combat"]["source"] == "merged_legacy_artifact"
+    assert merged["dimension_sources"]["combat"]["provenance_complete"] is False
+    print("[PASS] result provenance and legacy partial-merge source are explicit")
+
+
+def test_invalid_cross_task_visuals_fail_closed():
+    """Cross-task scalar/radar and horizon-line outputs must not be generated."""
+    import tempfile
+    from pathlib import Path
+    from slay_bench.visualize import horizon_collapse_curve, write_radar
+
+    with tempfile.TemporaryDirectory() as tmp:
+        out = Path(tmp) / "invalid.png"
+        for fn, args in (
+                (write_radar, ({"model": "mock"}, out)),
+                (horizon_collapse_curve, (Path(tmp), out))):
+            try:
+                fn(*args)
+            except RuntimeError as exc:
+                assert "invalid" in str(exc).lower() or "retired" in str(exc).lower()
+            else:
+                raise AssertionError(f"{fn.__name__} should fail closed")
+        assert not out.exists()
+    print("[PASS] invalid cross-task scalar visualizations fail closed")
+
+
+def test_synergy_dictionary_shortcut_solves_all_fixed_fixtures():
+    """A card-name lookup with no planning must expose fixed-fixture leakage."""
+    from scripts.instrument_diagnostics import synergy_lookup_audit
+
+    audit = synergy_lookup_audit()
+    for character, row in audit["by_character"].items():
+        assert row["fixture_position_cases"] == 60, (character, row)
+        assert row["archetype_lookup_accuracy"] == 1.0, (character, row)
+        assert row["unique_on_label_offer_rate"] == 1.0, (character, row)
+        assert row["card_pick_lookup_accuracy"] == 1.0, (character, row)
+        assert row["expert_position_counts"] == {0: 20, 1: 20, 2: 20}
+    print("[PASS] non-planning dictionary lookup solves all fixed synergy cases")
+
+
+def test_controlled_horizon_holds_state_and_action_contract_fixed():
+    """Only H changes in the decisive experiment prompt; its oracle is exact."""
+    from slay_bench import new_game, start_combat
+    from slay_bench.controlled_horizon import (
+        CONTROLLED_HORIZON_VERSION, build_prompt, exact_action_values, legal_actions,
+        score_response, transition)
+    from slay_bench.enemies import Cultist
+
+    state = new_game(42, "ironclad")
+    start_combat(state, [Cultist(state.rng.hp_rng)])
+    before_hand = [c.name for c in state.combat.hand]
+    h1 = exact_action_values(state, 1, node_budget=1000)
+    assert h1.version == CONTROLLED_HORIZON_VERSION and h1.exact
+    assert h1.nodes_expanded == len(legal_actions(state))
+    assert [c.name for c in state.combat.hand] == before_hand  # oracle does not mutate
+    assert h1.optimal_actions
+
+    system1, prompt1 = build_prompt(state, 1)
+    system2, prompt2 = build_prompt(state, 2)
+    assert system1 == system2
+    assert prompt1.replace("exactly 1 decision", "exactly 2 decision") == prompt2
+
+    best = h1.optimal_actions[0]
+    response = {"action": best.action, "card_index": best.card_index,
+                "target_index": best.target_index}
+    score = score_response(state, "smoke-42", 1, response, node_budget=1000)
+    assert score.legal and score.oracle_exact and score.regret == 0
+    assert score.normalized_quality == 1.0
+    # Transition operates on a clone.
+    transition(state, best)
+    assert [c.name for c in state.combat.hand] == before_hand
+    print("[PASS] controlled-horizon v1 changes only H and uses an exact oracle")
+
+
+def test_turn_oracle_persists_exactness_and_fails_closed_on_budget():
+    """A bound hit is visible and never serialized as an exact optimum."""
+    from slay_bench import new_game, start_combat
+    from slay_bench.benchmark import _exhaustive_best_sequence
+    from slay_bench.enemies import Cultist
+
+    state = new_game(42, "ironclad")
+    start_combat(state, [Cultist(state.rng.hp_rng)])
+    _dmg, _seq, full = _exhaustive_best_sequence(state, return_audit=True)
+    assert full["exact"] and 0 < full["nodes_expanded"] < full["node_budget"]
+    _dmg, _seq, bounded = _exhaustive_best_sequence(
+        state, node_budget=1, return_audit=True)
+    assert bounded == {"nodes_expanded": 1, "node_budget": 1, "exact": False}
+
+    score = TurnEvaluator(MockLLM(['{"plays": []}'])).evaluate(state)
+    sample = BenchmarkResult("m", "structured", 42, turn_scores=[score]).summary()["turn"]
+    assert sample["oracle_inexact_n"] == 0
+    assert sample["samples"][0]["oracle_exact"] is True
+    assert sample["samples"][0]["oracle_nodes_expanded"] > 0
+    print("[PASS] turn oracle exactness and node budget are persisted per sample")
+
+
+def test_compute_free_turn_oracle_audit_reports_bounds():
+    from scripts.instrument_diagnostics import turn_oracle_audit
+
+    audit = turn_oracle_audit(base_seeds=(42,), n_per_base=2)
+    for row in audit["by_character"].values():
+        assert row["states"] == 2
+        assert row["exact_states"] + row["bound_hits"] == 2
+        assert row["max_nodes_expanded"] <= row["node_budget"]
+    print("[PASS] compute-free turn oracle audit reports exactness by character")
+
+
 if __name__ == "__main__":
     tests = [
         test_structured_prompt,
@@ -1112,6 +1250,13 @@ if __name__ == "__main__":
         test_turn_parse_fail_truncation_diagnostics,
         # 2026-07-13 per-sample diagnostics persistence
         test_per_sample_diagnostics_persisted,
+        # 2026-08-30 adversarial research audit
+        test_result_provenance_and_legacy_merge_are_explicit,
+        test_invalid_cross_task_visuals_fail_closed,
+        test_synergy_dictionary_shortcut_solves_all_fixed_fixtures,
+        test_controlled_horizon_holds_state_and_action_contract_fixed,
+        test_turn_oracle_persists_exactness_and_fails_closed_on_budget,
+        test_compute_free_turn_oracle_audit_reports_bounds,
     ]
     passed = failed = 0
     for test in tests:

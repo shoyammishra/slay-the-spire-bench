@@ -109,7 +109,7 @@ same command passes after the change.
 - `prompt_builder.py`: structured/raw serialization and prompt contracts.
 - `visualize.py`: reports and figures.
 - `scripts/`: reproducible analyses and baselines; `cluster/`: Slurm launchers.
-- `tests/`: 174 directly runnable tests as of 2026-08-30.
+- `tests/`: 180 directly runnable tests as of 2026-08-30.
 
 ## Decisions, documentation, and completion
 

@@ -1,5 +1,49 @@
 # Decision Log
 
+## 2026-08-30 — Reject the cross-task horizon construct and version a controlled intervention
+
+**Problem.** A repository-wide adversarial audit found that the four reported
+“horizons” simultaneously change task, state distribution, action space, oracle,
+supervision, score, and model agency. The default run controller scripts map, rest,
+shop, and event choices. Fixed synergy fixtures admit a 100% card-name lookup policy.
+Connecting normalized task scores therefore does not identify planning horizon.
+
+**Options considered.** (a) keep the curve with stronger caveats; (b) adjust the
+normalization or fit a latent factor; (c) reject the construct, report task profiles,
+and create a same-state intervention where only future decision depth H changes.
+
+**Decision: (c).** Overall scores, radar charts, and horizon-collapse curves are retired
+and now fail closed. Current tasks are renamed immediate-damage sequencing,
+short-combat execution, fixed-deck recognition/card lookup, and hybrid-policy Act-1
+rollout. `controlled-decision-horizon-v1` holds state, action contract, utility, oracle,
+and encoding fixed while varying H∈{1,2,4,8}; model results are PENDING EXPERIMENT.
+
+**Invalidation.** Every historical claim of nested horizons, a common collapse curve,
+a model's maximum horizon, cross-task eta-squared collapse (C6), full-run agency, or a
+cross-task overall score is superseded. Existing within-task measurements remain
+historical observations. The Qwen3-235B/32B card-pick comparison survives as
+operation-selective evidence. Old PNGs are historical artifacts and must not be used.
+
+**Trade-offs and reversal.** This materially lowers the present paper ceiling but
+prevents a construct-invalid submission. Reversal requires a controlled manipulation
+with treatment strength, exact-oracle audit, adequate power, and replicated H slopes;
+no alternative normalization of the old four tasks is sufficient.
+
+## 2026-08-30 — Adopt result schema 2.0 and compute-free adversarial diagnostics
+
+**Problem.** None of 181 historical model JSONs carries complete provenance or an
+instrument version; run samples are absent from all. Partial dimension merges can also
+hide that blocks came from different invocations. A lookup policy had not been scored
+against synergy fixtures.
+
+**Decision.** Future artifacts record provider/config/seeds/sample counts/controller,
+commit/dirty state, environment versions, and per-dimension sources while excluding
+sensitive endpoints. Legacy merges are explicitly labeled incomplete. NumPy is a
+declared dependency. `scripts/instrument_diagnostics.py` inventories artifacts and
+demonstrates 100% name-dictionary performance on 120/120 synergy fixture-position
+cases. Historical missing traces cannot be repaired and remain a stated limitation.
+
+
 ## 2026-08-30 — Quarantine removal-v1 and rebuild synergy analyses without it
 
 **Problem.** A degenerate-strategy audit found that all 40 fixed synergy fixtures set

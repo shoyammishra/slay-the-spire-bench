@@ -1,5 +1,8 @@
 # Notes (scratch pad)
 
+> **Historical snapshot.** Radar, overall-score, and horizon-curve outputs referenced
+> below were retired on 2026-08-30 as construct-invalid. See `research_audit/`.
+
 ## TODO for paper-grade runs
 - Re-run llama-3.1-8b-instant with n_turn=20, n_combat=20, n_synergy=20, n_run=10
 - Run meta-llama/llama-4-scout-17b-16e-instruct same config

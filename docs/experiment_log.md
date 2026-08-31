@@ -1,5 +1,34 @@
 # Experiment Log
 
+## 2026-08-30 — Compute-free adversarial instrument audit and controlled-H smoke
+
+**No API, GPU, or cluster compute was used.** `scripts/instrument_diagnostics.py`
+evaluated a deterministic name-dictionary policy over all 20 fixed fixtures per
+character and all three rotated expert positions. It achieved archetype accuracy 1.0,
+unique on-label-offer rate 1.0, and card-pick accuracy 1.0 for Ironclad (60/60) and
+Silent (60/60). This proves that the current fixture labels do not require planning; it
+does not prove evaluated LLMs used the shortcut.
+
+The same script inventoried 181 model JSON artifacts: 0 carry the new provenance or
+instrument-version fields; 46 persist turn samples, 46 combat samples, 147 synergy
+samples, and 0 run samples. These are historical schema limitations.
+
+The current-code turn fixture replay covered 100 states per character on the paper
+seed schedule. All 200 searches completed exactly: Ironclad max/mean nodes 17/13.23,
+Silent 137/64.48, against a 20,000-node budget. Historical artifacts lack commits, so
+this validates the current generator rather than retroactively proving old binaries.
+
+`controlled-decision-horizon-v1` passed a no-inference smoke on a seeded Cultist state:
+the H=1 search enumerated every legal first action exactly under the test budget, did
+not mutate the fixture, and prompt-byte comparison confirmed that H was the only user
+prompt change between H=1 and H=2. Model results are **PENDING EXPERIMENT**.
+
+Oracle sizing on that same state expanded 6 / 37 / 618 / 168,487 nodes at
+H=1/2/4/8. H=8 completed below the declared 2,000,000-node budget with best value
+1040 and three tied optimal first actions. This is a smoke result, not a representative
+runtime claim; fixture-wide sizing and model-blind filtering remain required.
+
+
 ## 2026-08-30 — ✅ Qwen3-235B full matrix recovered, audited, reaggregated, and folded in
 
 **Status: complete at the registered tier.** Recovery jobs `329871`, `329872`, and

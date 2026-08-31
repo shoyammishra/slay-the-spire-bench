@@ -1,5 +1,11 @@
 # Design
 
+> **Construct boundary (2026-08-30):** the four evaluator types are heterogeneous
+> operations, not levels of a controlled planning-horizon variable. Do not aggregate or
+> connect them into a scalar/curve. The default run controller is a hybrid scripted
+> policy. See `research_audit/CONSTRUCT_VALIDITY.md` and
+> `slay_bench/controlled_horizon.py` for the versioned same-state intervention.
+
 ## Architecture Overview
 
 ```

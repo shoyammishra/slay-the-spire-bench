@@ -1,5 +1,11 @@
 # Findings
 
+> **2026-08-30 construct supersession:** historical “horizon,” “collapse curve,” and
+> full-run-agent interpretations below are not current claims. Within-task numbers
+> remain historical observations. Current claims are in
+> `research_audit/CLAIMS_MATRIX.md`; the revised thesis is operation-specific
+> competence, not a latent planning horizon.
+
 ## ⛔ Removal-v1 is confounded and quarantined (2026-08-30)
 
 A degenerate-strategy audit found that every one of the 40 fixed synergy fixtures labels

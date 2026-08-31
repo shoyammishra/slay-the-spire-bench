@@ -10,8 +10,12 @@ Usage:
      base, so adjacent bases like 42,43 share 19/20 samples -> fake std)
 """
 import argparse
+import datetime as dt
+import importlib.metadata
 import json
 import os
+import platform
+import subprocess
 import sys
 from pathlib import Path
 
@@ -23,6 +27,73 @@ for _stream in (sys.stdout, sys.stderr):
 
 from dotenv import load_dotenv
 load_dotenv()
+
+
+RESULT_SCHEMA_VERSION = "2.0"
+INSTRUMENT_VERSION = "slay-bench-2026-08-30-audit"
+
+
+def _git_value(*args: str) -> str | None:
+    """Return a small, non-sensitive git provenance value when available."""
+    try:
+        proc = subprocess.run(
+            ["git", *args], capture_output=True, text=True, check=True, timeout=5)
+        return proc.stdout.strip() or None
+    except (OSError, subprocess.SubprocessError):
+        return None
+
+
+def _package_versions() -> dict:
+    versions = {}
+    for distribution in ("groq", "python-dotenv", "matplotlib", "numpy"):
+        try:
+            versions[distribution] = importlib.metadata.version(distribution)
+        except importlib.metadata.PackageNotFoundError:
+            versions[distribution] = None
+    return versions
+
+
+def _attach_provenance(summary: dict, args: argparse.Namespace,
+                       artifact_seeds: list[int] | None = None) -> dict:
+    """Persist audit metadata while excluding endpoint and environment secrets."""
+    head = _git_value("rev-parse", "HEAD")
+    dirty = _git_value("status", "--porcelain")
+    dimensions = {
+        "turn": args.n_turn,
+        "combat": args.n_combat,
+        "synergy": args.n_synergy,
+        "run": args.n_run,
+    }
+    summary["result_schema_version"] = RESULT_SCHEMA_VERSION
+    summary["instrument_version"] = INSTRUMENT_VERSION
+    summary["provenance"] = {
+        "created_at_utc": dt.datetime.now(dt.timezone.utc).isoformat(),
+        "provider": args.provider,
+        "model": args.model,
+        "prompt_format": args.fmt,
+        "character": args.character,
+        "base_seeds": list(artifact_seeds if artifact_seeds is not None
+                           else (args.seeds if args.seeds else [args.seed])),
+        "requested_base_seeds": list(args.seeds if args.seeds else [args.seed]),
+        "sample_counts_per_base_seed": dimensions,
+        "temperature": args.temperature,
+        "max_tokens": 3000 if args.provider == "groq" else 8000,
+        "acts": args.acts,
+        "llm_routing": args.llm_routing,
+        "git_commit": head,
+        "git_dirty": None if dirty is None else bool(dirty),
+        "python": platform.python_version(),
+        "platform": platform.platform(),
+        "package_versions": _package_versions(),
+        "reasoning_configuration": "provider/server default; not exposed by this harness",
+        "endpoint_persisted": False,
+    }
+    summary["dimension_sources"] = {
+        dim: ({"source": "current_invocation", "instrument_version": INSTRUMENT_VERSION}
+              if count > 0 else None)
+        for dim, count in dimensions.items()
+    }
+    return summary
 
 
 def build_llm(provider: str, model: str, base_url: str = None):
@@ -81,6 +152,13 @@ def _merge_existing(fname: Path, summary: dict) -> dict:
         for dim in ("turn", "combat", "synergy", "run"):
             if summary.get(dim) is None and prev.get(dim) is not None:
                 summary[dim] = prev[dim]
+                previous_source = (prev.get("dimension_sources") or {}).get(dim)
+                summary.setdefault("dimension_sources", {})[dim] = previous_source or {
+                    "source": "merged_legacy_artifact",
+                    "artifact": fname.name,
+                    "instrument_version": prev.get("instrument_version", "unknown"),
+                    "provenance_complete": False,
+                }
                 print(f"  (kept existing '{dim}' results from previous run)")
     except (json.JSONDecodeError, OSError):
         pass
@@ -190,6 +268,7 @@ def main():
             n_run=args.n_run,
         )
         summary = result.summary()
+        summary = _attach_provenance(summary, args)
         print(json.dumps(summary, indent=2))
 
         stem = _tagged_stem(f"{safe_model}_{args.fmt}_seed{primary_seed}", args.run_tag)
@@ -216,6 +295,7 @@ def main():
                 n_run=args.n_run,
             )
             summary = result.summary()
+            summary = _attach_provenance(summary, args, artifact_seeds=[seed])
             stem = _tagged_stem(f"{safe_model}_{args.fmt}_seed{seed}", args.run_tag)
             fname = out_dir / f"{stem}.json"
             summary = _merge_existing(fname, summary)
@@ -227,6 +307,24 @@ def main():
 
         # Aggregate
         agg = _aggregate_summaries(per_seed_summaries, args.model, args.fmt, args.character, seeds)
+        agg["result_schema_version"] = RESULT_SCHEMA_VERSION
+        agg["instrument_version"] = INSTRUMENT_VERSION
+        if per_seed_summaries:
+            agg["provenance"] = dict(per_seed_summaries[0].get("provenance") or {})
+            agg["provenance"]["base_seeds"] = list(seeds)
+            agg["dimension_sources"] = {
+                dim: {
+                    "source": "aggregate_of_per_seed_artifacts",
+                    "per_seed": {
+                        str(seed): (summary.get("dimension_sources") or {}).get(dim)
+                        for seed, summary in zip(seeds, per_seed_summaries)
+                    },
+                }
+                for dim in ("turn", "combat", "synergy", "run")
+            }
+        else:
+            agg["provenance"] = None
+            agg["dimension_sources"] = None
         agg_stem = _tagged_stem(
             f"{safe_model}_{args.fmt}_seeds{'_'.join(str(s) for s in seeds)}", args.run_tag)
         agg_fname = out_dir / f"{agg_stem}.json"
@@ -265,7 +363,8 @@ def _aggregate_summaries(summaries: list, model: str, fmt: str,
     # Metric keys MUST match BenchmarkResult.summary() exactly, or every
     # aggregated mean silently comes out None.
     turn = _agg_dim("turn", ["avg_damage_ratio", "legal_rate", "parse_ok_rate",
-                             "parse_fail_n", "parse_fail_truncated"])
+                             "parse_fail_n", "parse_fail_truncated",
+                             "oracle_inexact_n", "oracle_max_nodes_expanded"])
     combat = _agg_dim("combat", ["win_rate", "avg_hp_ratio", "avg_parse_errors",
                                  "avg_json_parse_errors", "avg_illegal_action_errors",
                                  "avg_truncation_errors"])
