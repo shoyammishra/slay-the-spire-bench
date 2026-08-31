@@ -1,5 +1,61 @@
 # Decision Log
 
+## 2026-08-30 — Quarantine removal-v1 and rebuild synergy analyses without it
+
+**Problem.** A degenerate-strategy audit found that all 40 fixed synergy fixtures set
+`expert_remove_name="Strike"`. A model that always answers `Strike` therefore scores
+40/40. The recorded `removal_acc` values are exactly the parse-conditioned frequency of
+that constant response; they do not measure strategic card pruning. This invalidates the
+old removal result, every removal format test, and every three-metric synergy composite.
+
+**Options considered.** (a) retain the metric but describe it as basic-card knowledge;
+(b) repair the fixture targets in place and mix new results with the existing matrix; or
+(c) quarantine removal-v1 now, preserve its raw fields for provenance, and treat a
+redesigned instrument as a versioned re-baseline.
+
+**Decision: (c).** `removal_acc` remains serialized as a diagnostic but is excluded from
+descriptive statistics, pooled format tests, McNemar tests, variance decompositions,
+boundary audits, and headline claims. The plotted synergy horizon is now the chance-
+normalized mean of archetype identification and best-pick accuracy only. Regression tests
+prove both the universal-`Strike` confound and the exclusion from analysis/composites.
+
+**Invalidation and limitations.** All earlier claims that removal measures pruning skill,
+including “structured ≥ raw for 5 of 6 models,” are superseded. Old horizon figures and
+three-way synergy composites are also superseded and have been regenerated. Archetype,
+card-pick, turn, combat, and run measurements remain valid; quarantining does not require a
+model rerun. A future removal-v2 must vary the expert target, balance target/candidate
+positions so a constant answer is at chance, persist fixture/target metadata, and pass
+constant-answer audits before compute. Because the three synergy questions share one
+prompt, removal-v2 requires a full versioned synergy re-baseline and must not be blended
+with v1. Reversal requires such an audited v2 matrix, not reinterpretation of v1.
+
+## 2026-08-30 — Fold in the complete Qwen3-235B matrix as selective capability evidence
+
+**Problem.** Recovery jobs `329871`–`329873` completed the fourth Qwen3-235B cell under
+the 24-hour cap. The canonical matrix now contains all 20 expected per-seed artifacts and
+400 turn, 400 combat, 400 synergy, and 100 run observations. The former three-cell
+quarantine can therefore be resolved, but the comparison does not support a simple
+“larger models plan farther” claim.
+
+**Options considered.** (a) report the larger checkpoint as a general frontier improvement;
+(b) keep the complete row out because some horizons saturate; or (c) report the observed
+within-family dissociation with architecture, run-tier, and provenance caveats attached.
+
+**Decision: (c).** Relative to seed-matched Qwen3-32B, Qwen3-235B card-pick accuracy rises
+in all four cells by 0.110–0.280 and in 19/20 seed pairs. Archetype identification improves
+in 15 pairs, ties in 3, and falls in 2, while turn, combat, and run effects are mixed or
+saturated. The paper claim is therefore selective: in this benchmark, greater Qwen3 model
+capacity most clearly improves choosing deck additions; it does not uniformly extend the
+planning horizon.
+
+**Caveats and reversal.** Qwen3-235B-A22B-FP8 is a 22B-active MoE while Qwen3-32B is
+dense, so this is not a pure parameter-scaling law. Its run cells use `N_RUN=5` per seed and
+remain floor estimates; they are never pooled with balanced `N_RUN=20` variance rows. The
+original Slurm stdout survives only for Silent/raw, so exact run-loop error totals for the
+other three cells cannot be reconstructed from the JSON schema; this missing provenance is
+reported rather than inferred. A future matched architecture or higher-powered run study
+may revise the interpretation without invalidating these artifacts.
+
 ## 2026-08-22 — Split Silent/raw recovery by phase and seed under the 24-hour cap
 
 **Problem.** Job `267038` was wall-killed after `23:59:00`. Its retrieved stdout and

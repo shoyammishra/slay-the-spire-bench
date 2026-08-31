@@ -10,12 +10,14 @@ and raw English—on identical RNG seeds.
 |---|---|---|
 | Turn | Choose the best legal card sequence | Exhaustive legal-sequence search |
 | Combat | Play a complete fight | Outcome plus greedy-policy HP anchor |
-| Synergy | Identify archetype, pick and remove cards | Fixed expert-labelled fixtures |
+| Synergy | Identify archetype and choose a card | Fixed expert-labelled fixtures |
 | Run | Traverse an act or multi-act run | Survival, progress, floors, and coherence |
 
-The project has a complete multi-model matrix through Qwen3-32B, statistical rigor
-analysis, and a passed Qwen3-235B smoke test. The 235B full matrix is the next registered
-experiment. See [the handoff](docs/handoff.md), [experiment log](docs/experiment_log.md),
+The project has a complete seven-configuration open-model matrix through
+Qwen3-235B-A22B-FP8 and a regenerated statistical rigor analysis. The strongest 235B
+gain over Qwen3-32B is card selection, not a uniform horizon extension. Removal-v1 is
+quarantined because every fixture used the same `Strike` target. See
+[the handoff](docs/handoff.md), [experiment log](docs/experiment_log.md),
 [findings](docs/findings.md), and [statistics report](docs/stats_report.md) for current,
 caveated results. Older HTML reports are snapshots, not live status.
 
@@ -100,7 +102,7 @@ behavior because such changes can invalidate existing benchmark rows.
 
 ## Validation
 
-The suite currently contains 172 directly runnable tests:
+The suite currently contains 174 directly runnable tests:
 
 ```bash
 python tests/test_benchmark.py

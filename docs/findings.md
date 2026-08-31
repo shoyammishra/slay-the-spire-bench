@@ -1,8 +1,40 @@
 # Findings
 
-## ⚠️ Qwen3-235B PRELIMINARY THREE-CELL NOTE (2026-08-21) — QUARANTINED FROM PAPER CLAIMS
+## ⛔ Removal-v1 is confounded and quarantined (2026-08-30)
 
-Three of four Qwen3-235B cells have been retrieved and given a preliminary artifact audit;
+A degenerate-strategy audit found that every one of the 40 fixed synergy fixtures labels
+`Strike` as the expert removal. An always-`Strike` answer scores 40/40. Therefore the old
+`removal_acc` is an answer-frequency diagnostic, not evidence of strategic deck pruning.
+
+**This supersedes every removal capability or format claim later in this chronological
+file**, including “structured ≥ raw for 5 of 6 models,” the 0.00–0.55 capability range,
+and any three-metric synergy composite. Raw fields remain in artifacts for provenance,
+but statistics and regenerated horizon figures exclude them. Archetype identification
+and best-pick accuracy remain valid. Removal-v2 must vary and balance targets and requires
+a complete, versioned synergy re-baseline because all three questions share one prompt.
+
+## ✅ Qwen3-235B complete matrix: capacity helps selection, not every horizon (2026-08-30)
+
+All four Qwen3-235B character×format cells are complete: 400 turn, 400 combat, 400
+synergy, and 100 `N_RUN=5` run observations. Relative to seed-matched Qwen3-32B,
+card-pick accuracy improves by **0.110–0.280 in all four cells and 19/20 seed pairs**.
+Archetype improves in 15 pairs, ties in 3, and worsens in 2. Turn, combat HP, and run
+floors are mixed or ceiling/floor limited rather than uniformly better.
+
+> In this benchmark, greater Qwen3 model capacity most clearly improves choosing deck
+> additions; it does not uniformly extend the planning horizon.
+
+The comparison is not a pure parameter-scaling law: Qwen3-235B-A22B-FP8 is a 22B-active
+MoE and Qwen3-32B is dense. Run results are descriptive floor estimates (`N_RUN=5` per
+seed) and are never blended with balanced `N_RUN=20` rows. Full values, error counts, and
+the missing-original-stdout caveat are in the 2026-08-30 experiment-log entry.
+
+---
+
+## ⛔ Qwen3-235B PRELIMINARY THREE-CELL NOTE (2026-08-21) — SUPERSEDED 2026-08-30
+
+**Historical record only; use the complete-matrix section above.** At this point in the run,
+three of four Qwen3-235B cells had been retrieved and given a preliminary artifact audit;
 Silent/raw and the Slurm stdout are still missing. The full provenance and values are in the
 latest `docs/experiment_log.md` entry. **Do not cite this section, update headline model counts,
 or regenerate paper tables/figures from it until the fourth cell and the registered statistics
@@ -25,28 +57,28 @@ and characters.
 
 ---
 
-## 📊 P4b STATISTICAL RIGOR PASS (2026-08-07, zero GPU) — CIs, effect sizes, paired tests, variance decomposition
+## 📊 P4b STATISTICAL RIGOR PASS (refreshed 2026-08-30, zero GPU) — CIs, effect sizes, paired tests, variance decomposition
 
 Full tables: `docs/stats_report.md` (committed) + experiment_log 2026-08-07 (later); method
 choices: decision_log 2026-08-07 (later). Reproduce with
-`.venv/Scripts/python.exe scripts/stats_rigor.py`. **Additive analysis only — no published mean
-changed.** What follows is what the statistics *changed about how we may write*.
+`.venv/Scripts/python.exe scripts/stats_rigor.py`. The refresh discovers seven configurations,
+quarantines removal-v1, and leaves the valid benchmark means unchanged.
 
 **0. The power ceiling that must travel with every per-combo p-value.** The paired format test
 is an exact sign-flip permutation over 5 seed-matched differences. 2⁵ = 32 sign assignments ⇒
 **the smallest attainable two-sided p for any single combo is 0.0625** — no combo can reach
 α=0.05 *by construction, not by weakness of effect*. Per-combo rows are descriptive; the
-inferential weight sits on the pooled stratified test (12 model×character strata) and on
+inferential weight sits on the pooled stratified test (14 model×character strata) and on
 sample-level McNemar for synergy. Say this out loud in the paper; a reviewer who works it out
 before we do will not be generous.
 
-**1. The pairing the design promised is real — verified, not assumed.** For **60/60**
+**1. The pairing the design promised is real — verified, not assumed.** For **70/70**
 (model × character × seed) triples the structured and raw synergy streams are byte-identical on
 `(expert_archetype, expert_pick_idx)`: same fixtures, same rotated offer positions. This is the
 precondition for every paired test here, and the script re-checks it on every run.
 
 **2. ⭐ The horizon-collapse claim now has a single number: between-model η² share by horizon —
-turn 0.83, combat 0.89, synergy 0.51, run 0.02.** At the run horizon, *which model you use*
+turn damage .865, combat win .896, synergy archetype .629, run floors .021.** At the run horizon, *which model you use*
 explains **~2%** of the variance while *which character you play* explains **~57%** and seed
 noise **~34%**. This is the shared-collapse-floor finding restated as variance instead of as a
 converging curve, and it is the most quotable output of this pass. (Run rows: the 3 models with
@@ -56,16 +88,16 @@ which is exactly why run-level needs n=20 rather than more models.
 
 **3. ⚠️ CORRECTION — "combat/run are format-insensitive on outcome" is NOT supported as stated,
 and the old reading was a CEILING ARTIFACT.** Format reaches combat `hp_ratio` with a consistent
-direction: **10 of 12 strata favour structured, sign test p=0.039, pooled p=0.0001**. The
+direction: **12 of 14 strata favour structured, sign test p=.0129, pooled p=.0001**. The
 diagnosis is the useful part: for `win_rate`, *every* combo whose effect exceeds the ±0.05
-margin sits **below** the combat ceiling (all four R1-distill combos), and **0 of the 8
+margin sits **below** the combat ceiling (all four R1-distill combos), and **0 of the 10
 win-saturated combos** move materially. Models that win 100% of fights leave format nothing to
 move. `hp_ratio` is the finer instrument and moves even for two win-saturated combos
 (mistral/Silent +0.112, qwen3-32b/Silent +0.064). **Registered wording:** *"format-insensitivity
 at the combat horizon holds only where the win-rate ceiling removes the variance; where combat
 still discriminates, format moves hp_ratio by up to +0.19."* This generalises the single-model
 breach noted in finding F below. Also confirmed as a **general** effect: structured produces
-~1.03 fewer invalid-action errors per combat (10/12 strata, sign p=0.039).
+.94 fewer invalid-action errors per combat (12/14 directions, sign p=.0129).
 
 **4. ⚠️ CORRECTION — the qwen3-32b run-level lift shrinks under a run-seed-matched anchor.** The
 published comparison put the model's 25 runs against greedy's **100-run** anchor (.01 survival /
@@ -77,27 +109,25 @@ run-level floor, at n=25 with wide seed spread; needs n=20 to confirm") **stands
 numbers quoted beside it must now be the matched ones. **Run-seed-matched comparison is the
 standard run-level comparator from here on.**
 
-**5. Only synergy `removal` survives as a GENERAL format effect.** Pooled magnitude *and*
-direction both significant (10/2 strata, sign p=0.039, pooled p=0.0007; McNemar significant in
-4 combos after Holm). `archetype` (7/5) and `card_pick` (8/4) are **magnitude-only** ⇒ report
-them as model-dependent, not as general format effects. The paper's format claim should lead
-with removal.
+**5. Removal-v1 is QUARANTINED; neither valid synergy metric is a general format effect.**
+Every expert removal is `Strike`, so the previous direction test measured constant-answer
+frequency and is invalid. With removal excluded, `archetype` (+.0350, pooled p=.0137; 9/5
+directions) and `card_pick` (+.0717, pooled p=.0005; 10/4) are **magnitude-only**: report them
+as model-dependent, not as general format effects.
 
 **6. The turn-level format effect has no consistent direction — now quantified.** Pooled
-magnitude favours **raw** (−0.076, p=0.0005) but direction splits 5 structured / 7 raw (sign
+magnitude favours **raw** (−.0644, p=.0005) but direction splits 6 structured / 8 raw (sign
 test n.s.), because llama and mistral swing hard toward raw (−0.19 to −0.34) while deepseek-14b
 and qwen3-32b lean structured. **Registered wording:** *"format matters at turn level; its sign
 is a model property"* — never "raw beats structured at turn level". The existing
 format-as-model-property framing is now measured rather than asserted.
 
-**7. Confirmations worth citing.** (a) **"5 of 6 models"** on synergy removal reproduces exactly
-at sample level, and deepseek-14b's reversal is *significant* (Silent p=0.0006 after Holm) — a
-real model property, not noise. (b) deepseek-7b's parse conditioning is now quantified: **37–38
-of 100** synergy pairs dropped; its accuracies stay conditioned on the parseable subset.
-(c) `card_pick` is the noisiest synergy metric (seed residual 0.362 vs model 0.229) and should
-not carry a headline claim alone. (d) Boundary cells now have exact Clopper–Pearson intervals:
-qwen3-32b Silent-structured turn 100/100 → **[0.964, 1.0]**; the all-zero cells (mistral raw
-removal, several survivals) → **[0.0, 0.036]**.
+**7. Confirmations worth citing.** (a) All **70/70** structured/raw fixture pairings match.
+(b) deepseek-7b's parse conditioning remains quantified; its valid synergy accuracies stay
+conditioned on the parseable subset. (c) `card_pick` retains substantial seed residual (.308)
+and should travel with uncertainty even though the Qwen3-235B seed-pair gain is 19/20.
+(d) Boundary cells have exact Clopper–Pearson intervals: qwen3-32b Silent-structured turn
+100/100 → **[.964, 1.0]**; all-zero survivals → **[.0, .036]**.
 
 **8. Nuance to carry on the run floor.** Survival is floored for everyone, but *floors/progress*
 show small seed-consistent lifts over the matched greedy anchor for some combos — llama-3.1-8b

@@ -1,5 +1,12 @@
 # Roadmap
 
+> **Active supersession (2026-08-30):** M3a's open-model matrix is complete for seven
+> configurations through Qwen3-235B-A22B-FP8, with both characters/formats and all four
+> dimensions. The current backlog is in `docs/handoff.md`: M3b frontier validation,
+> paper assembly, and an optional removal-v2 redesign. Removal-v1 is quarantined because
+> every fixture targeted `Strike`; any older removal task/result below is historical and
+> must not be cited or folded into composites.
+
 ## Milestones
 
 ### M1 — Working simulator + harness (DONE)

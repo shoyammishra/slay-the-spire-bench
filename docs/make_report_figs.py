@@ -71,7 +71,7 @@ def make_scores():
         ("Combat\nHP ratio", lambda d: d["combat"]["avg_hp_ratio"]),
         ("Synergy\narchetype", lambda d: d["synergy"]["archetype_acc"]),
         ("Synergy\ncard pick", lambda d: d["synergy"]["card_pick_acc"]),
-        ("Synergy\nremoval", lambda d: d["synergy"]["removal_acc"]),
+        ("Removal-v1\ndiagnostic*", lambda d: d["synergy"]["removal_acc"]),
     ]
     labels = ["llama-8b · struct", "llama-8b · raw", "scout-17b · struct", "scout-17b · raw"]
     keys = list(FILES)

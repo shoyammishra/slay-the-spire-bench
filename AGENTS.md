@@ -7,15 +7,16 @@ Spire. It evaluates planning at four horizons—turn, combat, synergy, and run�
 Ironclad and Silent, with Acts 1–3 implemented. The CLI entry point is
 `run_benchmark.py`; the implementation is under `slay_bench/`.
 
-The immediate research milestone is completing and retrieving the
-Qwen3-235B-A22B-FP8 full matrix. Three cells are complete. Silent/raw job `267038`
-was retrieved after a 24-hour wall kill: turn+combat is complete for seeds
-`42 1042 2042 3042`, seed `4042` stopped at combat sample 11/20, and synergy/run never
-started. The validated combo script now supports phase/seed resume controls. Recovery
-is three sequential sub-day jobs: A finishes seed-4042 turn/combat plus all synergy;
-B/C split the five `N_RUN=5` seeds. Do not rerun the four-cell launcher. Cluster
-submission and other paid/limited compute remain user-authorized operations. Before
-acting on project status, read the newest entries in `docs/handoff.md`,
+The Qwen3-235B-A22B-FP8 full matrix is complete: all four cells and 20 per-seed
+artifacts are retrieved, Silent/raw was canonically reaggregated, and the seven-model
+statistics and horizon figures were regenerated on 2026-08-30. Its clearest gain over
+Qwen3-32B is card selection (all four cells; 19/20 seed pairs), not a uniform horizon
+extension. Removal-v1 is quarantined because every fixed fixture's expert target is
+`Strike`; exclude it from capability claims and composites. A future removal-v2 requires
+a versioned full-synergy re-baseline. The remaining expensive options are the M3b
+proprietary-frontier matrix and removal-v2; cluster/API submission and other paid or
+limited compute remain user-authorized operations. Before acting on project status,
+read the newest entries in `docs/handoff.md`,
 `docs/decision_log.md`, and `docs/experiment_log.md` because this summary can age.
 
 ## Read-first routing
@@ -108,7 +109,7 @@ same command passes after the change.
 - `prompt_builder.py`: structured/raw serialization and prompt contracts.
 - `visualize.py`: reports and figures.
 - `scripts/`: reproducible analyses and baselines; `cluster/`: Slurm launchers.
-- `tests/`: 172 directly runnable tests as of 2026-08-09.
+- `tests/`: 174 directly runnable tests as of 2026-08-30.
 
 ## Decisions, documentation, and completion
 

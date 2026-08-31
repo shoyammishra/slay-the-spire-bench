@@ -487,6 +487,24 @@ def test_synergy_pick_position_debias():
           f"always-0 scores {acc:.2f}")
 
 
+def test_synergy_removal_constant_strike_confounded():
+    """Removal-v1 is diagnostic only: every fixture's expert target is Strike,
+    so an input-ignoring constant answer reaches the 1.0 boundary."""
+    import contextlib
+    import io
+
+    response = ('{"archetype":"Aggro","best_card_index":0,'
+                '"worst_card_name":"Strike"}')
+    for character in ("ironclad", "silent"):
+        harness = BenchmarkHarness(MockLLM([response]), "m", "structured",
+                                   character=character)
+        with contextlib.redirect_stdout(io.StringIO()):
+            scores = harness.run_synergy_eval(list(range(500, 520)))
+        assert len(scores) == 20
+        assert all(score.removal_correct for score in scores)
+    print("[PASS] constant Strike scores 40/40; removal-v1 remains quarantined")
+
+
 def test_synergy_archetype_multi_mention_scored_false():
     """An answer naming several archetypes (or echoing the option list) must NOT
     count as correct just because the right name appears as a substring."""
@@ -1065,6 +1083,7 @@ if __name__ == "__main__":
         test_aggregation_keys_match_summary,
         test_synergy_fixture_ground_truth_rules,
         test_synergy_pick_position_debias,
+        test_synergy_removal_constant_strike_confounded,
         test_synergy_archetype_multi_mention_scored_false,
         test_combat_hp_scored_before_combat_end_heal,
         test_turn_oracle_handles_more_than_six_playable,

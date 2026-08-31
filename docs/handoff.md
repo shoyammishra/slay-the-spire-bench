@@ -13,12 +13,19 @@ Single source of truth stays where it already lives (see §2).
 
 ## 1. Project status snapshot (2026-07-12)
 
+- **Active supersession (2026-08-30):** the open-model matrix now has 28 canonical
+  aggregates (7 configurations × 2 characters × 2 formats), including the complete
+  Qwen3-235B rung. Its strongest relative gain over Qwen3-32B is card selection
+  (all 4 cells; 19/20 seed pairs), not a uniform horizon extension. Removal-v1 is
+  quarantined because every fixture's expert target is `Strike`; raw removal fields are
+  diagnostic only and the regenerated synergy composite uses archetype + best pick.
+
 - **Superseded snapshot:** the then-current 5-family result matrix was complete. 24 multi-seed aggregates
   (`results/*_seeds42_1042_2042_3042_4042.json`, 4 character×format combos × 6 model
   configs) are on this laptop and folded into all docs. Every remaining `—` cell in the
   legacy result tables was *intentional*, not pending. Nothing is running on the cluster.
 - **Engine + harness are post-audit stable**: 5 full audits (2026-06-10 → 06-12) found and
-  fixed ~130 bugs; **172/172 tests pass** (as of 2026-08-07); mock pipeline green for both characters × both
+  fixed ~130 bugs; **174/174 tests pass** (as of 2026-08-30); mock pipeline green for both characters × both
   formats.
 - **The two D&B-blocking gaps from the novelty review are closed** (≥3 model families +
   a reasoning model).
@@ -150,10 +157,10 @@ chain-of-thought — is only catchable by smoke).
   pre-fix 13.4-floors/20–40% numbers — that data is invalid.
 - Frame the name-vs-play dissociation as **confirming and quantifying FDG 2024**
   (Bateni & Whitehead), never as a discovery — a reviewer finds that paper in minutes.
-- Generalizations across the matrix must be counted, not asserted: "structured ≥ raw for
-  synergy removal" is true for **5 of 6 models** (deepseek-14b reverses) — state it that
-  way. When a model's parse_ok < 1.0, its accuracies are conditioned on the parseable
-  subset; say so.
+- Generalizations across the matrix must be counted, not asserted. Removal-v1 is not a
+  capability metric: all 40 expert targets are `Strike`, so a constant answer scores
+  100%. Exclude it from claims and composites. When a model's parse_ok < 1.0, valid
+  accuracies are conditioned on the parseable subset; say so.
 - Old numbers never get silently blended with new ones. When an instrument changes, the
   old files are deleted or marked ⛔ in docs (see the 2026-06-14 Groq-file deletion).
 - **(added 2026-08-07, P4b)** Statistics have their own honesty rules, all enforced by
@@ -182,9 +189,11 @@ chain-of-thought — is only catchable by smoke).
   (`docs/design.md`); add a regression test in the matching test file;
   run all four test files directly (no pytest); run the mock pipeline both characters ×
   both formats; then apply §5.1 before any real run.
-- **New synergy fixture**: obey the executable design-rule tests (added 2026-06-10) —
-  unique signature ownership, on-archetype best pick, basic-card removal target; the
-  harness rotates offer positions, don't hand-balance them.
+- **New synergy fixture**: obey the executable design-rule tests — unique signature
+  ownership and an on-archetype best pick; the harness rotates offer positions. Do not
+  add removal-v2 by editing the v1 fixture set in place: targets and candidate positions
+  must vary and be balanced, constant-answer baselines must stay at chance, metadata must
+  persist per sample, and the shared synergy prompt requires a full versioned re-baseline.
 - **New model**: add sbatch overrides (`HF_REPO`/`SERVED_NAME`/`CONDA_ENV`), smoke first
   (§5.3), gated models need `HF_TOKEN`. **Verify the prefetch with
   `cluster/verify_prefetch.py <repo>` before submitting** — the sbatch guards only check the
@@ -198,15 +207,12 @@ chain-of-thought — is only catchable by smoke).
 
 ## 6. Backlog (priority order, with owners)
 
-**2026-08-22 P4c status supersession:** job 267038's final stdout and partial artifacts are
-now on the laptop. It wall-killed at the 24-hour partition maximum after completing
-turn+combat for four seeds; seed 4042 stopped at combat 11/20, and synergy/run never started.
-The combo script now has default-preserving phase/seed resume controls. Submit three sequential
-`afterok` jobs only: A = seed-4042 turn/combat + all synergy, B = first three run seeds, C =
-last two run seeds. TP=2 jobs cannot run concurrently under the three-GPU cap. This supersedes
-both the “running” historical row and the 2026-08-21 unknown-state paragraph. The preliminary
-three-cell paper signal remains quarantined until Silent/raw, canonical aggregation, audit, and
-`stats_rigor.py` are complete.
+**2026-08-30 P4c status supersession:** recovery jobs `329871`–`329873` completed the
+missing Silent/raw phases. All 20 per-seed artifacts and four canonical aggregates are on
+the laptop, the null Silent/raw run aggregate was regenerated from its complete per-seed
+blocks, the full per-sample audit passed, statistics and horizon figures were regenerated,
+and the results are folded into the authoritative docs. The earlier recovery instructions
+and three-cell quarantine are historical only.
 
 | P | Task | Owner | Acceptance criteria |
 |---|---|---|---|
@@ -214,11 +220,12 @@ three-cell paper signal remains quarantined until Silent/raw, canonical aggregat
 | 2 | ~~**Fable 5 lit note** into `docs/draft.md` Related Work~~ — **✅ DONE 2026-07-12** (Opus 4.8 agent; 4 insertions in draft.md + Anthropic entry in `novelty_and_related_work.md` §10) | done | Met: domain validation cited; floor-vs-ceiling complement framing; ~3×-with-memory as corroboration-only; memory = future-work only |
 | 3 | ~~**Run-level discriminability decision**~~ — **✅ DECIDED 2026-07-12** (decision_log P3 entry): **reframe run as the shared collapse floor (Option B)**; `--acts 3` = conditional appendix probe gated on M3b frontier results also flooring at 1 act, preceded by an Act-2/3 engine audit + smoke (~12h/cell; full matrix would be ~72–144 GPU-h). roadmap step 6 re-tagged | done | Met: decision + trade-offs + revisit trigger (M3b) recorded; no compute spent |
 | 4 | **M3b frontier runs** (Claude/GPT via professor's channel) — fills the frontier gap; expected to bend the collapse curve. **⚠️ Budget protocol registered 2026-07-13 (decision_log): matched-8k first, escalate only on measured truncation** — the smoke test MUST read `parse_fail_truncated`/`truncation_errors` before any full cell (the DeepSeek budget-bound confound now instrumented); reasoning APIs need their decoupled budgets configured (Claude thinking budget separate from answer tokens; OpenAI `max_completion_tokens` covers reasoning too). **Scope added 2026-07-14 (review-driven, decision_log): fold-in includes a cross-benchmark correlation** — per-model collapse points vs *published* external agent-benchmark scores (GAIA/SWE-Bench/WebArena…); we run nothing external, n≈8–10 models, reported as directional only | `benchmark-operator` + user (credentials/spend) | Same harness, same seeds, all 4 combos; provider class may need adding to `benchmark.py`; smoke truncation check ≈ 0 (or the raised-budget condition added + both reported); correlation table with the directional caveat |
-| 4b | ~~**Statistical rigor pass**~~ — **✅ DONE 2026-08-07.** `scripts/stats_rigor.py` (models discovered from filenames → M3b rows join with no code change) + `tests/test_stats.py` (26 known-answer tests, **172/172 total**) + `docs/stats_report.md` (committed) + `results/stats/stats_rigor.json`. Methods/limitations: decision_log 2026-08-07 (later); numbers: experiment_log 2026-08-07 (later); wording impact: findings 📊 section. **⚠️ Registered power ceiling: exact sign-flip over 5 seed pairs ⇒ min attainable two-sided p per combo = 0.0625**, so inference rests on the pooled stratified test + sample-level McNemar. **Corrected two published claims** — "combat/run format-insensitive" (ceiling artifact; format reaches combat hp_ratio, 10/12 strata) and qwen3-32b's run lift (run-seed-matched greedy = .04/12.76, not .01/12.48). **Delivered the paper's cleanest number:** between-model η² share turn .83 / combat .89 / synergy .51 / **run .02**. **Re-run it as step 1 of the M3b fold-in.** | done | Met: reusable script (not a notebook); CIs + effect sizes on every headline claim; paired format test with p-values (+ direction test); no published mean changed |
-| 4c | **Open-model ladder, top rung: Qwen3-235B-A22B-FP8** (pre-M3b; ladder registered decision_log 2026-07-23 §1). **▶ STAGE 2 ACTIVE — 3/4 matrix cells landed remotely; Silent/raw job 267038 is running (2026-08-21).** Smoke passed 2026-08-09 (job 266749): wall 75m35s, zero truncation, sane non-quotable scores. The matrix launched under the then-documented 96 h cap; Ironclad structured/raw and Silent structured now have five per-seed artifacts plus aggregates. Before the final cell could start, `gpu_h200_8` changed to `MaxTime=1-00:00:00`, leaving its four-day request permanently pending. Job 267038 was updated in place to `23:59:00` and is running with the validated TP=2 configuration. **Do not rerun the four-cell launcher.** The measured 39–53 h/cell estimate exceeds the new cap, so after this pass inspect `slay_combo_267038.out` and Silent/raw partial saves, then split only its unfinished phases/seeds into sub-day jobs. No 235B scores are reportable until all four cells are retrieved and audited. | user (run/retrieval) + `benchmark-operator` (audit/fold-in) | Remaining: finish Silent/raw without recomputing landed cells; retrieve results + Slurm/vLLM logs; per-sample parse/truncation and degenerate-result audit; rerun `stats_rigor.py`; fold into experiment_log/findings/tables, keeping run at the `N_RUN=5` floor-estimate tier (never blend with n=20) |
+| 4b | ~~**Statistical rigor pass**~~ — **✅ REFRESHED 2026-08-30.** `scripts/stats_rigor.py` now discovers 7 configurations/28 cells and verifies 70/70 structured/raw fixture pairings. `tests/test_stats.py` has 27 known-answer tests (**174/174 repository total**). Removal-v1 is quarantined from every inferential surface and composite. Current between-model η² shares on the representative metrics are turn damage .865 / combat win .896 / synergy archetype .629 / **run floors .021**; the run estimate remains restricted to the three balanced `N_RUN=20` models. **⚠️ Power ceiling:** five seed pairs imply min attainable two-sided per-combo p=.0625, so inference uses pooled strata and sample-level tests. | done | Met: reusable script; CIs + effect sizes; paired tests; removal quarantine enforced; Qwen3-235B folded in without blending run tiers |
+| 4c | ~~**Open-model ladder, top rung: Qwen3-235B-A22B-FP8**~~ — **✅ COMPLETE 2026-08-30.** All four cells, 20 per-seed artifacts, and 400/400/400/100 observations recovered and audited. Silent/raw's canonical null run block was reaggregated correctly. Relative to Qwen3-32B, card pick improves in all four cells and 19/20 seed pairs; other horizons are mixed or saturated. Parse/truncation counts, matched-greedy floor comparisons, MoE-vs-dense caveat, and missing-original-stdout limitation are recorded in the 2026-08-30 experiment/decision entries. | complete | Met: no landed work recomputed; exact sample inventory and seed audit; canonical aggregate; statistics/figures/docs refreshed; run remains `N_RUN=5` floor-estimate tier |
+| 4d | **Removal-v2 redesign and synergy re-baseline** — only if strategic pruning is needed as a paper claim. Version the instrument; vary/balance expert targets and candidate positions; persist target metadata; demonstrate constant-answer chance baselines; then rerun all synergy cells because the prompt is joint. Never mix v1 and v2. | `engine-auditor` + `benchmark-operator` + user (compute) | Design decision and degenerate tests before spend; exact-stack smoke; full versioned matrix; statistics and figures regenerated |
 | 5 | ~~Complete qwen3-32b non-synergy dimensions~~ — **✅ DONE 2026-08-07; full four-dimension matrix retrieved, audited, and folded in.** | complete | See experiment log 2026-08-07 |
 | 5b | ~~**Run the parse probe** and fold the truncation-vs-malformed answer into findings + the paper's DeepSeek framing~~ — **✅ DONE 2026-07-13.** Four cells ran (deepseek-7b IC + 14b Silent, both formats): **`parse_fail_truncated/parse_fail_n` = 1.0 in every cell** ⇒ verdict = **budget-bound deliberation** (models exhaust the 8k budget mid-`<think>`; zero malformed-but-complete outputs). Folded into experiment_log (2026-07-13), findings (probe section + finding-2 supersession), draft.md (finding 3 mechanism + §5.4), report_matrix.html. Probe caveats recorded (seed 42 only, combat n=3); diagnostic cells kept OUT of matrix tables. The **"invalid-action errors"** reporting rule for the matrix metric remains in force | done | Met: answer recorded as budget-bound with n/seed caveat; no diagnostic scores in matrix tables |
-| 6 | **Paper assembly** for a D&B-track submission; citations need venue/year completion. ~~**Scope added 2026-07-12 (found during P2): full draft-refresh pass**~~ — **✅ REFRESH SUBTASK DONE 2026-07-12** (draft.md: new matrix-accurate Abstract + superseded-claims box, "contributes" numbers updated, §4–5 results-summary skeleton added with the run-as-collapse-floor framing + horizon-figure caption language ("0 = non-planning floor"; combat = `win×min(1,hp)` so greedy ≈ 1.0), venue ladder + gaps re-ranked — no stale pilot claims remain). **Also delivered: `docs/report_matrix.html`** — standalone professor-facing results report (both horizon-collapse PNGs base64-embedded, full matrix tables, 5 findings, honest caveats, M3b ask; supersedes the pilot `docs/report.html`). **REMAINING P6 scope:** full paper assembly (Sections 1, 3–6 prose from the draft.md skeleton) + BibTeX completion — best done after P4/M3b lands. **Scope extended 2026-07-14 (review-driven, decision_log + `docs/review_2026-07-14.md` §2.3):** (a) explicit oracle-quality limitations taxonomy (turn exact → combat greedy → synergy expert → run baseline); (b) three named rebuttal arguments — difficulty≠horizon (dissociation pattern: deepseek-7b execution collapse vs matrix-2nd synergy removal, qwen3-32b bends only at synergy), run collapse ≠ context accumulation (memoryless harness, bounded prompts), budget-bound deliberation as mechanism (promote from footnote to first-class finding); (c) claim-scoping pass — every general claim reads "in this benchmark" until M3b/second-domain evidence; (d) explicit memory/tools scope-out defense (floor vs ceiling); (e) positioning vs FDG-2024/Orak LEADS the paper (the review estimates 45% of reviewers open with "already done") | Opus 4.8 (writing) + Sonnet (formatting/BibTeX mechanics) | Novelty framing follows `novelty_and_related_work.md` + §5.4 honesty rules; no stale pilot claims survive the refresh; all five 2026-07-14 scope items present; P4b numbers used wherever stats are cited |
+| 6 | **Paper assembly** for a D&B-track submission; citations need venue/year completion. The 2026-08-30 fold-in adds the complete Qwen3-235B selective-capability result and removes all removal-v1 claims/composites. `docs/report_matrix.html` is the professor-facing report; `docs/draft.md` is the paper skeleton. **REMAINING P6 scope:** full Sections 1 and 3–6 prose, BibTeX completion, and a final claim-scope pass. Preserve the run-as-collapse-floor framing, explicit oracle-quality taxonomy, difficulty≠horizon evidence (Qwen3-235B card-selection gains without uniform long-horizon gains), memoryless-run defense, and budget-bound-deliberation mechanism. | `paper-writer` + `docs-formatter` for mechanical work | No removal-v1 capability claims; current 7-configuration statistics and figures; all caveats attached; novelty framing follows related-work and review docs |
 
 **2026-08-16 ownership supersession:** historical Opus/Sonnet labels in completed rows
 record who performed that work. For remaining work, use the Codex roles in §10:
@@ -228,7 +235,7 @@ mechanical formatting or transcription.
 ## 7. Risks & failure modes
 
 - **Results exist only on this laptop.** `results/` is gitignored; cluster `~/scratch`
-  purges after 30 days. The 24 aggregates are the project's crown jewels — back them up
+  purges after 30 days. The 28 aggregates are the project's crown jewels — back them up
   (private location, NOT this public repo) before any machine change.
 - **Public-repo leak** (invariant 8). GitHub may still serve old commit SHA `74cf854`
   by direct URL (internal RFC1918 IP only; low risk; purge via GitHub Support if desired).
@@ -236,12 +243,12 @@ mechanical formatting or transcription.
   batch any remaining GPU work.
 - **Fake-precision risk**: n=20 × 5 seeds is paper-grade for this scope, but any new
   claim needs its own power check (12.5pp steps at n=8 was the old trap).
-- **No CI** (see §9): the 172 tests only run when someone runs them. Run all four files
+- **No CI** (see §9): the 174 tests only run when someone runs them. Run all four files
   before every commit.
 
 ## 8. Review checklist (no merge without)
 
-1. All 4 test files pass (**172 tests**: benchmark 48, combat 62, run 36, stats 26), run
+1. All 4 test files pass (**174 tests**: benchmark 49, combat 62, run 36, stats 27), run
    directly with `PYTHONIOENCODING=utf-8`.
 2. Mock pipeline green: both characters × both formats.
 3. §5.1 classification done: does this change invalidate data? If yes, re-baseline plan
@@ -261,8 +268,12 @@ mechanical formatting or transcription.
 - Run-level dimension doesn't discriminate between current models (floor effect) — this
   is a *finding* to be framed, and P3's decision point.
 - deepseek-7b synergy accuracies conditioned on parse_ok .69–.92.
-- qwen3-32b has synergy-only coverage (deliberate: the horizon where it separates).
-- `visualize.py` predates the matrix — P1 modernizes it.
+- Qwen3 run cells are `N_RUN=5` floor estimates and must not be pooled with the
+  balanced `N_RUN=20` rows.
+- Removal-v1 is a known invalid instrument (universal `Strike` target); a valid
+  removal-v2 requires full versioned synergy re-baselining.
+- `visualize.py` is matrix-aware as of 2026-08-30; removal is excluded from its
+  synergy composites and both horizon figures are current.
 
 ## 10. Delegation & the agent roster
 

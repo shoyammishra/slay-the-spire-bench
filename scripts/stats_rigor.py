@@ -23,13 +23,16 @@ Two units of analysis, chosen by what the harness actually persisted:
     seed-level observations. Structured and raw share the same seed bases, so
     the two formats are PAIRED at the seed level.
   * SAMPLE level (synergy only). ``synergy.samples[]`` persists per-fixture
-    outcomes for every combo (2,400 records). Verified 2026-08-07: for a given
+    outcomes for every combo. Verified 2026-08-07: for a given
     (model, character, seed), the structured and raw sample streams carry
-    byte-identical ``expert_archetype``/``expert_pick_idx`` sequences in all 60
-    pairs -- the two formats saw the SAME fixtures in the SAME offer positions.
-    That licenses McNemar's exact test on paired binary outcomes.
-    (``turn.samples[]``/``combat.samples[]`` were instrumented 2026-07-13, AFTER
-    the matrix ran; only qwen3-32b has them, so turn/combat stay seed-level.)
+    byte-identical ``expert_archetype``/``expert_pick_idx`` sequences in every
+    discovered pair (70 in the 2026-08-30 matrix) -- the two formats saw the SAME
+    fixtures in the SAME offer positions.
+    That licenses McNemar's exact test on the archetype and rotated card-pick
+    outcomes. Removal is excluded: every fixture uses the same expert answer
+    (``Strike``), so a constant answer scores 100%.
+    (``turn.samples[]``/``combat.samples[]`` were instrumented after the initial
+    matrix; only later model rows have them, so turn/combat stay seed-level.)
 
 METHOD CHOICES (rationale in docs/decision_log.md 2026-08-07)
 -------------------------------------------------------------
@@ -39,13 +42,12 @@ METHOD CHOICES (rationale in docs/decision_log.md 2026-08-07)
     smallest attainable two-sided p is 2/32 = 0.0625. **No single combo can
     reach p < 0.05.** Per-combo rows are therefore descriptive; the inferential
     claims come from the pooled stratified test (sign-flips within combo,
-    across all 12 model x character strata) and from sample-level McNemar.
+    across all discovered model x character strata) and from sample-level McNemar.
   * Sample-level McNemar has more power but assumes independent pairs, and the
     same 20 fixtures recur across seeds. It is reported alongside the
-    cluster-safe seed-level permutation test; a claim is called supported only
-    when both agree, and disagreements are printed explicitly.
+    cluster-safe seed-level permutation test; disagreements are printed explicitly.
   * Multiplicity: Holm-Bonferroni within each family (a family = one metric
-    across the 12 combos).
+    across the discovered combos).
   * A non-significant result is NEVER reported as "no effect". Format
     insensitivity is tested as EQUIVALENCE (TOST via the 90% bootstrap CI of
     the paired difference) against a pre-declared margin of 0.05 -- the
@@ -106,6 +108,15 @@ RNG_SEED = 20260807          # fixed => reproducible CIs
 ALPHA = 0.05                 # 95% CIs
 EQUIV_MARGIN = 0.05          # see module docstring: 1 sample in 20
 
+# Quarantined observations remain in the immutable result JSONs for audit, but
+# must not enter descriptive headline tables, format inference, boundary claims,
+# variance decomposition, or horizon composites. The removal instrument assigns
+# every fixture the same expert target (Strike), so the degenerate constant policy
+# scores 100%; this is not a chance-calibrated strategic-removal measure.
+QUARANTINED_METRICS = {
+    ("synergy", "removal_acc"): "constant 'Strike' answers score 100%",
+}
+
 # Metrics analysed per dimension. (key in the per-seed summary, display name,
 # "higher is better" flag used only for wording).
 METRICS: Dict[str, List[Tuple[str, str, bool]]] = {
@@ -117,7 +128,6 @@ METRICS: Dict[str, List[Tuple[str, str, bool]]] = {
                 ("avg_parse_errors", "invalid_action_errors", False)],
     "synergy": [("archetype_acc", "archetype", True),
                 ("card_pick_acc", "card_pick", True),
-                ("removal_acc", "removal", True),
                 ("parse_ok_rate", "parse_ok", True)],
     "run":     [("survival_rate", "survival", True),
                 ("avg_floors_reached", "floors", True),
@@ -128,13 +138,12 @@ METRICS: Dict[str, List[Tuple[str, str, bool]]] = {
 # The metrics the paper's headline claims rest on.
 HEADLINE = [("turn", "avg_damage_ratio"), ("combat", "win_rate"),
             ("combat", "avg_hp_ratio"), ("synergy", "archetype_acc"),
-            ("synergy", "card_pick_acc"), ("synergy", "removal_acc"),
+            ("synergy", "card_pick_acc"),
             ("run", "avg_floors_reached"), ("run", "avg_progress")]
 
 # Per-sample synergy fields -> metric names (paired sample-level tests).
 SYNERGY_SAMPLE_FIELDS = [("archetype_correct", "archetype"),
-                         ("card_pick_correct", "card_pick"),
-                         ("removal_correct", "removal")]
+                         ("card_pick_correct", "card_pick")]
 
 # Files that are diagnostics or superseded, never matrix rows.
 EXCLUDE_SUBSTRINGS = ("parse_probe", "sharanga_smoke", "mock")
@@ -228,8 +237,9 @@ def stratified_sign_flip_p(diffs_by_stratum: Dict[str, Sequence[float]],
 
     Statistic = unweighted mean of per-stratum mean differences, so a combo with
     more seeds cannot dominate. Signs are flipped independently per observation
-    within its stratum. With 60 observations exhaustive enumeration is
-    infeasible, so this is Monte-Carlo with the script's fixed RNG seed;
+    within its stratum. With the full matrix's dozens of observations,
+    exhaustive enumeration is infeasible, so this is Monte-Carlo with the
+    script's fixed RNG seed;
     ``n_perm`` is reported and the p-value carries its MC error.
     """
     keys = [k for k, v in diffs_by_stratum.items() if len(v)]
@@ -835,7 +845,7 @@ def analysis_boundary_cells(cells: Dict, models: Sequence[str]) -> List[Dict]:
     targets = [("turn", "avg_damage_ratio"), ("turn", "legal_rate"),
                ("turn", "parse_ok_rate"),
                ("combat", "win_rate"), ("synergy", "archetype_acc"),
-               ("synergy", "card_pick_acc"), ("synergy", "removal_acc"),
+               ("synergy", "card_pick_acc"),
                ("run", "survival_rate")]
     for model in models:
         for ch in CHARACTERS:
@@ -939,36 +949,26 @@ def analysis_headline_claims(cells: Dict, models: Sequence[str], desc: List[Dict
     """G. Re-check each published headline claim against the statistics above.
 
     Every claim gets a verdict of SUPPORTED / SUPPORTED-DIRECTIONAL /
-    UNDERPOWERED / NOT-SUPPORTED plus the evidence used. "UNDERPOWERED" is a
-    distinct outcome from "NOT-SUPPORTED" on purpose.
+    UNDERPOWERED / NOT-SUPPORTED / QUARANTINED plus the evidence used.
+    "UNDERPOWERED" is a distinct outcome from "NOT-SUPPORTED" on purpose.
     """
     claims: List[Dict] = []
 
-    # C1 -- "structured >= raw on synergy removal for 5 of 6 models".
-    rem = [r for r in mcnemar if r["metric"] == "removal"]
-    by_model: Dict[str, List[Dict]] = {}
-    for r in rem:
-        by_model.setdefault(r["model"], []).append(r)
-    holds, reverses, detail = [], [], []
-    for model, rows in sorted(by_model.items()):
-        d = mean([r["risk_diff"] for r in rows])
-        (holds if d >= 0 else reverses).append(model)
-        sig = [r for r in rows if r["p_mcnemar"] < ALPHA]
-        detail.append({"model": model, "mean_risk_diff": round(d, 4),
-                       "chars_significant_mcnemar": [r["character"] for r in sig]})
+    # C1 -- superseded removal claim. The values stay in source artifacts for
+    # provenance, but a constant "Strike" policy gets every fixture right.
     claims.append({
-        "id": "C1", "claim": "structured >= raw on synergy removal for 5 of 6 models",
-        "verdict": "SUPPORTED" if len(reverses) <= 1 else "NOT-SUPPORTED",
-        "n_hold": len(holds), "n_models": len(by_model),
-        "models_holding": holds, "models_reversing": reverses,
-        "evidence": "sample-level paired McNemar on fixture-matched pairs",
-        "detail": detail,
+        "id": "C1", "claim": "synergy removal accuracy measures strategic pruning",
+        "verdict": "QUARANTINED",
+        "note": ("every fixture has expert_remove_name='Strike', so an always-Strike "
+                 "policy scores 100%; removal is excluded from all inferential and "
+                 "composite analyses until redesigned fixtures are fully re-baselined"),
+        "evidence": "degenerate constant-policy audit over the fixed-fixture harness",
     })
 
     # C2 -- format effect on synergy, pooled across the whole matrix. A pooled
     # result counts as SUPPORTED only when the magnitude test AND the direction
     # test agree; magnitude alone can be carried by a single model.
-    for metric in ("archetype", "card_pick", "removal"):
+    for metric in ("archetype", "card_pick"):
         p = next((x for x in fmt_res["pooled"]
                   if x["dimension"] == "synergy" and x["metric"] == metric), None)
         if not p:
@@ -994,7 +994,8 @@ def analysis_headline_claims(cells: Dict, models: Sequence[str], desc: List[Dict
                      "consistent across models (sign test n.s.) -- report as a "
                      "model-dependent effect, not a general one"),
             "evidence": ("stratified sign-flip permutation (magnitude) + exact sign "
-                         "test on per-stratum direction, 12 model x character strata"),
+                         f"test on per-stratum direction, {p['n_strata']} model x "
+                         "character strata"),
         })
 
     # C3 -- "combat/run outcomes are format-insensitive". Tested as EQUIVALENCE,
@@ -1081,7 +1082,8 @@ def analysis_headline_claims(cells: Dict, models: Sequence[str], desc: List[Dict
             "note": ("if SUPPORTED this CORRECTS the standing claim that combat "
                      "outcomes are format-insensitive; check whether the effect is "
                      "carried by the R1 distills before generalising"),
-            "evidence": "stratified permutation + sign test over 12 strata",
+            "evidence": ("stratified permutation + sign test over "
+                         f"{p['n_strata']} strata"),
         })
 
     # C8 -- turn-level format direction. The published framing is that the format
@@ -1179,7 +1181,8 @@ def analysis_headline_claims(cells: Dict, models: Sequence[str], desc: List[Dict
         row = next((r for r in var_rows if r["dimension"] == dim
                     and r["metric"] == key and not r.get("degenerate")), None)
         if row:
-            sep[dim] = {"share_model": row["share_model"],
+            sep[dim] = {"metric": key,
+                        "share_model": row["share_model"],
                         "share_residual_seed": row["share_residual_seed"],
                         "n_models": row["n_models"]}
     if sep:
@@ -1189,7 +1192,8 @@ def analysis_headline_claims(cells: Dict, models: Sequence[str], desc: List[Dict
             "verdict": "SUPPORTED" if sep.get("turn", {}).get("share_model", 0) >
                        sep.get("run", {}).get("share_model", 1) else "NOT-SUPPORTED",
             "model_variance_share_by_dimension": sep,
-            "evidence": "eta^2 shares from the balanced model x character x format decomposition",
+            "evidence": ("eta^2 shares from representative balanced metrics: turn damage, "
+                         "combat win, synergy archetype, and run floors"),
         })
     return claims
 
@@ -1219,7 +1223,8 @@ def render_markdown(res: Dict) -> str:
              f"× {len(SEED_BASES)} seeds). Bootstrap B={meta['boot']}, RNG seed {meta['rng_seed']} "
              f"→ numbers reproduce exactly.*")
     L.append("")
-    L.append("**This file adds uncertainty to published means; it changes none of them.**")
+    L.append("**Benchmark means are unchanged. The invalid removal metric is quarantined "
+             "from every analysis and composite below.**")
     L.append("")
     L.append("## 0. Method + the power ceiling you must quote with these numbers")
     L.append("")
@@ -1237,6 +1242,11 @@ def render_markdown(res: Dict) -> str:
              f"from a non-significant test.")
     L.append("- Boundary cells get **Clopper–Pearson** exact intervals (a bootstrap of a "
              "constant vector reports zero width, which is not certainty).")
+    L.append("- **Removal quarantine:** every synergy fixture has `Strike` as its expert "
+             "removal target, so a constant `Strike` answer scores 100%. Raw observations "
+             "remain in result JSONs for audit, but removal is excluded from descriptive "
+             "headline tables, format tests, McNemar, variance, and composites pending a "
+             "full-fixture redesign and re-baseline.")
     L.append("")
 
     pv = res["pairing_verification"]
@@ -1256,6 +1266,8 @@ def render_markdown(res: Dict) -> str:
     L.append("|---|---|---|")
     for c in res["claims"]:
         ev = []
+        if c.get("evidence"):
+            ev.append(str(c["evidence"]))
         for k in ("pooled_mean_diff", "p_pooled", "p_sign_test", "n_hold",
                   "combos_equivalent", "combos_tested", "survival_cp95",
                   "survival_p_exact"):
@@ -1264,7 +1276,8 @@ def render_markdown(res: Dict) -> str:
         share = c.get("model_variance_share_by_dimension")
         if share:
             ev.append("model-variance share " + ", ".join(
-                f"{d} {v['share_model']:.2f}" for d, v in share.items()))
+                f"{('synergy(archetype)' if d == 'synergy' else d)} "
+                f"{v['share_model']:.2f}" for d, v in share.items()))
         L.append(f"| **{c['id']}** {c['claim']} | `{c['verdict']}` | {'; '.join(ev[:3])} |")
     L.append("")
     for c in res["claims"]:
@@ -1300,9 +1313,10 @@ def render_markdown(res: Dict) -> str:
 
     L.append("## 3. Format ablation — synergy at the sample level (McNemar exact, fixture-matched)")
     L.append("")
-    L.append("The strongest test available: same fixture, same offer position, both formats. "
+    L.append("The strongest valid test available: same fixture, same offer position, both formats. "
              "`b` = structured-only correct, `c` = raw-only correct; concordant pairs carry "
-             "no information. CIs are hierarchical bootstraps (seed → sample).")
+             "no information. CIs are hierarchical bootstraps (seed → sample). Removal is "
+             "not shown because its constant target fails the degenerate-policy audit.")
     L.append("")
     L.append("| Model | Char | Metric | pairs | dropped | structured [95% CI] | raw [95% CI] | risk diff | b/c | p | p (Holm) |")
     L.append("|---|---|---|---|---|---|---|---|---|---|---|")
@@ -1471,7 +1485,11 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
             "n_cells": len(cells),
             "power_ceiling_note": ("5 seed pairs => 32 sign assignments => minimum "
                                    "attainable two-sided p per combo is 0.0625"),
-            "additive_only": True,
+            "benchmark_means_unchanged": True,
+            "quarantined_metrics": [
+                {"dimension": dim, "key": key, "reason": reason}
+                for (dim, key), reason in QUARANTINED_METRICS.items()
+            ],
         },
         "pairing_verification": pairing,
         "claims": claims,

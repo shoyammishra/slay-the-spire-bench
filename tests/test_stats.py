@@ -17,6 +17,7 @@ from stats_rigor import (
     binom_test_two_sided, binom_cdf, clopper_pearson, cohens_dz, cliffs_delta,
     holm, bootstrap_mean_ci, hierarchical_bootstrap_ci, equivalence_test,
     anova_variance_shares, discover_models, EQUIV_MARGIN,
+    METRICS, HEADLINE, SYNERGY_SAMPLE_FIELDS, QUARANTINED_METRICS,
 )
 
 
@@ -282,6 +283,23 @@ def test_discover_models_parses_filenames_and_skips_diagnostics():
     print(f"[PASS] discovery -> {found} (diagnostics/mock/aggregates skipped)")
 
 
+def test_removal_metric_is_quarantined_from_analysis_and_composites():
+    """A constant Strike answer scores 100%, so removal must stay out of every
+    inferential family and the normalized synergy composite."""
+    from slay_bench.visualize import _norm_synergy
+
+    assert ("synergy", "removal_acc") in QUARANTINED_METRICS
+    assert all(key != "removal_acc" for key, _disp, _hib in METRICS["synergy"])
+    assert ("synergy", "removal_acc") not in HEADLINE
+    assert all(field != "removal_correct" for field, _disp in SYNERGY_SAMPLE_FIELDS)
+
+    base = {"archetype_acc_mean": 0.6, "card_pick_acc_mean": 0.7,
+            "removal_acc_mean": 0.0}
+    changed = dict(base, removal_acc_mean=1.0)
+    assert _norm_synergy(base) == _norm_synergy(changed)
+    print("[PASS] constant-target removal is quarantined from stats and horizon composite")
+
+
 if __name__ == "__main__":
     tests = [
         test_sign_flip_is_exact_and_hits_its_floor,
@@ -310,6 +328,7 @@ if __name__ == "__main__":
         test_variance_shares_sum_to_one_on_mixed_data,
         test_variance_shares_refuse_unbalanced_designs,
         test_discover_models_parses_filenames_and_skips_diagnostics,
+        test_removal_metric_is_quarantined_from_analysis_and_composites,
     ]
     passed = failed = 0
     for test in tests:

@@ -109,7 +109,7 @@ slay_bench/
 |---|---|
 | Turn-level | Exhaustive search over ≤720 permutations |
 | Combat-level | Greedy bot baseline |
-| Synergy | Hand-crafted archetype fixtures (20/character × 2 characters), expert-labeled best pick + worst removal |
+| Synergy | Hand-crafted archetype fixtures (20/character × 2 characters), expert-labeled archetype + best pick; removal-v1 is quarantined |
 | Run-level | Absolute (survival + progress per act) |
 
 ## Sampling & Seeds
@@ -140,12 +140,29 @@ Dimensions handle an unparseable LLM answer differently, by design:
 - **Turn-level**: a parse failure scores `damage_ratio = 0` AND `legal = False` (an
   empty/garbage answer is not a legal play — counting it as legal would inflate
   `legal_rate` by exactly the parse-failure rate). `parse_ok_rate` is reported separately.
-- **Synergy**: a parse failure is **excluded** (`None`) from all three accuracies
-  (`archetype_acc`, `card_pick_acc`, `removal_acc`) — synergy accuracy is *knowledge
-  conditional on a parseable answer*, not a parse-success metric. To keep the
-  denominator visible, `summary()` reports `archetype_n_scored`, `card_pick_n_scored`,
-  and `removal_n_scored` alongside `parse_ok_rate`. (Currently moot — `parse_ok=1.0`
-  everywhere — but it would otherwise bias cross-model comparison for a flaky model.)
+- **Synergy**: a parse failure is **excluded** (`None`) from the serialized accuracies
+  (`archetype_acc`, `card_pick_acc`, `removal_acc`) — these values are conditional on a
+  parseable answer, not parse-success metrics. To keep the denominator visible,
+  `summary()` reports the three `*_n_scored` fields alongside `parse_ok_rate`.
+  **Only archetype and card pick are valid capability metrics.** `removal_acc` remains
+  serialized for provenance but is quarantined as described below.
+
+## Removal-v1 quarantine (2026-08-30)
+
+All 40 fixed synergy fixtures currently set `expert_remove_name="Strike"`. A constant
+`Strike` answer therefore scores 100%, so removal-v1 cannot distinguish strategic
+pruning from a degenerate response. It is intentionally excluded from statistical
+analysis, headline tables, and the synergy horizon composite. Existing raw fields are
+preserved so the failure remains auditable.
+
+A future removal-v2 is a new instrument version, not an in-place correction. It must:
+
+- vary the expert target across strategically justified cards;
+- balance target names and candidate positions so every constant answer is at chance;
+- persist fixture ID, candidate set, expert target, and model selection per sample;
+- pass explicit constant-answer and position-only regression tests; and
+- re-baseline the full synergy matrix, because archetype, pick, and removal share one
+  model prompt and old/new synergy answers are not byte-comparable.
 
 ## Documented simplifications (intentional, not bugs)
 These are deliberate fidelity gaps recorded so future audits don't re-flag them

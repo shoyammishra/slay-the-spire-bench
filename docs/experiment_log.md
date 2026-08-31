@@ -1,5 +1,73 @@
 # Experiment Log
 
+## 2026-08-30 — ✅ Qwen3-235B full matrix recovered, audited, reaggregated, and folded in
+
+**Status: complete at the registered tier.** Recovery jobs `329871`, `329872`, and
+`329873` completed the missing Silent/raw work; one timed-out request was retried
+successfully. The laptop now has 20/20 per-seed artifacts: four character×format cells ×
+five spaced base seeds (`42 1042 2042 3042 4042`). Every artifact contains 20 turn, 20
+combat, 20 synergy, and 5 run samples, for matrix totals of **400 / 400 / 400 / 100**.
+Per-dimension sample-seed streams are exact and non-overlapping across base seeds.
+
+The Silent/raw canonical aggregate initially had a null run block even though all five
+per-seed run blocks were complete. It was regenerated through the authoritative
+`run_benchmark._aggregate_summaries` path. Its corrected run result is survival `.00`,
+floors `10.68 ± 1.0640`, and progress `.6675 ± .0665`.
+
+### Canonical Qwen3-235B results
+
+| Character / format | Turn damage ratio | Combat win / HP ratio | Archetype / pick | Removal-v1 diagnostic | Run floors / progress / survival |
+|---|---:|---:|---:|---:|---:|
+| Ironclad structured | .9644 | 1.00 / 1.0832 | .70 / .79 | .18 | 12.60 / .7875 / .04 |
+| Ironclad raw | .9765 | .99 / 1.0317 | .68 / .67 | .12 | 12.00 / .7500 / .00 |
+| Silent structured | .9786 | 1.00 / 1.0444 | .80 / .65 | .48 | 11.44 / .7150 / .00 |
+| Silent raw | .9586 | .99 / .9893 | .79 / .64 | .27 | 10.68 / .6675 / .00 |
+
+Removal-v1 is shown only to identify the preserved artifact field. A constant `Strike`
+answer scores every fixed fixture, so it is quarantined from scientific analysis (see the
+2026-08-30 decision entry).
+
+### Qwen3-235B versus seed-matched Qwen3-32B
+
+- Card-pick deltas are **+.2558 / +.1100 / +.2800 / +.2100** in the table order and
+  improve in **19/20** seed pairs.
+- Archetype deltas are **+.0937 / +.1700 / +.0100 / +.0800**; 15 pairs improve, 3 tie,
+  and 2 worsen.
+- Turn deltas are +.0044 / +.0429 / −.0214 / −.0314, with 91–97 of 100 samples per
+  cell already at the exact oracle. Combat HP deltas are +.0080 / −.0196 / −.0142 /
+  −.0053. These horizons are mixed and substantially ceiling-limited.
+- Run-floor deltas are −.64 / −.20 / −.12 / +.56. At the exact `N_RUN=5` matched greedy
+  anchors, Qwen3-235B floors are 12.60 vs 12.76, 12.00 vs 12.76, 11.44 vs 11.32, and
+  10.68 vs 11.32. These are descriptive floor estimates, not wins or losses.
+
+### Parse, truncation, and provenance audit
+
+| Cell | Turn parse failures | Combat errors: total / JSON / illegal | Combat samples affected |
+|---|---:|---:|---:|
+| Ironclad structured | 0 | 19 / 17 / 2 | 15 |
+| Ironclad raw | 1 | 61 / 47 / 14 | 40 |
+| Silent structured | 1 | 13 / 12 / 1 | 11 |
+| Silent raw | 0 | 50 / 32 / 18 | 35 |
+
+Structured combat won 200/200 samples; raw combat won 198/200. Recovery server logs
+contain 568, 1,861, and 1,042 HTTP 200 responses with no server errors. The original
+Slurm stdout for jobs `267035`–`267037` is absent, while `267038` stdout records 150
+run parse errors across 25 Silent/raw runs. Current run JSON does not persist per-run
+error counters, so the other three cells' run error burden is unrecoverable and is not
+silently estimated.
+
+### Statistical fold-in
+
+`scripts/stats_rigor.py` now discovers seven configurations and 28 complete cells. All
+70 structured/raw fixture pairings match. With removal-v1 excluded, pooled structured
+effects are magnitude-only for archetype (`+0.0350`, p=.0137; 9/14 directions) and
+card pick (`+0.0717`, p=.0005; 10/14); neither direction sign test is significant.
+Between-model variance shares on the representative metrics are turn damage `.865`,
+combat win `.896`, synergy archetype `.629`, and run floors `.021` (the run row remains
+restricted to the three balanced `N_RUN=20` models).
+The complete fold-in supports selective card-choice improvement, not a uniform horizon
+extension.
+
 ## 2026-08-22 — ⏱ Qwen3-235B Silent/raw job 267038 wall-killed; partial results retrieved and recovery split registered
 
 **Status: incomplete but recoverable.** Job `267038` ran for the partition maximum and

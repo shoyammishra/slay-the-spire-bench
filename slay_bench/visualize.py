@@ -84,7 +84,7 @@ def write_text_report(summary: Dict[str, Any], out_path: Path) -> None:
         a(f"  Samples          : {s['n']}")
         a(f"  Archetype acc    : {_bar(s['archetype_acc'])}  {_pct(s['archetype_acc'])}  {_rating(s['archetype_acc'])}")
         a(f"  Best card acc    : {_bar(s['card_pick_acc'])}  {_pct(s['card_pick_acc'])}  {_rating(s['card_pick_acc'])}")
-        a(f"  Removal acc      : {_bar(s.get('removal_acc'))}  {_pct(s.get('removal_acc'))}  {_rating(s.get('removal_acc'))}")
+        a(f"  Removal diagnostic (QUARANTINED): {_pct(s.get('removal_acc'))}")
         a(f"  Parse success    : {_bar(s['parse_ok_rate'])}  {_pct(s['parse_ok_rate'])}")
     else:
         a("  (not evaluated)")
@@ -111,8 +111,8 @@ def write_text_report(summary: Dict[str, Any], out_path: Path) -> None:
     if t:   scores.append(t["avg_damage_ratio"] or 0)
     if c:   scores.append(c["win_rate"] or 0)
     if s:
-        sub = [v for v in [s.get("archetype_acc"), s.get("card_pick_acc"),
-                            s.get("removal_acc")] if v is not None]
+        sub = [v for v in [s.get("archetype_acc"), s.get("card_pick_acc")]
+               if v is not None]
         if sub: scores.append(sum(sub) / len(sub))
     if r:   scores.append(r["survival_rate"] or 0)
 
@@ -212,7 +212,7 @@ def write_charts(summary: Dict[str, Any], out_path: Path) -> None:
     s = summary.get("synergy")
     if s:
         draw_bars(axes[1, 0],
-                  ["Archetype\nAcc", "Best Card\nAcc", "Removal\nAcc", "Parse\nOK"],
+                  ["Archetype\nAcc", "Best Card\nAcc", "Removal\nDiagnostic*", "Parse\nOK"],
                   [s.get("archetype_acc"), s.get("card_pick_acc"),
                    s.get("removal_acc"), s.get("parse_ok_rate")],
                   "3. Synergy  (deck strategy recognition?)")
@@ -274,7 +274,7 @@ def write_radar(summary: Dict[str, Any], out_path: Path) -> None:
     values = [
         _avg(t.get("avg_damage_ratio")),
         _avg(c.get("win_rate")),
-        _avg(s.get("archetype_acc"), s.get("card_pick_acc"), s.get("removal_acc")),
+        _avg(s.get("archetype_acc"), s.get("card_pick_acc")),
         _avg(r.get("survival_rate"), r.get("avg_progress")),
         _avg(c.get("avg_hp_ratio"), r.get("avg_hp_fraction")),
     ]
@@ -340,8 +340,8 @@ def save_all(summary: Dict[str, Any], stem: str, out_dir: Path) -> None:
 # ── Horizon-collapse curve + cross-horizon normalization ──────────────────────
 #
 # The four benchmark dimensions live in different units (turn = damage_ratio vs an
-# exhaustive optimum; combat = win_rate / hp_ratio vs a greedy bot; synergy = three
-# accuracies vs chance; run = progress vs greedy survival). To draw one line per model
+# exhaustive optimum; combat = win_rate / hp_ratio vs a greedy bot; synergy = two
+# valid accuracies vs chance; run = progress vs greedy survival). To draw one line per model
 # over the planning-horizon x-axis (turn → combat → synergy → run) they must first be
 # rescaled onto a common "vs-baseline" 0–1 axis where 0 = the non-planning floor for
 # that dimension and 1 = perfect play. The exact formulas + rationale + limitations are
@@ -349,15 +349,16 @@ def save_all(summary: Dict[str, Any], stem: str, out_dir: Path) -> None:
 #
 #   turn    = avg_damage_ratio                       (already 0–1 vs exhaustive oracle)
 #   combat  = win_rate * min(1, hp_ratio)            (greedy bot ≈ 1.0; losers → 0)
-#   synergy = mean over {archetype, pick, removal} of
+#   synergy = mean over {archetype, pick} of
 #             clamp01((acc - chance) / (1 - chance)) (chance floor per metric → 0)
 #   run     = clamp01((progress - greedy_floor[char]) / (1 - greedy_floor[char]))
 #                                                    (per-character greedy Act-1
 #                                                     survival → 0; MEASURED, see
 #                                                     GREEDY_PROGRESS_BY_CHAR)
 #
-# Missing dimensions (qwen3-32b non-synergy; deepseek run) stay None and BREAK the line
-# — never interpolated, never invented.
+# Removal is intentionally excluded: every fixture's expert target is Strike, so a
+# constant answer scores 100% and fails the degenerate-policy audit (2026-08-30).
+# Missing dimensions stay None and BREAK the line — never interpolated or invented.
 
 HORIZONS: List[str] = ["turn", "combat", "synergy", "run"]
 HORIZON_LABELS = ["Turn\n(1 turn)", "Combat\n(1 fight)",
@@ -367,7 +368,6 @@ HORIZON_LABELS = ["Turn\n(1 turn)", "Combat\n(1 fight)",
 SYNERGY_CHANCE = {
     "archetype_acc": 0.25,   # 4 archetypes, uniform
     "card_pick_acc": 1.0 / 3.0,  # 3 offers, correct index rotated uniformly
-    "removal_acc": 0.10,     # removal target = 1 basic among ~10-card fixture deck
 }
 
 # ── Run-level greedy floor: MEASURED, per character ──────────────────────────
