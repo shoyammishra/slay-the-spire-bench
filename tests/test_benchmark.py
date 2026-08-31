@@ -1158,7 +1158,7 @@ def test_controlled_horizon_holds_state_and_action_contract_fixed():
     # Transition operates on a clone.
     transition(state, best)
     assert [c.name for c in state.combat.hand] == before_hand
-    print("[PASS] controlled-horizon v1 changes only H and uses an exact oracle")
+    print("[PASS] controlled-horizon v2 changes only H and uses an exact oracle")
 
 
 def test_controlled_horizon_fixture_recipe_is_deterministic_and_fails_on_drift():
@@ -1197,7 +1197,7 @@ def test_controlled_horizon_pilot_generator_is_model_blind_and_deterministic():
     assert [fixture.state_digest for fixture in first] == [
         fixture.state_digest for fixture in second]
     assert {fixture.character for fixture in first} == {"ironclad", "silent"}
-    assert all(fixture.version == "controlled-decision-horizon-v1"
+    assert all(fixture.version == "controlled-decision-horizon-v2"
                for fixture in first)
     print("[PASS] controlled-H pilot generator is deterministic and model-blind")
 
@@ -1213,6 +1213,63 @@ def test_controlled_horizon_memoized_oracle_matches_full_tree():
     assert memo.nodes_expanded <= full.nodes_expanded
     assert memo.cache_hits > 0
     print("[PASS] controlled-H memoized oracle matches the full search tree")
+
+
+def test_controlled_horizon_oracle_wall_time_fails_closed():
+    from slay_bench.controlled_horizon import (
+        OracleTimeBudgetExceeded, create_fixture, exact_action_values)
+
+    _fixture, state = create_fixture("silent", 52000, ("Cultist",))
+    try:
+        exact_action_values(state, 8, wall_time_budget_s=1e-12)
+        assert False, "wall-time truncation must not return an exact oracle"
+    except OracleTimeBudgetExceeded as exc:
+        assert "exceeded" in str(exc) and "H=8" in str(exc)
+    print("[PASS] controlled-H wall-time limit fails closed")
+
+
+def test_controlled_horizon_checkpoint_write_is_atomic():
+    from tempfile import TemporaryDirectory
+    from pathlib import Path
+    from scripts.controlled_horizon_pilot import _atomic_write_json
+
+    with TemporaryDirectory() as directory:
+        target = Path(directory) / "audit.json"
+        _atomic_write_json(target, {"rows": [{"fixture_id": "one"}]})
+        assert json.loads(target.read_text(encoding="utf-8"))["rows"][0][
+            "fixture_id"] == "one"
+        assert not target.with_name(target.name + ".tmp").exists()
+    print("[PASS] controlled-H checkpoint JSON uses atomic replacement")
+
+
+def test_controlled_horizon_prompt_exposes_oracle_relevant_draw_order():
+    """No identical model prompt may receive a different hidden-state oracle label."""
+    import copy
+    from slay_bench.controlled_horizon import (
+        build_prompt, create_fixture, exact_action_values)
+
+    deck = [
+        "Strike_R", "Defend_R", "Bash", "Evolve", "Intimidate",
+        "Seeing Red", "Battle Trance", "Double Tap", "Immolate",
+        "Reckless Charge", "Bludgeon", "Impervious", "Offering",
+        "Demon Form", "Cleave",
+    ]
+    _fixture, first = create_fixture(
+        "ironclad", 424242, ("Cultist",), deck_names=deck)
+    second = copy.deepcopy(first)
+    second.combat.draw_pile[0], second.combat.draw_pile[6] = (
+        second.combat.draw_pile[6], second.combat.draw_pile[0])
+    # The ordinary game-facing prompt aliases these states.
+    assert combat_state_structured(first) == combat_state_structured(second)
+    assert combat_state_raw(first) == combat_state_raw(second)
+    # Their oracle labels differ, so controlled-H must disambiguate them.
+    one = exact_action_values(first, 2)
+    two = exact_action_values(second, 2)
+    assert one.optimal_actions != two.optimal_actions
+    assert build_prompt(first, 2, "structured") != build_prompt(
+        second, 2, "structured")
+    assert build_prompt(first, 2, "raw") != build_prompt(second, 2, "raw")
+    print("[PASS] controlled-H v2 exposes oracle-relevant hidden continuation state")
 
 
 def test_turn_oracle_persists_exactness_and_fails_closed_on_budget():
@@ -1313,6 +1370,9 @@ if __name__ == "__main__":
         test_controlled_horizon_fixture_recipe_is_deterministic_and_fails_on_drift,
         test_controlled_horizon_pilot_generator_is_model_blind_and_deterministic,
         test_controlled_horizon_memoized_oracle_matches_full_tree,
+        test_controlled_horizon_oracle_wall_time_fails_closed,
+        test_controlled_horizon_checkpoint_write_is_atomic,
+        test_controlled_horizon_prompt_exposes_oracle_relevant_draw_order,
         test_turn_oracle_persists_exactness_and_fails_closed_on_budget,
         test_compute_free_turn_oracle_audit_reports_bounds,
     ]

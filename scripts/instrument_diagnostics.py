@@ -109,7 +109,8 @@ def artifact_audit(results_dir: Path, include_files: bool = False) -> dict:
 def instrument_inventory() -> dict:
     return {
         "legacy_four_task_controlled_horizon": False,
-        "controlled_horizon_v1_status": "implemented; no model results",
+        "controlled_horizon_v1_status": "superseded pre-inference: hidden-state collision",
+        "controlled_horizon_v2_status": "implemented; no model results",
         "turn": {
             "enemy_classes": ["Cultist"],
             "state_family": "starter-deck opening state",

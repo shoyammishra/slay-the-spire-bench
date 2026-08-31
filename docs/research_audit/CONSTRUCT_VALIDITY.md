@@ -77,7 +77,7 @@ Invalid until new data:
 
 ## Remediation
 
-Use `controlled-decision-horizon-v1`: identical combat state and prompt contract,
+Use `controlled-decision-horizon-v2`: identical fully observable combat state and prompt contract,
 identical next-action vocabulary and terminal utility, exact value-to-go oracle, with
 only H ∈ {1,2,4,8} changed. Add memory/retrieval and parse controls, then test the
 within-state H slope. Results are **PENDING EXPERIMENT**.

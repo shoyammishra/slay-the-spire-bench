@@ -1,5 +1,70 @@
 # Decision Log
 
+## 2026-08-31 — Keep model inference stopped after the exploratory v2 treatment-strength screen
+
+**Problem.** The full-observability v2 generator produced four exact H=1/H=8-sensitive
+states across both characters, and the H=1-mismatched control lost on each. However,
+the harder encounter family, HP mode, cheap H=1/H=4 discovery screen, and individual
+H=8 advancements were refined while oracle results were visible. One Silent candidate
+also exceeded the 120 s H=8 ceiling. Treating these selected rows as a passed
+preregistration gate would overstate treatment prevalence and hide feasibility risk.
+
+**Options considered.** (a) authorize a cheap model pilot from the four successful
+rows; (b) tune and select until 200 sensitive rows are found; (c) treat the results as
+construct/feasibility evidence only, retain every success, insensitive row, and timeout,
+then freeze a model-blind generation and filtering protocol before producing the release
+fixtures.
+
+**Decision: (c).** The successful rows establish that v2 can create the intended
+same-state intervention, but `go_for_model_pilot` remains false at the project level.
+Before any evaluated-model call, freeze the seed schedule, encounter/deck/HP strata,
+candidate count, staged H=1/H=4-to-H=8 advancement rule, wall/node budgets, timeout and
+zero-span disposition, character balance, and full flow accounting. Selection may use
+oracle properties but never model behavior. The released audit must report the complete
+candidate funnel, not only retained sensitive fixtures.
+
+**Trade-offs, invalidation, and reversal.** Freezing before scale may retain some
+insensitive states and makes Silent oracle cost a first-class constraint, but it
+protects treatment-strength estimates from adaptive selection. No prior model result is
+invalidated because none exists. Reverse the inference STOP only after the frozen v2
+protocol yields an exact, feasible, character-balanced fixture set with at least the
+registered 20% disjoint H=1/H=8 rate, H-mismatch loss, prompt/action controls, and a
+power-backed 30-fixture pilot plan; paid or cluster execution still requires explicit
+user authorization.
+
+## 2026-08-31 — Supersede controlled-H v1 before inference; require full observability in v2
+
+**Problem.** The resumed varied-state v1 pilot remained computationally and
+scientifically unready. Ironclad exceeded a predeclared 120 s H=8 ceiling. Silent
+completed H=8 in 118.07 s, but the H=1-optimal action was still H=8-optimal. More
+fundamentally, v1's exact oracle used hidden pile and RNG state absent from both model
+prompt formats. A direct counterexample held the visible state and prompt bytes fixed,
+swapped two hidden draw-pile positions, and changed the H=2 optimum from end turn to
+Bash. V1 could therefore assign different labels to indistinguishable model inputs.
+
+**Options considered.** (a) keep v1 and call hidden-state prediction part of planning;
+(b) restrict fixtures until hidden continuation happens not to affect their labels;
+(c) supersede v1 before model inference and expose the deterministic continuation state
+used by the oracle at every H.
+
+**Decision: (c).** `controlled-decision-horizon-v2` appends a canonical
+full-observability block to both structured and raw prompts: ordered draw/discard/
+exhaust piles, combat counters, enemy runtime state, player runtime flags, RNG stream
+state, and the RNG algorithm. The appendix is fixed within a fixture/format contrast,
+so H remains the only treatment change. Rules-hidden versus rules-provided remains a
+separate control: exposing state does not silently provide transition semantics. Node
+and 120 s time budgets fail closed, and every completed fixture row is atomically
+checkpointed.
+
+**Invalidation, trade-offs, and reversal.** V1 has no model results, so this invalidates
+only compute-free prompt-smoke claims; its oracle sizing and treatment-strength traces
+remain historical diagnostics under their v1 label. V2 prompts are longer and less
+game-natural, but that cost is preferable to privileged-oracle labels in a causal
+lookahead experiment. Do not run models until a revised model-blind v2 fixture family
+passes exactness, time feasibility, at least 20% disjoint H=1/H=8 optima, and H-mismatch
+loss. Reversal requires an alternative observation contract proving that identical
+model inputs cannot receive different oracle labels.
+
 ## 2026-08-31 — Present controlled-H as an audit-derived protocol, not a missing climax
 
 **Problem.** The PTA manuscript's completed result is the adversarial instrument

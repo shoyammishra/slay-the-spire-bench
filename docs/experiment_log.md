@@ -1,5 +1,87 @@
 # Experiment Log
 
+## 2026-08-31 — Controlled-H v2 exploratory screen finds treatment strength; inference remains stopped
+
+**No model, API, GPU, or cluster inference ran.** This was local CPU oracle work to
+test whether the full-observability v2 state family can produce a usable intervention.
+The exploratory generator used a deterministic harder-encounter schedule, varied
+ten-card decks, HP strata, turns, and model-blind prefixes. The selection procedure was
+developed while inspecting oracle results, so these rows are instrument-development
+evidence, not a preregistered sample or an estimate of population treatment strength.
+
+A cheap H={1,4} screen evaluated 20 deterministic fixtures (10 per character) from
+base seed 62000. All 20 completed exactly in 13.39 s total under a 10 s per-fixture/H
+ceiling. Five had disjoint H=1/H=4 optimal-action sets: Ironclad fixtures 001, 006,
+and 008, and Silent fixtures 002 and 007. Their H=1-mismatched qualities at H=4 were
+0.842, 0.727, 0.250, 0.006, and 0.824 respectively. The ignored local audit is
+`results/controlled_h_v2_discovery_stratified_20_audit.json`.
+
+H=8 advancement produced the following exact, model-blind diagnostics:
+
+- Ironclad 001 (Lagavulin): disjoint H=1/H=8 optima; H=1 mismatch quality 0.688,
+  regret 5; 58,709 unique states in 63.99 s.
+- Ironclad 006: disjoint optima; quality 0.900, regret 1; 79,104 unique states in
+  77.74 s.
+- Ironclad 008 (Hexaghost): disjoint optima; quality 0.742, regret 8; 51,702 unique
+  states in 60.49 s.
+- Silent full-HP 005 (Gremlin Nob), found in a separate full-HP screen: disjoint
+  optima; quality 0.800, regret 6; 86,483 unique states in 92.67 s.
+- Silent 002 (low-HP Slime Boss): exact in 0.07 s but effectively doomed; its broad
+  H=8 optimal set included the H=1 action, so sensitivity was false.
+- Silent 007 (Slime Boss): H=1/2/4 were exact, but H=8 hit the declared 120 s ceiling
+  and raised `OracleTimeBudgetExceeded`; it is a feasibility failure, not a negative
+  horizon label.
+
+The exact sensitive rows demonstrate that v2 can manipulate decision horizon and make
+the H=1-mismatched control lose. They do **not** authorize a model pilot: the discovery
+and advancement rule is not frozen, the sample is adaptively selected and tiny, and
+Silent feasibility has both a near-ceiling success and a timeout. Resume by freezing a
+model-blind candidate-generation/filter rule, character-balanced strata, feasibility
+policy, and exclusion accounting before generating the 200-fixture release. Preserve
+all screened rows, including insensitive states and timeouts. Local detailed artifacts
+are under `results/controlled_h_v2_*` and remain ignored by git as intended.
+
+Post-change verification passed all four direct test files (**186/186**: benchmark
+61, combat 62, run 36, stats 27), including exact-cache equivalence, time-budget,
+atomic-checkpoint, and hidden-continuation collision regressions. The no-API mock
+pipeline also completed for both characters in structured and raw formats. Python
+compilation, `git diff --check`, and the changed-file credential/private-key scan were
+clean; only expected Windows LF-to-CRLF working-copy warnings were emitted.
+
+## 2026-08-31 — Varied-state controlled-H v1 pilot STOP; hidden-state collision; v2 fix
+
+**No model, API, GPU, or cluster inference ran.** The resumed compute-free pilot added
+per-fixture atomic schema-2.0 checkpoints and a 120 s per-fixture/H wall-time ceiling in
+addition to the 2,000,000 unique-node ceiling. Both requested varied ten-card fixture
+rows were preserved in `results/controlled_h_rich_pilot_2_audit_v2.json` (the filename
+predates the protocol-version decision; its embedded instrument version is v1).
+
+The gate remained a **STOP**:
+
+- Ironclad H=1/2/4 completed exactly, but H=8 raised
+  `OracleTimeBudgetExceeded` at 120 s. Its H=1 action already lost at H=2 (quality
+  0.0) and was slightly suboptimal at H=4 (quality 0.9), but no H=8 result exists.
+- Silent H=8 completed exactly in 118.07 s with 107,054 unique states, 118,339
+  search calls, and 11,285 cache hits. H=4 preferred end turn and made the H=1
+  action quality 0.0, but at H=8 that H=1 action returned to the broad optimal set
+  (quality 1.0). The registered H=1/H=8 sensitivity flag was false.
+- Only 1/2 fixtures was exact at every H; 0/1 exact fixtures had disjoint H=1/H=8
+  optimal sets. `go_for_model_pilot=false`.
+
+The traces then exposed an observation-contract bug. On a deterministic 15-card
+Ironclad/Cultist state, swapping hidden draw-pile positions 0 and 6 left the structured
+and raw v1 prompts byte-identical. Under the first ordering, H=2 preferred end turn at
+value 21; under the second, it preferred Bash at value 17, with the end-turn value
+falling from 21 to 7. The oracle therefore had decision-relevant information the model
+did not receive.
+
+`controlled-decision-horizon-v2` supersedes v1 before inference. V2 exposes ordered
+piles, combat/enemy runtime state, player runtime flags, RNG streams, and RNG algorithm
+in the same full-observability appendix at every H. A regression test reproduces the
+v1 collision and verifies that both v2 prompt formats distinguish the states. Focused
+benchmark tests pass 61/61. V2 still has **no model evidence** and needs a revised
+model-blind fixture/treatment-strength pilot.
+
 ## 2026-08-31 — Controlled-H fixture/oracle pilot: exact but no treatment strength
 
 **No model, API, GPU, or cluster inference ran.** This was a compute-free main-track

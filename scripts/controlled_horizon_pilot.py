@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-"""Compute-free fixture and oracle gates for controlled-decision-horizon-v1.
+"""Compute-free fixture and oracle gates for controlled-decision-horizon-v2.
 
 This script never calls an LLM. It creates model-blind deterministic fixture
 recipes, verifies their integrity digests, sizes the exact oracle, and scores the
@@ -26,6 +26,7 @@ from slay_bench.controlled_horizon import (  # noqa: E402
     DEFAULT_HORIZONS,
     ControlledAction,
     OracleBudgetExceeded,
+    OracleTimeBudgetExceeded,
     build_prompt,
     create_fixture,
     exact_action_values,
@@ -38,13 +39,11 @@ from slay_bench.rewards import card_pool_for  # noqa: E402
 
 
 PILOT_ENCOUNTERS = (
-    ("Cultist",),
-    ("JawWorm",),
-    ("RedLouse",),
-    ("GreenLouse",),
-    ("AcidSlimeM",),
-    ("FungalBeast",),
-    ("RedLouse", "GreenLouse"),
+    ("GremlinNob",),
+    ("Lagavulin",),
+    ("SlimeBoss",),
+    ("Hexaghost",),
+    ("Sentry", "Sentry"),
 )
 
 
@@ -125,23 +124,28 @@ def _prefix_for_candidate(character: str, seed: int, enemy_ids: tuple[str, ...],
     return prefix
 
 
-def generate_fixtures(per_character: int) -> list:
+def generate_fixtures(per_character: int, seed_base: int = 62000,
+                      hp_mode: str = "stratified") -> list:
     """Create a deterministic, model-blind pilot fixture set."""
+    if hp_mode not in ("stratified", "full"):
+        raise ValueError("hp_mode must be stratified or full")
     fixtures = []
     for character_index, character in enumerate(("ironclad", "silent")):
         ordinal = attempts = 0
         while ordinal < per_character:
-            seed = 42000 + character_index * 10000 + attempts * 1009
+            seed = seed_base + character_index * 10000 + attempts * 1009
             enemy_ids = PILOT_ENCOUNTERS[attempts % len(PILOT_ENCOUNTERS)]
             attempts += 1
             try:
                 deck_names = _deck_for_candidate(character, seed, ordinal)
                 max_hp = 80 if character == "ironclad" else 70
-                player_hp = (max_hp, round(max_hp * 0.75), round(max_hp * 0.50))[
-                    ordinal % 3]
+                player_hp = (max_hp if hp_mode == "full" else
+                             (max_hp, round(max_hp * 0.75), round(max_hp * 0.50))[
+                                 ordinal % 3])
                 prefix = _prefix_for_candidate(
                     character, seed, enemy_ids, ordinal, deck_names, player_hp)
-                fixture_id = f"pilot-{character}-{ordinal:03d}"
+                family = "pilot-full" if hp_mode == "full" else "pilot"
+                fixture_id = f"{family}-{character}-{ordinal:03d}"
                 fixture, _state = create_fixture(
                     character, seed, enemy_ids, prefix, fixture_id,
                     deck_names, player_hp)
@@ -228,7 +232,8 @@ def _prompt_only_h_changes(state, horizons: tuple[int, ...]) -> bool:
     return len(set(systems)) == 1 and len(set(normalized)) == 1
 
 
-def audit_fixture(fixture, horizons: tuple[int, ...], node_budget: int) -> dict:
+def audit_fixture(fixture, horizons: tuple[int, ...], node_budget: int,
+                  wall_time_budget_s: float | None = None) -> dict:
     state = load_fixture(fixture)
     actions = legal_actions(state)
     action_contract = _action_list(actions)
@@ -256,7 +261,9 @@ def audit_fixture(fixture, horizons: tuple[int, ...], node_budget: int) -> dict:
     try:
         for horizon in horizons:
             started = time.perf_counter()
-            oracle = exact_action_values(state, horizon, node_budget=node_budget)
+            oracle = exact_action_values(
+                state, horizon, node_budget=node_budget,
+                wall_time_budget_s=wall_time_budget_s)
             elapsed = time.perf_counter() - started
             if horizon == 1:
                 h1_actions = list(oracle.optimal_actions)
@@ -267,7 +274,7 @@ def audit_fixture(fixture, horizons: tuple[int, ...], node_budget: int) -> dict:
                 "zero_span": oracle.best_value == oracle.worst_value,
                 "baselines": _baseline_rows(state, oracle, h1_actions),
             }
-    except OracleBudgetExceeded as exc:
+    except (OracleBudgetExceeded, OracleTimeBudgetExceeded) as exc:
         row["error"] = {"type": type(exc).__name__, "message": str(exc)}
 
     if row["error"] is None and "1" in row["oracles"] and "8" in row["oracles"]:
@@ -283,7 +290,9 @@ def audit_fixture(fixture, horizons: tuple[int, ...], node_budget: int) -> dict:
     return row
 
 
-def summarize(rows: list[dict], node_budget: int) -> dict:
+def summarize(rows: list[dict], node_budget: int,
+              wall_time_budget_s: float | None = None,
+              horizons: tuple[int, ...] = DEFAULT_HORIZONS) -> dict:
     exact_rows = [row for row in rows if row["error"] is None]
     sensitive = [row for row in exact_rows if row["horizon_sensitive_h1_h8"]]
     mismatched = [
@@ -309,13 +318,21 @@ def summarize(rows: list[dict], node_budget: int) -> dict:
         "fixture_count": len(rows),
         "exact_fixture_count": len(exact_rows),
         "oracle_budget_failures": len(rows) - len(exact_rows),
+        "oracle_node_budget_failures": sum(
+            (row.get("error") or {}).get("type") == "OracleBudgetExceeded"
+            for row in rows),
+        "oracle_time_budget_failures": sum(
+            (row.get("error") or {}).get("type") == "OracleTimeBudgetExceeded"
+            for row in rows),
         "node_budget_per_fixture_h": node_budget,
+        "wall_time_budget_seconds_per_fixture_h": wall_time_budget_s,
+        "horizons": list(horizons),
         "h1_h8_disjoint_optimal_set_count": len(sensitive),
         "treatment_strength_rate": treatment_rate,
         "h1_mismatch_mean_quality_sensitive": mismatch_mean_quality,
-        "max_h8_nodes": max(
-            (row["oracles"]["8"]["nodes_expanded"] for row in exact_rows),
-            default=None),
+        "max_h8_nodes": max((
+            row["oracles"]["8"]["nodes_expanded"]
+            for row in exact_rows if "8" in row["oracles"]), default=None),
         "total_oracle_wall_seconds": sum(
             oracle["wall_seconds"] for row in exact_rows
             for oracle in row["oracles"].values()),
@@ -324,37 +341,21 @@ def summarize(rows: list[dict], node_budget: int) -> dict:
     }
 
 
-def main() -> None:
-    parser = argparse.ArgumentParser()
-    parser.add_argument("--per-character", type=int, default=10)
-    parser.add_argument("--node-budget", type=int, default=2_000_000)
-    parser.add_argument("--fixtures-out", type=Path)
-    parser.add_argument("--audit-out", type=Path)
-    parser.add_argument("--compact", action="store_true")
-    args = parser.parse_args()
-    if args.per_character < 1:
-        parser.error("--per-character must be positive")
-    if args.node_budget < 1:
-        parser.error("--node-budget must be positive")
+def _atomic_write_json(path: Path, payload: dict, compact: bool = False) -> None:
+    """Replace a checkpoint only after its complete JSON has been written."""
+    path.parent.mkdir(parents=True, exist_ok=True)
+    temporary = path.with_name(path.name + ".tmp")
+    rendered = json.dumps(payload, indent=None if compact else 2, sort_keys=True) + "\n"
+    temporary.write_text(rendered, encoding="utf-8")
+    temporary.replace(path)
 
-    fixtures = generate_fixtures(args.per_character)
-    if args.fixtures_out:
-        args.fixtures_out.parent.mkdir(parents=True, exist_ok=True)
-        args.fixtures_out.write_text(json.dumps(
-            {"version": CONTROLLED_HORIZON_VERSION,
-             "fixtures": [asdict(fixture) for fixture in fixtures]},
-            indent=2, sort_keys=True) + "\n", encoding="utf-8")
 
-    rows = []
-    for index, fixture in enumerate(fixtures, 1):
-        print(f"[{index}/{len(fixtures)}] auditing {fixture.fixture_id}",
-              file=sys.stderr, flush=True)
-        rows.append(audit_fixture(fixture, DEFAULT_HORIZONS, args.node_budget))
-    report = {
+def _build_report(fixtures, rows, args, created_at_utc: str) -> dict:
+    return {
         "result_schema_version": "2.0",
         "instrument_version": CONTROLLED_HORIZON_VERSION,
         "run_kind": "compute-free-fixture-oracle-pilot",
-        "created_at_utc": dt.datetime.now(dt.timezone.utc).isoformat(),
+        "created_at_utc": created_at_utc,
         "provenance": {
             "git_commit": _git_value("rev-parse", "HEAD"),
             "git_dirty": bool(_git_value("status", "--porcelain")),
@@ -366,15 +367,82 @@ def main() -> None:
             "model_blind": True,
             "generator": "fixed seed/enemy schedule with deterministic prefix policy",
             "per_character": args.per_character,
-            "horizons": list(DEFAULT_HORIZONS),
+            "horizons": list(args.horizons),
+            "node_budget_per_fixture_h": args.node_budget,
+            "wall_time_budget_seconds_per_fixture_h": args.wall_seconds_per_h,
+            "seed_base": args.seed_base,
+            "hp_mode": args.hp_mode,
         },
-        "summary": summarize(rows, args.node_budget),
+        "checkpoint": {
+            "completed_fixture_rows": len(rows),
+            "requested_fixture_rows": len(fixtures),
+            "complete": len(rows) == len(fixtures),
+        },
+        "summary": summarize(
+            rows, args.node_budget, args.wall_seconds_per_h,
+            tuple(args.horizons)),
         "rows": rows,
     }
+
+
+def main() -> None:
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--per-character", type=int, default=10)
+    parser.add_argument("--node-budget", type=int, default=2_000_000)
+    parser.add_argument("--wall-seconds-per-h", type=float, default=120.0)
+    parser.add_argument("--horizons", type=int, nargs="+",
+                        default=list(DEFAULT_HORIZONS),
+                        choices=list(DEFAULT_HORIZONS))
+    parser.add_argument("--seed-base", type=int, default=62000)
+    parser.add_argument("--hp-mode", choices=["stratified", "full"],
+                        default="stratified")
+    parser.add_argument(
+        "--fixture-id", action="append", default=[],
+        help="Audit only the named generated fixture; repeat for multiple IDs.")
+    parser.add_argument("--fixtures-out", type=Path)
+    parser.add_argument("--audit-out", type=Path)
+    parser.add_argument("--compact", action="store_true")
+    args = parser.parse_args()
+    if args.per_character < 1:
+        parser.error("--per-character must be positive")
+    if args.node_budget < 1:
+        parser.error("--node-budget must be positive")
+    if args.wall_seconds_per_h <= 0:
+        parser.error("--wall-seconds-per-h must be positive")
+    args.horizons = list(dict.fromkeys(args.horizons))
+    if 1 not in args.horizons:
+        parser.error("--horizons must include 1 for registered baseline scoring")
+
+    fixtures = generate_fixtures(
+        args.per_character, seed_base=args.seed_base, hp_mode=args.hp_mode)
+    if args.fixture_id:
+        requested = set(args.fixture_id)
+        fixtures = [fixture for fixture in fixtures
+                    if fixture.fixture_id in requested]
+        missing = requested - {fixture.fixture_id for fixture in fixtures}
+        if missing:
+            parser.error("unknown --fixture-id(s) for generated pool: "
+                         + ", ".join(sorted(missing)))
+    if args.fixtures_out:
+        _atomic_write_json(args.fixtures_out,
+            {"version": CONTROLLED_HORIZON_VERSION,
+             "fixtures": [asdict(fixture) for fixture in fixtures]})
+
+    created_at_utc = dt.datetime.now(dt.timezone.utc).isoformat()
+    rows = []
+    for index, fixture in enumerate(fixtures, 1):
+        print(f"[{index}/{len(fixtures)}] auditing {fixture.fixture_id}",
+              file=sys.stderr, flush=True)
+        rows.append(audit_fixture(
+            fixture, tuple(args.horizons), args.node_budget,
+            args.wall_seconds_per_h))
+        if args.audit_out:
+            _atomic_write_json(
+                args.audit_out,
+                _build_report(fixtures, rows, args, created_at_utc),
+                compact=args.compact)
+    report = _build_report(fixtures, rows, args, created_at_utc)
     rendered = json.dumps(report, indent=None if args.compact else 2, sort_keys=True)
-    if args.audit_out:
-        args.audit_out.parent.mkdir(parents=True, exist_ok=True)
-        args.audit_out.write_text(rendered + "\n", encoding="utf-8")
     print(rendered)
 
 

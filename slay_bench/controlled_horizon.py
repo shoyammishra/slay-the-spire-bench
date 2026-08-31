@@ -11,6 +11,7 @@ from __future__ import annotations
 import copy
 import hashlib
 import json
+import time
 from dataclasses import asdict, dataclass, fields, is_dataclass
 from enum import Enum
 from typing import Any, Dict, Iterable, List, Optional, Tuple
@@ -19,12 +20,16 @@ from .enums import CardType
 from .prompt_builder import combat_state_raw, combat_state_structured, system_prompt
 
 
-CONTROLLED_HORIZON_VERSION = "controlled-decision-horizon-v1"
+CONTROLLED_HORIZON_VERSION = "controlled-decision-horizon-v2"
 DEFAULT_HORIZONS = (1, 2, 4, 8)
 
 
 class OracleBudgetExceeded(RuntimeError):
     """Raised rather than silently treating a truncated search as exact."""
+
+
+class OracleTimeBudgetExceeded(RuntimeError):
+    """Raised rather than silently treating a wall-time-limited search as exact."""
 
 
 @dataclass(frozen=True, order=True)
@@ -278,7 +283,8 @@ def terminal_utility(state, initial_player_hp: int, initial_enemy_hp: int) -> fl
 
 def exact_action_values(state, horizon: int,
                         node_budget: int = 2_000_000,
-                        memoize: bool = True) -> HorizonOracleResult:
+                        memoize: bool = True,
+                        wall_time_budget_s: Optional[float] = None) -> HorizonOracleResult:
     """Exhaustively value every first action for exactly ``horizon`` transitions.
 
     Search truncation is never reported as an oracle: exceeding ``node_budget``
@@ -288,16 +294,26 @@ def exact_action_values(state, horizon: int,
 
     if horizon < 1:
         raise ValueError("horizon must be >= 1")
+    if wall_time_budget_s is not None and wall_time_budget_s <= 0:
+        raise ValueError("wall_time_budget_s must be positive")
     initial_player_hp = state.player.hp
     initial_enemy_hp = sum(max(0, enemy.hp) for enemy in state.combat.enemies)
     nodes = 0
     calls = 0
     cache_hits = 0
     cache: Dict[Tuple[int, str], float] = {}
+    started = time.perf_counter()
 
     def value(node, depth: int) -> float:
         nonlocal nodes, calls, cache_hits
         calls += 1
+        # Checking every 128 visits keeps the limit tight without making the
+        # timer call a material part of the oracle's inner-loop cost.
+        if (wall_time_budget_s is not None and calls % 128 == 1
+                and time.perf_counter() - started > wall_time_budget_s):
+            raise OracleTimeBudgetExceeded(
+                f"controlled-horizon oracle exceeded {wall_time_budget_s:g}s "
+                f"at H={horizon}")
         key = (depth, state_digest(node)) if memoize else None
         if key is not None and key in cache:
             cache_hits += 1
@@ -339,6 +355,67 @@ def exact_action_values(state, horizon: int,
     )
 
 
+def _continuation_card(card) -> dict:
+    return {
+        "id": card.id,
+        "name": card.name,
+        "cost": card.cost,
+        "cost_override": card.cost_override,
+        "upgraded": card.upgraded,
+        "exhaust": card.exhaust,
+        "ethereal": card.ethereal,
+        "retain": card.retain,
+    }
+
+
+def oracle_visible_continuation_state(state) -> dict:
+    """Expose deterministic continuation data that the exact oracle can use.
+
+    The ordinary combat prompt intentionally hides draw order without Frozen Eye.
+    That is unsuitable for a causal lookahead test: otherwise two identical prompts
+    can receive different oracle labels. Controlled-H therefore adds this fixed
+    full-observability appendix at every H.
+    """
+    combat = state.combat
+    primitive = (bool, int, float, str, type(None))
+    return {
+        "draw_pile_next_first": [
+            _continuation_card(card) for card in reversed(combat.draw_pile)],
+        "discard_pile_stored_order": [
+            _continuation_card(card) for card in combat.discard_pile],
+        "exhaust_pile_stored_order": [
+            _continuation_card(card) for card in combat.exhaust_pile],
+        "combat_counters": {
+            "turn": combat.turn,
+            "cards_played_this_turn": combat.cards_played_this_turn,
+            "cards_played_this_combat": combat.cards_played_this_combat,
+            "attacks_played_this_turn": combat.attacks_played_this_turn,
+            "discarded_this_turn": combat.discarded_this_turn,
+            "time_warp_lock": combat.time_warp_lock,
+        },
+        "enemy_runtime": [
+            {
+                "id": enemy.id,
+                "move_index": enemy.move_index,
+                "move_history": list(enemy.move_history),
+                "private_flags": {
+                    key: value for key, value in sorted(vars(enemy).items())
+                    if key.startswith("_") and isinstance(value, primitive)
+                },
+            }
+            for enemy in combat.enemies
+        ],
+        "player_runtime_flags": {
+            key: value for key, value in sorted(vars(state.player).items())
+            if key.startswith("_") and isinstance(value, primitive)
+        },
+        "rng_stream_states": {
+            name: stream.seed for name, stream in sorted(vars(state.rng).items())
+        },
+        "rng_algorithm": "java.util.Random-compatible 48-bit LCG",
+    }
+
+
 def build_prompt(state, horizon: int, prompt_format: str = "structured") -> Tuple[str, str]:
     if horizon < 1:
         raise ValueError("horizon must be >= 1")
@@ -348,9 +425,15 @@ def build_prompt(state, horizon: int, prompt_format: str = "structured") -> Tupl
         context = combat_state_raw(state)
     else:
         raise ValueError("prompt_format must be structured or raw")
+    continuation = json.dumps(
+        oracle_visible_continuation_state(state), indent=2, sort_keys=True)
     system = system_prompt("combat", getattr(state, "character", "ironclad"))
     user = (
         context + "\n\n"
+        "=== CONTROLLED-H FULL-OBSERVABILITY APPENDIX ===\n"
+        "The exact oracle and the model receive the same deterministic continuation "
+        "state. Draw-pile order is next-card first.\n"
+        + continuation + "\n\n"
         f"Choose the next action that maximizes the stated utility after exactly {horizon} "
         "decision transitions. Utility is enemy HP lost minus player HP lost, plus "
         "1000 for a win and minus 1000 for a loss.\n"

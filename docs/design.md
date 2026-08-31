@@ -8,7 +8,7 @@
 
 ## Controlled-H fixture and oracle boundary
 
-`controlled-decision-horizon-v1` uses deterministic replay recipes rather than a
+`controlled-decision-horizon-v2` uses deterministic replay recipes rather than a
 second general-purpose `GameState` deserializer. A recipe records character, seed,
 enemy IDs, initial deck, initial HP, and the exact action prefix. Regeneration must
 match its SHA-256 digest over visible state, hidden piles, enemy runtime state, player
@@ -23,6 +23,15 @@ budget. `scripts/controlled_horizon_pilot.py` owns model-blind fixture generatio
 prompt/action invariance checks, oracle sizing, ties/spans, and degenerate/H-mismatched
 baseline gates. Its varied-deck generator is exploratory as of 2026-08-31 and is not a
 frozen preregistration or final fixture release.
+
+V2 supersedes v1 before model inference. V1 allowed the oracle to use hidden draw-pile
+and RNG state omitted from both model prompt formats; two byte-identical v1 prompts can
+therefore have different optimal actions. V2 appends the same canonical deterministic
+continuation state to structured and raw prompts: full pile order, combat counters,
+enemy runtime state, player runtime flags, RNG stream state, and the RNG algorithm.
+The appendix is invariant across H. Rules-hidden versus rules-provided remains a
+separate registered control; full state observability does not assume the model knows
+the simulator's transition rules.
 
 ## Architecture Overview
 

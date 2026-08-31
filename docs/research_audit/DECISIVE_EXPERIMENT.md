@@ -1,8 +1,21 @@
 # The decisive experiment: controlled decision horizon
 
-**Protocol:** `controlled-decision-horizon-v1`
+**Protocol:** `controlled-decision-horizon-v2`
 **Implementation:** `slay_bench/controlled_horizon.py`
 **Status:** Infrastructure implemented and smoke-tested; model evidence **PENDING EXPERIMENT**
+
+V2 supersedes v1 before model inference. V1 admitted identical model prompts with
+different oracle labels because hidden draw order affected future value. V2 appends a
+canonical full-observability continuation block at every H, including pile order,
+combat/enemy runtime state, and deterministic RNG stream state. Only H may differ
+within a fixture/format treatment contrast.
+
+An exploratory 2026-08-31 oracle screen found exact H=1/H=8-sensitive examples for
+both characters, so the intervention is constructively attainable. It also produced an
+insensitive Silent state and a Silent H=8 timeout. Because the generator and staged
+selection were refined while oracle results were visible, those diagnostics do not
+constitute the frozen fixture audit or authorize model inference. The complete numbers
+and resume boundary are in `docs/experiment_log.md` and `docs/handoff.md`.
 
 ## Question
 
@@ -23,7 +36,9 @@ Terminal utility is fixed across H:
 `enemy HP lost − player HP lost + 1000·win − 1000·loss`.
 
 Search exceeding the declared node budget raises `OracleBudgetExceeded`; it must not
-be silently labeled exact. Persist node counts and exactness per fixture/H.
+be silently labeled exact. Search exceeding the declared wall-time ceiling likewise
+raises `OracleTimeBudgetExceeded`. Persist unique expanded states, total search calls,
+cache hits, wall time, budget failures, and exactness per fixture/H.
 
 ## Primary estimand
 
@@ -40,7 +55,7 @@ span. Do not pool characters or prompt formats until interaction estimates are s
 
 ## Fixtures
 
-Create at least 100 engine-generated frozen states per character stratified by:
+Create 100 engine-generated frozen states per character (200 total) stratified by:
 
 - combat turn and current HP;
 - one versus multiple enemies;

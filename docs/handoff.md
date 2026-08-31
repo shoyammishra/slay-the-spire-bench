@@ -38,7 +38,7 @@ Single source of truth stays where it already lives (see §2).
   `docs/research_audit/` contains the 15-file review/rebuild package.
 - **P0 implementation:** future result schema 2.0 records provenance and per-dimension
   merge sources; a compute-free dictionary policy solves 120/120 fixed synergy cases;
-  `controlled-decision-horizon-v1` infrastructure is implemented and smoke-tested.
+  `controlled-decision-horizon-v2` infrastructure is implemented and smoke-tested.
   No model inference has run; controlled-H remains instrument work, not model evidence.
 - **Controlled-H pilot update (2026-08-31):** a deterministic fixture-recipe and
   exact-oracle gate now exists in `scripts/controlled_horizon_pilot.py`. The completed
@@ -47,6 +47,19 @@ Single source of truth stays where it already lives (see §2).
   transposition cache reproduced the same H=8 values while reducing the two H=8 runs
   to 18.98 s and 86.05 s. An exploratory varied-deck generator exists but its first run
   was stopped before producing a row. No API/GPU/cluster/model inference ran.
+- **Controlled-H v2 supersession (2026-08-31):** the resumed varied-state v1 pilot
+  checkpointed both rows but remained a STOP: Ironclad exceeded the 120 s H=8 ceiling;
+  Silent completed H=8 in 118.07 s but its H=1 optimum remained H=8-optimal. A direct
+  audit then found byte-identical v1 prompts whose hidden draw order changed the H=2
+  optimum (end turn versus Bash). V2 exposes the oracle-relevant deterministic
+  continuation state in every prompt. V1 has no model data and is historical only.
+- **Controlled-H v2 exploratory gate (2026-08-31):** a 20-fixture H=1/H=4 screen and
+  targeted H=8 advancements found three exact sensitive Ironclad rows and one exact
+  sensitive Silent row; H=1-mismatch quality at H=8 ranged from 0.688 to 0.900. One
+  Silent row was insensitive and another exceeded the 120 s H=8 ceiling. This proves
+  v2 can instantiate the intervention, not that a frozen fixture distribution passes:
+  selection was adaptive and exploratory. Model/API/GPU/cluster inference remains
+  stopped pending a frozen, fully accounted generation/filter protocol.
 
 - **Active supersession (2026-08-30):** the open-model matrix now has 28 canonical
   aggregates (7 configurations × 2 characters × 2 formats), including the complete
@@ -255,15 +268,21 @@ chain-of-thought — is only catchable by smoke).
 
 **Controlled-H resume point (2026-08-31):**
 
-1. Add per-fixture atomic checkpointing to `scripts/controlled_horizon_pilot.py`; the
-   current combined write loses completed in-memory rows on interruption.
-2. Re-run the focused/full-tree oracle equivalence checks, then a one-fixture-per-
-   character varied-deck sizing pass with explicit wall-time and node ceilings.
-3. Audit whether the model-blind varied state family produces disjoint H=1/H=8 optimal
-   sets and makes the H=1-mismatched control lose. Do not optimize for model failures.
-4. Freeze generator/filter/strata and the exactness audit before creating the 200
-   fixtures. Only then run the cheap 30-fixture model pilot and power simulation.
-5. Keep all paid/API/cluster/model calls stopped until the gates pass and the user
+1. ~~Add per-fixture atomic checkpointing~~ — done; each completed row atomically
+   replaces the schema-2.0 audit, and node/time limits fail closed.
+2. ~~Run one varied v1 fixture per character~~ — done; one H=8 timeout and zero
+   sensitive exact rows. V1 is superseded by the hidden-state collision audit.
+3. ~~Audit whether a revised model-blind **v2** state family can produce disjoint
+   H=1/H=8 optimal sets and make the H=1-mismatched control lose~~ — done
+   exploratorily: three Ironclad and one Silent exact rows passed; one Silent row was
+   insensitive and one timed out. This is construct evidence, not a prevalence estimate.
+4. Freeze seed/encounter/deck/HP strata, candidate count, the staged H=1/H=4-to-H=8
+   advancement rule, time/node ceilings, exclusions, character balance, and full
+   candidate-funnel reporting. Do not optimize for model failures.
+5. Generate and audit the 200 fixtures under that frozen protocol. Only after all
+   registered gates pass should a separately authorized cheap 30-fixture model pilot
+   and power simulation run.
+6. Keep all paid/API/cluster/model calls stopped until the gates pass and the user
    authorizes the concrete run.
 
 The older numbered table below is retained as project history. Any row that depends on

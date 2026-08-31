@@ -2,7 +2,7 @@
 
 | Criticism | Severity | Evidence location | Can current data answer it? | Required action | Status |
 |---|---:|---|---:|---|---|
-| No controlled horizon variable | Fatal | evaluator/task definitions | No | run controlled-decision-horizon-v1 | infrastructure ready; **PENDING EXPERIMENT** |
+| No controlled horizon variable | Fatal | evaluator/task definitions | No | run controlled-decision-horizon-v2 | infrastructure ready; **PENDING EXPERIMENT** |
 | Cross-task line implies a latent scale | Fatal | `visualize.py`, old draft | Yes | retire curve/radar/overall | implemented |
 | Default run is not full agency | Fatal to run claim | `RunEvaluator`, `run_loop.py` | Yes | rename hybrid policy; add agency ablation | rename planned; experiment pending |
 | Synergy admits lexical lookup | Fatal to planning claim | fixtures/tables | Yes | publish shortcut audit; build card-pick-v2 | lookup audit implemented; v2 pending |

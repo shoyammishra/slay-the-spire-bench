@@ -9,7 +9,7 @@
 | Card pick | sole on-archetype offer | no prospective utility validation | dictionary lookup scores 100% | invalid as planning/synergy utility measure |
 | Removal-v1 | always `Strike` | no | constant `Strike` scores 100% | quarantined; never restore in place |
 | Run | survival/progress in simulator | exact for implemented simulator | scripted greedy is on par | valid environment outcome, not external game competence |
-| Controlled H v1 | exhaustive value-to-go at fixed H | exact or explicit exception | H=1 greedy and H-mismatch controls | appropriate after fixture and node audit |
+| Controlled H v2 | exhaustive value-to-go at fixed H | exact or explicit node/time exception | H=1 greedy and H-mismatch controls | appropriate after observability, fixture, and budget audit |
 
 ## Turn oracle checks required
 
@@ -38,6 +38,8 @@ prompt comparability and therefore requires a full re-baseline.
 
 `slay_bench/controlled_horizon.py` fails closed if its search budget is exceeded. It
 values all legal first actions using one fixed utility at every H. Before inference:
+
+- verify that oracle-relevant continuation state is present in the model prompt;
 
 - independently replay every returned optimal action;
 - check permutation invariance under duplicate card identities;
