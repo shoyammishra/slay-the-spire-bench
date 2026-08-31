@@ -6,6 +6,26 @@ The rebuilt paper should open with a measurement problem: heterogeneous game tas
 often treated as levels of planning without a causal horizon intervention. Slay-Bench
 then becomes both a diagnostic suite and a case study in instrument self-audit.
 
+## Dual-track output strategy (2026-08-31)
+
+The rebuild now produces two manuscripts with different evidentiary ceilings:
+
+1. **PTA at NeurIPS 2026 workshop short paper (four pages, non-archival).** Report
+   the existing operation profile, Qwen3 card-selection contrast, shortcut audit, and
+   construct correction. Present controlled-H only as an implemented protocol with
+   model results PENDING EXPERIMENT. Deadline: 2026-09-05 AoE; internal quality gate:
+   2026-09-04.
+2. **ICML 2027 main-track paper.** Make the controlled same-state H intervention the
+   central contribution. Require treatment strength, exact-oracle audits, adequate
+   power, multi-family replication, interface controls, simulator conformance, agency
+   ablation, and complete traces. Internal freeze: 2027-01-15; official conference
+   dates remain unannounced.
+
+The short paper is not a compressed version of unsupported future claims. It is the
+bounded instrument-audit result that exists now. The ICML paper earns a planning claim
+only through new controlled evidence. Full dates, venue links, policy constraints, and
+submission checklists are in `docs/submission_plan.md`.
+
 ## Proposed outline
 
 1. **Introduction**

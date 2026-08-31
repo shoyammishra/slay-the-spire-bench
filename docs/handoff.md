@@ -13,6 +13,14 @@ Single source of truth stays where it already lives (see §2).
 
 ## 1. Project status snapshot (2026-07-12)
 
+- **Submission supersession (2026-08-31):** the active venue strategy is a four-page,
+  non-archival PTA at NeurIPS 2026 workshop submission due **2026-09-05 AoE**, alongside
+  an ICML 2027 main-track build centered on the controlled-H intervention. The
+  workshop paper reports the existing operation profile and instrument audit; it must
+  label controlled-H model results PENDING EXPERIMENT. `docs/submission_plan.md` is the
+  authoritative schedule and gate list. If the workshop PDF is not review-clean by
+  2026-09-04, fall back to an ICLR 2027 workshop rather than submit a rushed paper.
+
 - **Construct supersession (2026-08-30):** a repository-wide adversarial research
   audit rejects the four-task “planning horizon” interpretation. The tasks are now
   operation profiles; the horizon curve, radar, and overall scalar fail closed.
@@ -38,9 +46,9 @@ Single source of truth stays where it already lives (see §2).
   formats.
 - **The two D&B-blocking gaps from the novelty review are closed** (≥3 model families +
   a reasoning model).
-- **Open work** is paper-side, not harness-side: see §6 backlog. The top item
-  (horizon-collapse curve in `visualize.py`) was delegated to an Opus 4.8 agent on
-  2026-07-12.
+- **Active open work:** first produce the PTA short paper, then build and validate the
+  200-fixture controlled-H instrument before any ICML model matrix. See §6 and
+  `docs/submission_plan.md`. The historical horizon-collapse work is retired.
 - Uncommitted doc changes may exist in the working tree; the user triggers commits with
   the word "checkpoint" (protocol in the user-level memory store).
 
@@ -50,6 +58,7 @@ Single source of truth stays where it already lives (see §2).
 |---|---|---|
 | 1 | `AGENTS.md` | Active routing, current milestone, invariants, commands, safety |
 | 2 | `docs/handoff.md` | (this) judgment, delegation, backlog, risks |
+| 2b | `docs/submission_plan.md` | Active venue strategy, deadlines, manuscript separation, submission gates |
 | 3 | `docs/design.md` | Architecture, interfaces, invariants in depth |
 | 4 | `docs/decision_log.md` | Why every design decision was made (rationale record) |
 | 5 | `docs/experiment_log.md` | Every run: config, numbers, failures. 2026-06-22 section = current matrix |
@@ -215,6 +224,20 @@ chain-of-thought — is only catchable by smoke).
   degenerate-model analysis (§5.2), or it doesn't ship.
 
 ## 6. Backlog (priority order, with owners)
+
+**2026-08-31 active critical path:**
+
+1. Produce and audit the four-page anonymized PTA workshop PDF by 2026-09-04; submit
+   only after explicit final author approval.
+2. Freeze the controlled-H preregistration by 2026-09-15.
+3. Generate 200 model-blind fixtures and pass the treatment-strength/oracle gates
+   before any paid or cluster inference.
+4. Complete the registered multi-family evidence, conformance checks, agency ablation,
+   and trace release for the ICML 2027 internal freeze on 2027-01-15.
+
+The older numbered table below is retained as project history. Any row that depends on
+the retired cross-task horizon construct is superseded by this critical path and the
+2026-08-30 construct decision.
 
 **2026-08-30 P4c status supersession:** recovery jobs `329871`–`329873` completed the
 missing Silent/raw phases. All 20 per-seed artifacts and four canonical aggregates are on

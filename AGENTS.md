@@ -2,22 +2,33 @@
 
 ## Purpose and current state
 
-`slay-bench` is a deterministic Python simulator and LLM benchmark for Slay the
-Spire. It evaluates planning at four horizons—turn, combat, synergy, and run—across
-Ironclad and Silent, with Acts 1–3 implemented. The CLI entry point is
+`slay-bench` is a deterministic Python simulator and LLM decision-profile benchmark
+for Slay the Spire. It evaluates four operational tasks—immediate-damage sequencing,
+short-combat execution, fixed-deck recognition/card selection, and hybrid-policy
+run rollout—across Ironclad and Silent, with Acts 1–3 implemented. These tasks do not
+identify a common planning horizon. The CLI entry point is
 `run_benchmark.py`; the implementation is under `slay_bench/`.
 
 The Qwen3-235B-A22B-FP8 full matrix is complete: all four cells and 20 per-seed
 artifacts are retrieved, Silent/raw was canonically reaggregated, and the seven-model
-statistics and horizon figures were regenerated on 2026-08-30. Its clearest gain over
+statistics were regenerated on 2026-08-30; cross-task horizon figures are now retired.
+Its clearest gain over
 Qwen3-32B is card selection (all four cells; 19/20 seed pairs), not a uniform horizon
 extension. Removal-v1 is quarantined because every fixed fixture's expert target is
 `Strike`; exclude it from capability claims and composites. A future removal-v2 requires
-a versioned full-synergy re-baseline. The remaining expensive options are the M3b
-proprietary-frontier matrix and removal-v2; cluster/API submission and other paid or
-limited compute remain user-authorized operations. Before acting on project status,
+a versioned full-synergy re-baseline. The decisive expensive path is the controlled-H
+multi-family matrix; M3b frontier profiling and removal-v2 are optional. Cluster/API
+submission and other paid or limited compute remain user-authorized operations. Before
+acting on project status,
 read the newest entries in `docs/handoff.md`,
 `docs/decision_log.md`, and `docs/experiment_log.md` because this summary can age.
+
+The active publication plan, established 2026-08-31, is a four-page non-archival PTA
+at NeurIPS 2026 workshop paper due 2026-09-05 AoE and an ICML 2027 main-track build
+centered on controlled same-state H evidence. `docs/submission_plan.md` is
+authoritative for deadlines, manuscript separation, policy boundaries, and stop/go
+gates. External submission, paid compute, registration, and travel require explicit
+user authorization.
 
 ## Read-first routing
 
@@ -25,6 +36,8 @@ read the newest entries in `docs/handoff.md`,
    and the definition of done.
 2. Read the newest relevant entries in `docs/decision_log.md` before revisiting a
    settled design or measurement decision.
+2b. Read `docs/submission_plan.md` before venue, manuscript, deadline, or
+   dual-submission work.
 3. Read `docs/design.md` before changing engine boundaries, scoring, prompts, RNG,
    or state transitions.
 4. Read `docs/experiment_log.md` for run provenance and authoritative measurements;

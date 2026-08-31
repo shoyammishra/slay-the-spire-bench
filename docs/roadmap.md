@@ -1,5 +1,11 @@
 # Roadmap
 
+> **Submission supersession (2026-08-31):** the active plan is a four-page,
+> non-archival PTA at NeurIPS 2026 workshop paper due 2026-09-05 AoE and an ICML 2027
+> main-track paper built around controlled-H evidence. See `docs/submission_plan.md`
+> for the authoritative deadlines, paper separation, and stop/go gates. Historical
+> roadmap items that assume a cross-task horizon curve no longer define the paper.
+
 > **Active supersession (2026-08-30):** M3a's open-model matrix is complete for seven
 > configurations through Qwen3-235B-A22B-FP8, with both characters/formats and all four
 > dimensions. The current backlog is in `docs/handoff.md`: M3b frontier validation,

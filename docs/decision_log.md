@@ -1,5 +1,35 @@
 # Decision Log
 
+## 2026-08-31 — Adopt a NeurIPS-workshop / ICML-main dual-track submission plan
+
+**Problem.** The corrected operation-profile and instrument-audit result is ready for
+workshop feedback, while the stronger planning claim still requires controlled-H model
+evidence. ICLR 2027 workshop calls are not yet available. The PTA workshop at NeurIPS
+2026 has an open 2026-09-05 deadline, directly solicits evaluation of planning and
+acting agents, accepts four-page short papers, and is explicitly non-archival. ICML
+2027 has not published official dates, but its recent submission cycles closed in late
+January.
+
+**Options considered.** (a) wait for ICLR 2027 workshops; (b) rush the current work
+into an archival main track; (c) submit a bounded four-page audit/profile paper to PTA
+while reserving the controlled same-state H intervention for ICML 2027 main track.
+
+**Decision: (c).** Target PTA at NeurIPS 2026 with a double-blind, non-archival short
+paper by 2026-09-05 AoE. Its thesis is operation-specific competence plus instrument
+self-audit; controlled-H model results remain PENDING EXPERIMENT. In parallel, target
+ICML 2027 main track with controlled-H treatment strength, exact-oracle auditing,
+power, multi-family replication, interface controls, conformance evidence, agency
+ablation, and complete traces. `docs/submission_plan.md` is authoritative for the
+schedule and gates.
+
+**Trade-offs and reversal.** The five-day PTA window is only acceptable if a polished
+four-page PDF passes claim, citation, anonymity, and artifact review by 2026-09-04;
+otherwise fall back to an ICLR 2027 non-archival workshop. CORE A* describes the parent
+conference, not the workshop publication. The workshop must remain non-archival to
+avoid conflict with ICML. Official ICML 2027 dates and policies supersede provisional
+late-January planning dates as soon as they are released. External submission, paid
+compute, registration, and travel still require explicit user authorization.
+
 ## 2026-08-30 — Reject the cross-task horizon construct and version a controlled intervention
 
 **Problem.** A repository-wide adversarial audit found that the four reported

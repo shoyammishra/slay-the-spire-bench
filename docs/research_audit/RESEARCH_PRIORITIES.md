@@ -12,6 +12,11 @@
 | P0.6 | controlled-H infrastructure | same prompt/state/action/utility; exactness fails closed | zero inference — done |
 | P0.7 | turn oracle exactness audit | node count and exact flag for every fixture | zero inference — done on current-code replay |
 | P0.8 | manuscript supersession | current draft has explicit audit banner and corrected thesis | writing — pending |
+| P0.9 | PTA workshop short paper | four-page anonymized, citation-checked PDF approved by 2026-09-04; submit by 2026-09-05 AoE | writing — active |
+
+The immediate submission schedule and venue-policy boundaries live in
+`docs/submission_plan.md`. A missed quality gate means fallback to an ICLR 2027
+non-archival workshop, not a rushed PTA submission.
 
 ## P1 — decisive evidence
 
@@ -24,6 +29,10 @@
 6. Run full-agency versus default scripted-agency ablation on matched seeds.
 7. Build an external simulator conformance suite and resolve severity-1 discrepancies.
 8. Release complete future traces under schema 2.0+.
+
+These items form the ICML 2027 main-track critical path. Internal freeze is
+2027-01-15; official ICML dates are not yet published and will supersede the
+provisional late-January planning dates.
 
 ## P2 — top-tier and community ceiling
 
