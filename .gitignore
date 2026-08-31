@@ -45,3 +45,6 @@ results/**
 # OS
 .DS_Store
 Thumbs.db
+
+# Local rendering and visual-QA intermediates
+tmp/

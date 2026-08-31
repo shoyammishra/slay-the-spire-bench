@@ -39,10 +39,10 @@ they do not identify a single planning horizon. In Slay-Bench, the clearest matc
 capacity gain is card selection, while an adversarial audit exposes shortcut labels
 and invalidates the former cross-task horizon interpretation.
 
-Working title:
+Current title:
 
-> Auditing Planning Claims in Language-Model Agents: Operation-Specific Competence
-> in a Deterministic Game Benchmark
+> From Pretrained Knowledge to Action: Auditing Language Models in a Deterministic
+> Game
 
 ### Four-page content contract
 
@@ -60,6 +60,8 @@ full-run autonomous control, simulator faithfulness, or controlled-H model evide
 ### Submission checklist
 
 - four-page anonymized PDF in the current NeurIPS style;
+- omit the NeurIPS paper checklist: the official PTA call explicitly exempts workshop
+  submissions even though the general template includes it;
 - one operation-profile figure with task-specific units;
 - one compact construct/shortcut table;
 - citations verified against primary sources;

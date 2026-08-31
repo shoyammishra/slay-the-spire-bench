@@ -1,5 +1,37 @@
 # Decision Log
 
+## 2026-08-31 — Build the PTA short paper around instrument falsification and native-unit profiles
+
+**Problem.** The repository contains enough evidence for a bounded workshop paper but
+not for a causal planning-horizon claim. The supplied NeurIPS template includes the
+main-conference checklist, while the official PTA call explicitly says workshop
+submissions do not need that checklist. A four-page draft also needed to preserve task
+units, distinguish model from scripted agency, and make pending controlled-H evidence
+impossible to mistake for a result.
+
+**Options considered.** (a) compress the retired horizon narrative; (b) lead with a
+large benchmark table and relegate the audit to limitations; or (c) make the audit the
+scientific contribution, use a native-unit operation profile, and present controlled-H
+only as a visibly pending protocol.
+
+**Decision: (c).** The anonymized source lives in `paper/pta2026/`. The paper is titled
+“From Pretrained Knowledge to Action: Auditing Language Models in a Deterministic
+Game.” Its central figure reports four operations in separate units and isolates the
+Qwen3 card-choice deltas; a second schematic marks controlled-H model results PENDING
+EXPERIMENT. The agency/construct table names scripted decisions, and the falsification
+table reports the constant-`Strike` and 120/120 combined dictionary audits. References
+begin after exactly four content pages. The PTA-specific build omits `checklist.tex`
+because the official workshop call exempts it; this does not revise the main-conference
+template instructions.
+
+**Trade-offs, limitations, and reversal.** The short paper intentionally gives up a
+larger “planning horizon” claim in exchange for construct validity. It does not include
+an identifying repository URL, full simulator conformance, downstream validation of
+authored card utilities, or controlled-H model evidence. Restore a checklist only if
+PTA changes its instructions. Restore horizon language only after the registered
+same-state experiment passes its gates. External submission and author identity remain
+user-controlled.
+
 ## 2026-08-31 — Adopt a NeurIPS-workshop / ICML-main dual-track submission plan
 
 **Problem.** The corrected operation-profile and instrument-audit result is ready for

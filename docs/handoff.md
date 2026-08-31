@@ -21,6 +21,16 @@ Single source of truth stays where it already lives (see §2).
   authoritative schedule and gate list. If the workshop PDF is not review-clean by
   2026-09-04, fall back to an ICLR 2027 workshop rather than submit a rushed paper.
 
+- **PTA manuscript build (2026-08-31):** `paper/pta2026/` now contains the anonymized
+  NeurIPS-2026 source, primary-source bibliography, reproducible native-unit operation
+  profile, and controlled-H schematic. The compiled paper uses exactly four content
+  pages plus references and keeps all controlled-H model results PENDING EXPERIMENT.
+  The official PTA call says its submissions do not need the NeurIPS paper checklist,
+  so the workshop build omits it. The release build passed claim/citation review,
+  compilation, all-page visual QA, PDF metadata/anonymity checks, and a targeted
+  public-repository security scan. Remaining gates are author approval and the
+  separately authorized submission/attendance decisions.
+
 - **Construct supersession (2026-08-30):** a repository-wide adversarial research
   audit rejects the four-task “planning horizon” interpretation. The tasks are now
   operation profiles; the horizon curve, radar, and overall scalar fail closed.
