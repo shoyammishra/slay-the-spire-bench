@@ -21,8 +21,20 @@ therefore counts unique expanded cells; `search_calls` counts all recursive visi
 `cache_hits` reports reused cells. Search still fails closed on the declared unique-node
 budget. `scripts/controlled_horizon_pilot.py` owns model-blind fixture generation,
 prompt/action invariance checks, oracle sizing, ties/spans, and degenerate/H-mismatched
-baseline gates. Its varied-deck generator is exploratory as of 2026-08-31 and is not a
-frozen preregistration or final fixture release.
+baseline gates. The frozen funnel is defined by
+`configs/controlled_h_v2_preregistration.json` and executed stage-by-stage by
+`scripts/controlled_horizon_funnel.py`. The protocol digest is checked at every stage;
+manifest, H={1,4} screen, full H={1,2,4,8} audit, and release are separate artifacts.
+Each oracle row is atomically checkpointed, and reruns skip every completed disposition,
+including explicit budget failures.
+
+The frozen pool attempts 400 candidates per character without replacement. It advances
+all exact H=1/H=4-disjoint states and 125 SHA-256-ranked screen-insensitive controls per
+character. The release is a predeclared 25-sensitive/75-control stratum per character,
+not an estimate of natural prevalence. Release fails closed unless all 200 rows are
+exact at every H, prompt-invariant in both formats, nonzero-span at H=8, and every
+sensitive row makes the conservative H=1-mismatched oracle lose. The full candidate
+funnel—not the deliberately stratified release ratio—is the feasibility report.
 
 V2 supersedes v1 before model inference. V1 allowed the oracle to use hidden draw-pile
 and RNG state omitted from both model prompt formats; two byte-identical v1 prompts can

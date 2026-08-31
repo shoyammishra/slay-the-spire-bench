@@ -2,7 +2,8 @@
 
 **Protocol:** `controlled-decision-horizon-v2`
 **Implementation:** `slay_bench/controlled_horizon.py`
-**Status:** Infrastructure implemented and smoke-tested; model evidence **PENDING EXPERIMENT**
+**Status:** Fixture protocol frozen; release-oracle audit in progress; model evidence
+**PENDING EXPERIMENT**
 
 V2 supersedes v1 before model inference. V1 admitted identical model prompts with
 different oracle labels because hidden draw order affected future value. V2 appends a
@@ -16,6 +17,18 @@ insensitive Silent state and a Silent H=8 timeout. Because the generator and sta
 selection were refined while oracle results were visible, those diagnostics do not
 constitute the frozen fixture audit or authorize model inference. The complete numbers
 and resume boundary are in `docs/experiment_log.md` and `docs/handoff.md`.
+
+The release protocol is now frozen in
+`configs/controlled_h_v2_preregistration.json` (SHA-256
+`78a768f7fb27ecfba3d8c2cb4bee47ce3284c427fe6ea22b2a6dd64c70c5f110`).
+It attempts 400 candidates per character with deterministic seed, encounter, deck, HP,
+turn, and prefix strata and no outcome-driven replacement. A cheap exact H={1,4}
+screen advances every disjoint candidate plus 125 hash-ranked insensitive controls per
+character. The full H={1,2,4,8} audit then fills a fixed release quota of 25 sensitive
+and 75 control fixtures per character. Any generation, exactness, time, node, prompt,
+span, mismatch, or quota failure is retained in the funnel and fails closed under the
+registered disposition. Because the release is deliberately sensitivity-stratified,
+its 25% ratio is not a prevalence estimate; report rates over the full candidate funnel.
 
 ## Question
 
@@ -55,7 +68,7 @@ span. Do not pool characters or prompt formats until interaction estimates are s
 
 ## Fixtures
 
-Create 100 engine-generated frozen states per character (200 total) stratified by:
+Release 100 engine-generated frozen states per character (200 total) stratified by:
 
 - combat turn and current HP;
 - one versus multiple enemies;
@@ -63,9 +76,19 @@ Create 100 engine-generated frozen states per character (200 total) stratified b
 - attack/defense/setup tradeoff;
 - whether the H-optimal first-action set changes between H=1 and H=8.
 
-The last stratum is essential. States whose optimal set never changes test execution,
-not lookahead. Pre-register the fixture generator and release fixture JSON before
-running evaluated models. No model-specific fixture selection.
+The last stratum is fixed at 25 disjoint H=1/H=8 states and 75 controls per character.
+States whose optimal set never changes test execution, not lookahead. The complete
+800-candidate funnel and release fixture JSON must be preserved before running evaluated
+models. No model-specific fixture selection is permitted.
+
+Run the frozen stages with:
+
+```powershell
+python scripts/controlled_horizon_funnel.py manifest --out results/controlled_h_v2_frozen_manifest.json
+python scripts/controlled_horizon_funnel.py screen --out results/controlled_h_v2_frozen_screen.json
+python scripts/controlled_horizon_funnel.py full --screen-audit results/controlled_h_v2_frozen_screen.json --out results/controlled_h_v2_frozen_full.json
+python scripts/controlled_horizon_funnel.py release --full-audit results/controlled_h_v2_frozen_full.json --fixtures-out results/controlled_h_v2_release_fixtures.json --out results/controlled_h_v2_release_audit.json
+```
 
 ## Baselines and falsifiers
 

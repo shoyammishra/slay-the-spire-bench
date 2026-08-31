@@ -1,0 +1,59 @@
+{
+  "protocol_id": "controlled-h-v2-fixtures-2026-08-31",
+  "instrument_version": "controlled-decision-horizon-v2",
+  "status": "frozen-before-release-oracle-run",
+  "candidate_generation": {
+    "candidates_per_character": 400,
+    "characters": [
+      "ironclad",
+      "silent"
+    ],
+    "seed_base": 831000,
+    "character_seed_offset": 1000000,
+    "seed_stride": 1009,
+    "encounters": [
+      ["GremlinNob"],
+      ["Lagavulin"],
+      ["SlimeBoss"],
+      ["Hexaghost"],
+      ["Sentry", "Sentry"]
+    ],
+    "hp_fractions": [1.0, 0.75, 0.5],
+    "combat_turns": [1, 2, 3],
+    "fixture_turn_plays": [0, 1],
+    "deck_size": 10,
+    "replacement_after_generation_failure": false
+  },
+  "screen": {
+    "horizons": [1, 4],
+    "node_budget_per_fixture_h": 250000,
+    "wall_seconds_per_fixture_h": 10.0,
+    "advance_all_disjoint_h1_h4": true,
+    "screen_insensitive_advances_per_character": 125,
+    "screen_insensitive_rank": "sha256(protocol_id:fixture_id)"
+  },
+  "full_oracle": {
+    "horizons": [1, 2, 4, 8],
+    "node_budget_per_fixture_h": 2000000,
+    "wall_seconds_per_fixture_h": 120.0
+  },
+  "release": {
+    "fixtures_per_character": 100,
+    "h1_h8_sensitive_per_character": 25,
+    "h1_h8_insensitive_per_character": 75,
+    "rank_within_character_and_sensitivity": "sha256(protocol_id:fixture_id)",
+    "minimum_sensitive_fraction": 0.2,
+    "require_nonzero_h8_oracle_span": true,
+    "require_prompt_invariance": true,
+    "require_exact_oracles_at_all_horizons": true,
+    "require_h1_mismatch_loss_on_sensitive_fixtures": true
+  },
+  "failure_policy": {
+    "generation_failure": "account-and-exclude-without-replacement",
+    "screen_budget_failure": "account-and-exclude",
+    "full_oracle_budget_failure": "account-and-exclude",
+    "zero_h8_span": "account-and-exclude-from-release",
+    "quota_shortfall": "fail-closed-without-changing-the-protocol",
+    "model_behavior_used_for_selection": false
+  }
+}

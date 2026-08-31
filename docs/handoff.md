@@ -60,6 +60,20 @@ Single source of truth stays where it already lives (see §2).
   v2 can instantiate the intervention, not that a frozen fixture distribution passes:
   selection was adaptive and exploratory. Model/API/GPU/cluster inference remains
   stopped pending a frozen, fully accounted generation/filter protocol.
+- **Controlled-H preregistration freeze (2026-08-31):** the executable protocol is
+  frozen at `configs/controlled_h_v2_preregistration.json`, digest `78a768…f110`.
+  Its manifest generated 800/800 unique candidates (400 per character) with no
+  replacements or failures. The staged runner preserves every screen/full disposition,
+  advances all H=1/H=4-sensitive rows plus hash-ranked controls, and fails closed unless
+  it can release 25 sensitive + 75 control fixtures per character under the exactness,
+  prompt, span, mismatch, and budget gates. The release ratio is designed and must not
+  be reported as natural prevalence. No model inference is authorized.
+- **Frozen funnel checkpoint (2026-08-31):** the H={1,4} screen is complete: 800/800
+  exact, zero budget or prompt-invariance failures, with 142/400 Ironclad and 91/400
+  Silent disjoint screens. The frozen rule advances 483 rows. The full H={1,2,4,8}
+  artifact is checkpointed at 3/483: two H=8 timeouts and one exact 66.12-second,
+  64,527-state insensitive row. The interrupted fourth row has no disposition and will
+  restart. Resume the same command; do not tune the protocol from these outcomes.
 
 - **Active supersession (2026-08-30):** the open-model matrix now has 28 canonical
   aggregates (7 configurations × 2 characters × 2 formats), including the complete
@@ -73,7 +87,7 @@ Single source of truth stays where it already lives (see §2).
   configs) are on this laptop and folded into all docs. Every remaining `—` cell in the
   legacy result tables was *intentional*, not pending. Nothing is running on the cluster.
 - **Engine + harness are post-audit stable**: 5 full audits (2026-06-10 → 06-12) found and
-  fixed ~130 bugs; **180/180 tests pass** (as of 2026-08-30); mock pipeline green for both characters × both
+  fixed ~130 bugs; **188/188 tests pass** (as of 2026-08-31); mock pipeline green for both characters × both
   formats.
 - **The two D&B-blocking gaps from the novelty review are closed** (≥3 model families +
   a reasoning model).
@@ -260,7 +274,8 @@ chain-of-thought — is only catchable by smoke).
 
 1. Produce and audit the four-page anonymized PTA workshop PDF by 2026-09-04; submit
    only after explicit final author approval.
-2. Freeze the controlled-H preregistration by 2026-09-15.
+2. ~~Freeze the controlled-H preregistration by 2026-09-15.~~ — done 2026-08-31;
+   protocol digest `78a768…f110`.
 3. Generate 200 model-blind fixtures and pass the treatment-strength/oracle gates
    before any paid or cluster inference.
 4. Complete the registered multi-family evidence, conformance checks, agency ablation,
@@ -276,10 +291,11 @@ chain-of-thought — is only catchable by smoke).
    H=1/H=8 optimal sets and make the H=1-mismatched control lose~~ — done
    exploratorily: three Ironclad and one Silent exact rows passed; one Silent row was
    insensitive and one timed out. This is construct evidence, not a prevalence estimate.
-4. Freeze seed/encounter/deck/HP strata, candidate count, the staged H=1/H=4-to-H=8
+4. ~~Freeze seed/encounter/deck/HP strata, candidate count, the staged H=1/H=4-to-H=8
    advancement rule, time/node ceilings, exclusions, character balance, and full
-   candidate-funnel reporting. Do not optimize for model failures.
-5. Generate and audit the 200 fixtures under that frozen protocol. Only after all
+   candidate-funnel reporting.~~ — done; do not optimize for model failures.
+5. Generate and audit the 200 fixtures under that frozen protocol. The 800-candidate
+   manifest and H={1,4} screen are complete; resume the full audit at 3/483. Only after all
    registered gates pass should a separately authorized cheap 30-fixture model pilot
    and power simulation run.
 6. Keep all paid/API/cluster/model calls stopped until the gates pass and the user
@@ -325,12 +341,12 @@ mechanical formatting or transcription.
   batch any remaining GPU work.
 - **Fake-precision risk**: n=20 × 5 seeds is paper-grade for this scope, but any new
   claim needs its own power check (12.5pp steps at n=8 was the old trap).
-- **No CI** (see §9): the 180 tests only run when someone runs them. Run all four files
+- **No CI** (see §9): the 188 tests only run when someone runs them. Run all four files
   before every commit.
 
 ## 8. Review checklist (no merge without)
 
-1. All 4 test files pass (**180 tests**: benchmark 55, combat 62, run 36, stats 27), run
+1. All 4 test files pass (**188 tests**: benchmark 63, combat 62, run 36, stats 27), run
    directly with `PYTHONIOENCODING=utf-8`.
 2. Mock pipeline green: both characters × both formats.
 3. §5.1 classification done: does this change invalidate data? If yes, re-baseline plan

@@ -1,5 +1,45 @@
 # Decision Log
 
+## 2026-08-31 — Freeze the controlled-H v2 candidate funnel before release-oracle work
+
+**Problem.** The exploratory v2 screen proved that the intervention can produce
+H=1/H=8-sensitive states, but its seed range, HP mode, advancement choices, and H=8
+targets were adapted while oracle results were visible. Continuing from those rows
+would make treatment prevalence and feasibility unauditable. Exhaustively running H=8
+on every possible state would also spend the oracle budget on many uninformative
+controls.
+
+**Options considered.** (a) retain the four successful exploratory fixtures and tune
+until 200 are found; (b) run all horizons on 200 newly generated states; (c) freeze a
+larger model-blind candidate pool, screen it cheaply at H={1,4}, advance every disjoint
+screen result plus a hash-ranked control sample, and fill predeclared H=1/H=8 release
+strata only after exact full-oracle audit.
+
+**Decision: (c).** The frozen payload is
+`configs/controlled_h_v2_preregistration.json`, protocol
+`controlled-h-v2-fixtures-2026-08-31`, SHA-256
+`78a768f7fb27ecfba3d8c2cb4bee47ce3284c427fe6ea22b2a6dd64c70c5f110`.
+It attempts 400 candidates per character with no replacement after a generation
+failure. Seeds, encounters, ten-card decks, HP fractions {1,.75,.5}, combat turns
+{1,2,3}, and zero/one fixture-turn prefix plays are deterministic. The H={1,4}
+screen uses 250,000 unique nodes and 10 seconds per fixture/H. Every exact disjoint
+H=1/H=4 candidate advances, together with the 125 hash-ranked screen-insensitive
+controls per character. Full H={1,2,4,8} audit uses 2,000,000 nodes and 120 seconds per
+fixture/H. The release target is 100 fixtures per character: 25 with disjoint H=1/H=8
+optimal sets and positive H=1-mismatch regret, plus 75 execution controls. Exactness,
+nonzero H=8 span, and prompt invariance in both formats are mandatory. A quota
+shortfall fails closed; it does not trigger adaptive replacement or threshold changes.
+
+**Trade-offs, invalidation, and reversal.** The released set is intentionally
+stratified to 25% sensitive and therefore cannot estimate natural sensitivity
+prevalence; the complete 800-candidate funnel is the prevalence/feasibility audit.
+H=1/H=4 screening can miss states that become sensitive only at H=8, so the ranked
+screen-insensitive sample is retained to measure that failure mode. The candidate pool
+is larger than the release set and may spend several CPU-hours at H=8, but it avoids
+model-conditioned selection. No historical model result is invalidated because none
+exists. Any protocol change requires a new protocol ID and digest and must occur before
+using the affected oracle output; this frozen run may only pass or fail as written.
+
 ## 2026-08-31 — Keep model inference stopped after the exploratory v2 treatment-strength screen
 
 **Problem.** The full-observability v2 generator produced four exact H=1/H=8-sensitive

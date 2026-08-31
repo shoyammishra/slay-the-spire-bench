@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import argparse
 import datetime as dt
+import hashlib
 import json
 import subprocess
 import sys
@@ -46,6 +47,8 @@ PILOT_ENCOUNTERS = (
     ("Sentry", "Sentry"),
 )
 
+FROZEN_PROTOCOL_PATH = ROOT / "configs" / "controlled_h_v2_preregistration.json"
+
 
 def _git_value(*args: str) -> str | None:
     try:
@@ -77,7 +80,9 @@ def _deck_for_candidate(character: str, seed: int, ordinal: int) -> list[str]:
 
 def _prefix_for_candidate(character: str, seed: int, enemy_ids: tuple[str, ...],
                           ordinal: int, deck_names: list[str],
-                          player_hp: int) -> list[ControlledAction]:
+                          player_hp: int, desired_turn: int | None = None,
+                          current_turn_plays: int | None = None
+                          ) -> list[ControlledAction]:
     """Produce state diversity with a fixed, non-model policy.
 
     The policy advances 0--2 complete turns and optionally plays one card on the
@@ -87,8 +92,9 @@ def _prefix_for_candidate(character: str, seed: int, enemy_ids: tuple[str, ...],
     _fixture, state = create_fixture(
         character, seed, enemy_ids, deck_names=deck_names, player_hp=player_hp)
     prefix: list[ControlledAction] = []
-    desired_turn = 1 + ordinal % 3
-    current_turn_plays = (ordinal // 3) % 2
+    desired_turn = desired_turn if desired_turn is not None else 1 + ordinal % 3
+    current_turn_plays = (current_turn_plays if current_turn_plays is not None
+                          else (ordinal // 3) % 2)
     step = 0
 
     def choose_play() -> ControlledAction | None:
@@ -156,6 +162,217 @@ def generate_fixtures(per_character: int, seed_base: int = 62000,
     return fixtures
 
 
+def load_frozen_protocol(path: Path = FROZEN_PROTOCOL_PATH) -> tuple[dict, str]:
+    """Load and hash the immutable preregistration payload."""
+    protocol = json.loads(path.read_text(encoding="utf-8"))
+    if protocol.get("instrument_version") != CONTROLLED_HORIZON_VERSION:
+        raise ValueError("frozen protocol instrument version does not match code")
+    rendered = json.dumps(protocol, sort_keys=True, separators=(",", ":"))
+    return protocol, hashlib.sha256(rendered.encode("utf-8")).hexdigest()
+
+
+def _protocol_rank(protocol_id: str, fixture_id: str) -> str:
+    return hashlib.sha256(f"{protocol_id}:{fixture_id}".encode("utf-8")).hexdigest()
+
+
+def generate_frozen_candidates(protocol: dict) -> tuple[list, list[dict]]:
+    """Generate every predeclared candidate once, without outcome-driven replacement."""
+    spec = protocol["candidate_generation"]
+    fixtures = []
+    attempts = []
+    encounters = [tuple(ids) for ids in spec["encounters"]]
+    hp_fractions = spec["hp_fractions"]
+    turns = spec["combat_turns"]
+    fixture_plays = spec["fixture_turn_plays"]
+    per_character = spec["candidates_per_character"]
+    for character_index, character in enumerate(spec["characters"]):
+        max_hp = 80 if character == "ironclad" else 70
+        for ordinal in range(per_character):
+            fixture_id = (
+                f"{protocol['protocol_id']}-{character}-{ordinal:04d}")
+            seed = (spec["seed_base"]
+                    + character_index * spec["character_seed_offset"]
+                    + ordinal * spec["seed_stride"])
+            encounter = encounters[ordinal % len(encounters)]
+            hp_index = (ordinal // len(encounters)) % len(hp_fractions)
+            turn_index = (
+                ordinal // (len(encounters) * len(hp_fractions))) % len(turns)
+            play_index = (
+                ordinal // (len(encounters) * len(hp_fractions) * len(turns))
+            ) % len(fixture_plays)
+            player_hp = round(max_hp * hp_fractions[hp_index])
+            attempt = {
+                "fixture_id": fixture_id,
+                "character": character,
+                "ordinal": ordinal,
+                "seed": seed,
+                "enemy_ids": list(encounter),
+                "hp_fraction": hp_fractions[hp_index],
+                "target_combat_turn": turns[turn_index],
+                "fixture_turn_plays": fixture_plays[play_index],
+                "generated": False,
+                "error": None,
+            }
+            try:
+                deck_names = _deck_for_candidate(character, seed, ordinal)
+                prefix = _prefix_for_candidate(
+                    character, seed, encounter, ordinal, deck_names, player_hp,
+                    desired_turn=turns[turn_index],
+                    current_turn_plays=fixture_plays[play_index])
+                fixture, _state = create_fixture(
+                    character, seed, encounter, prefix, fixture_id,
+                    deck_names, player_hp)
+                fixtures.append(fixture)
+                attempt["generated"] = True
+                attempt["state_digest"] = fixture.state_digest
+            except ValueError as exc:
+                attempt["error"] = {"type": type(exc).__name__, "message": str(exc)}
+            attempts.append(attempt)
+    return fixtures, attempts
+
+
+def _optimal_keys(row: dict, horizon: int) -> set[str]:
+    oracle = row.get("oracles", {}).get(str(horizon))
+    if not oracle:
+        return set()
+    return {
+        _action_key(ControlledAction(**action))
+        for action in oracle["optimal_actions"]
+    }
+
+
+def select_frozen_advancements(screen_rows: list[dict], protocol: dict) -> dict:
+    """Apply the preregistered H=1/H=4 advancement rule deterministically."""
+    spec = protocol["screen"]
+    protocol_id = protocol["protocol_id"]
+    decisions = []
+    selected_ids = set()
+    negative_by_character = {
+        character: [] for character in protocol["candidate_generation"]["characters"]}
+    for row in screen_rows:
+        fixture = row["fixture"]
+        fixture_id = fixture["fixture_id"]
+        character = fixture["character"]
+        eligible = (
+            row.get("error") is None
+            and row.get("prompt_only_h_changes") is True
+            and bool(_optimal_keys(row, 1))
+            and bool(_optimal_keys(row, 4))
+            and not row["oracles"]["4"]["zero_span"]
+        )
+        disjoint = eligible and _optimal_keys(row, 1).isdisjoint(
+            _optimal_keys(row, 4))
+        decision = {
+            "fixture_id": fixture_id,
+            "character": character,
+            "eligible": eligible,
+            "disjoint_h1_h4": bool(disjoint),
+            "rank": _protocol_rank(protocol_id, fixture_id),
+            "advanced": False,
+            "reason": "screen_ineligible",
+        }
+        if disjoint and spec["advance_all_disjoint_h1_h4"]:
+            decision["advanced"] = True
+            decision["reason"] = "all_screen_sensitive"
+            selected_ids.add(fixture_id)
+        elif eligible:
+            decision["reason"] = "screen_insensitive_rank_pool"
+            negative_by_character[character].append(decision)
+        decisions.append(decision)
+    limit = spec["screen_insensitive_advances_per_character"]
+    for character, pool in negative_by_character.items():
+        for decision in sorted(pool, key=lambda item: item["rank"])[:limit]:
+            decision["advanced"] = True
+            decision["reason"] = "ranked_screen_insensitive_control"
+            selected_ids.add(decision["fixture_id"])
+    return {
+        "selected_fixture_ids": sorted(selected_ids),
+        "decisions": decisions,
+    }
+
+
+def select_frozen_release(full_rows: list[dict], protocol: dict) -> dict:
+    """Select the fixed character/sensitivity quotas or fail closed."""
+    spec = protocol["release"]
+    protocol_id = protocol["protocol_id"]
+    buckets = {}
+    dispositions = []
+    for row in full_rows:
+        fixture = row["fixture"]
+        fixture_id = fixture["fixture_id"]
+        character = fixture["character"]
+        h1 = _optimal_keys(row, 1)
+        h8 = _optimal_keys(row, 8)
+        eligible = (
+            row.get("error") is None
+            and (not spec["require_prompt_invariance"]
+                 or row.get("prompt_only_h_changes") is True)
+            and bool(h1) and bool(h8)
+            and (not spec["require_nonzero_h8_oracle_span"]
+                 or not row["oracles"]["8"]["zero_span"])
+            and (not spec["require_exact_oracles_at_all_horizons"]
+                 or all(str(h) in row["oracles"] and row["oracles"][str(h)]["exact"]
+                        for h in protocol["full_oracle"]["horizons"]))
+        )
+        sensitive = eligible and h1.isdisjoint(h8)
+        if (sensitive
+                and spec["require_h1_mismatch_loss_on_sensitive_fixtures"]
+                and row["oracles"]["8"]["baselines"][
+                    "h1_mismatched_oracle"]["regret"] <= 0):
+            eligible = False
+            sensitive = False
+        disposition = {
+            "fixture_id": fixture_id,
+            "character": character,
+            "eligible": eligible,
+            "h1_h8_sensitive": bool(sensitive),
+            "rank": _protocol_rank(protocol_id, fixture_id),
+            "released": False,
+            "reason": "full_oracle_ineligible",
+        }
+        if eligible:
+            key = (character, bool(sensitive))
+            buckets.setdefault(key, []).append(disposition)
+            disposition["reason"] = "eligible_rank_pool"
+        dispositions.append(disposition)
+
+    shortfalls = []
+    selected_ids = set()
+    for character in protocol["candidate_generation"]["characters"]:
+        for sensitive, quota_key in (
+                (True, "h1_h8_sensitive_per_character"),
+                (False, "h1_h8_insensitive_per_character")):
+            quota = spec[quota_key]
+            pool = sorted(buckets.get((character, sensitive), []),
+                          key=lambda item: item["rank"])
+            if len(pool) < quota:
+                shortfalls.append({
+                    "character": character,
+                    "h1_h8_sensitive": sensitive,
+                    "required": quota,
+                    "available": len(pool),
+                })
+            for disposition in pool[:quota]:
+                disposition["released"] = True
+                disposition["reason"] = "selected_by_preregistered_rank"
+                selected_ids.add(disposition["fixture_id"])
+    expected = (spec["fixtures_per_character"]
+                * len(protocol["candidate_generation"]["characters"]))
+    sensitive_n = sum(item["released"] and item["h1_h8_sensitive"]
+                      for item in dispositions)
+    fraction = sensitive_n / len(selected_ids) if selected_ids else 0.0
+    gate = (not shortfalls and len(selected_ids) == expected
+            and fraction >= spec["minimum_sensitive_fraction"])
+    return {
+        "release_gate_passed": gate,
+        "selected_fixture_ids": sorted(selected_ids) if gate else [],
+        "candidate_selected_fixture_ids": sorted(selected_ids),
+        "shortfalls": shortfalls,
+        "sensitive_fraction": fraction,
+        "dispositions": dispositions,
+    }
+
+
 def _action_key(action: ControlledAction) -> str:
     return f"{action.action}:{action.card_index}:{action.target_index}"
 
@@ -221,15 +438,18 @@ def _baseline_rows(state, oracle, h1_actions: list[ControlledAction]) -> dict:
 
 
 def _prompt_only_h_changes(state, horizons: tuple[int, ...]) -> bool:
-    normalized = []
-    systems = []
-    for horizon in horizons:
-        system, prompt = build_prompt(state, horizon, "structured")
-        systems.append(system)
-        normalized.append(prompt.replace(
-            f"after exactly {horizon} decision transitions",
-            "after exactly <H> decision transitions"))
-    return len(set(systems)) == 1 and len(set(normalized)) == 1
+    for prompt_format in ("structured", "raw"):
+        normalized = []
+        systems = []
+        for horizon in horizons:
+            system, prompt = build_prompt(state, horizon, prompt_format)
+            systems.append(system)
+            normalized.append(prompt.replace(
+                f"after exactly {horizon} decision transitions",
+                "after exactly <H> decision transitions"))
+        if len(set(systems)) != 1 or len(set(normalized)) != 1:
+            return False
+    return True
 
 
 def audit_fixture(fixture, horizons: tuple[int, ...], node_budget: int,

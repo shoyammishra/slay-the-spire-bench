@@ -1202,6 +1202,91 @@ def test_controlled_horizon_pilot_generator_is_model_blind_and_deterministic():
     print("[PASS] controlled-H pilot generator is deterministic and model-blind")
 
 
+def test_controlled_horizon_frozen_protocol_is_digest_locked_and_balanced():
+    from collections import Counter
+    from scripts.controlled_horizon_pilot import (
+        generate_frozen_candidates, load_frozen_protocol)
+
+    protocol, digest = load_frozen_protocol()
+    assert digest == "78a768f7fb27ecfba3d8c2cb4bee47ce3284c427fe6ea22b2a6dd64c70c5f110"
+    fixtures, attempts = generate_frozen_candidates(protocol)
+    assert len(fixtures) == len(attempts) == 800
+    assert all(attempt["generated"] and attempt["error"] is None
+               for attempt in attempts)
+    assert len({fixture.fixture_id for fixture in fixtures}) == 800
+    assert len({fixture.seed for fixture in fixtures}) == 800
+    assert all(len(fixture.deck_names) == 10 for fixture in fixtures)
+    by_character = Counter(fixture.character for fixture in fixtures)
+    assert by_character == {"ironclad": 400, "silent": 400}
+    assert {attempt["target_combat_turn"] for attempt in attempts} == {1, 2, 3}
+    assert {attempt["hp_fraction"] for attempt in attempts} == {1.0, 0.75, 0.5}
+    assert {len(attempt["enemy_ids"]) for attempt in attempts} == {1, 2}
+    print("[PASS] frozen controlled-H protocol is digest-locked and balanced")
+
+
+def test_controlled_horizon_frozen_funnel_is_deterministic_and_fails_closed():
+    import copy
+    from scripts.controlled_horizon_pilot import (
+        load_frozen_protocol, select_frozen_advancements, select_frozen_release)
+
+    protocol, _digest = load_frozen_protocol()
+    protocol = copy.deepcopy(protocol)
+    protocol["candidate_generation"]["characters"] = ["ironclad", "silent"]
+    protocol["screen"]["screen_insensitive_advances_per_character"] = 1
+    protocol["release"].update({
+        "fixtures_per_character": 2,
+        "h1_h8_sensitive_per_character": 1,
+        "h1_h8_insensitive_per_character": 1,
+    })
+
+    def row(character, ordinal, h4_sensitive, h8_sensitive):
+        fixture_id = f"synthetic-{character}-{ordinal}"
+        action_a = {"action": "end_turn", "card_index": -1, "target_index": -1}
+        action_b = {"action": "play", "card_index": 0, "target_index": 0}
+        def oracle(action):
+            return {
+                "exact": True,
+                "optimal_actions": [action],
+                "zero_span": False,
+                "baselines": {
+                    "h1_mismatched_oracle": {
+                        "regret": 1 if action == action_b else 0,
+                    },
+                },
+            }
+        return {
+            "fixture": {"fixture_id": fixture_id, "character": character},
+            "prompt_only_h_changes": True,
+            "error": None,
+            "oracles": {
+                "1": oracle(action_a),
+                "2": oracle(action_a),
+                "4": oracle(action_b if h4_sensitive else action_a),
+                "8": oracle(action_b if h8_sensitive else action_a),
+            },
+        }
+
+    rows = [
+        row("ironclad", 0, True, True),
+        row("ironclad", 1, False, False),
+        row("silent", 0, True, True),
+        row("silent", 1, False, False),
+    ]
+    first = select_frozen_advancements(rows, protocol)
+    second = select_frozen_advancements(list(reversed(rows)), protocol)
+    assert first["selected_fixture_ids"] == second["selected_fixture_ids"]
+    assert len(first["selected_fixture_ids"]) == 4
+
+    release = select_frozen_release(rows, protocol)
+    assert release["release_gate_passed"]
+    assert len(release["selected_fixture_ids"]) == 4
+    failed = select_frozen_release(rows[:-1], protocol)
+    assert not failed["release_gate_passed"]
+    assert failed["selected_fixture_ids"] == []
+    assert failed["shortfalls"]
+    print("[PASS] frozen controlled-H funnel is deterministic and fails closed")
+
+
 def test_controlled_horizon_memoized_oracle_matches_full_tree():
     from slay_bench.controlled_horizon import create_fixture, exact_action_values
 
@@ -1369,6 +1454,8 @@ if __name__ == "__main__":
         test_controlled_horizon_holds_state_and_action_contract_fixed,
         test_controlled_horizon_fixture_recipe_is_deterministic_and_fails_on_drift,
         test_controlled_horizon_pilot_generator_is_model_blind_and_deterministic,
+        test_controlled_horizon_frozen_protocol_is_digest_locked_and_balanced,
+        test_controlled_horizon_frozen_funnel_is_deterministic_and_fails_closed,
         test_controlled_horizon_memoized_oracle_matches_full_tree,
         test_controlled_horizon_oracle_wall_time_fails_closed,
         test_controlled_horizon_checkpoint_write_is_atomic,

@@ -1,5 +1,42 @@
 # Experiment Log
 
+## 2026-08-31 — Frozen controlled-H manifest and H={1,4} screen complete; full audit checkpointed
+
+**No model, API, GPU, or cluster inference ran.** The frozen protocol
+`controlled-h-v2-fixtures-2026-08-31` (digest `78a768…f110`) generated 800/800
+deterministic candidates, 400 per character, with no generation failures or
+replacement. The ignored manifest is
+`results/controlled_h_v2_frozen_manifest.json`.
+
+The exact H={1,4} screen completed all 800 rows under 250,000 unique nodes and 10
+seconds per fixture/H. There were zero node/time failures and zero structured/raw
+prompt-invariance failures. Maximum H=4 unique expansions were 5,234; total recorded
+oracle wall time was 535.29 seconds. Twenty-nine rows had zero H=4 span and are not
+advancement-eligible. Disjoint H=1/H=4 optima occurred in 142/400 Ironclad candidates
+(35.5%) and 91/400 Silent candidates (22.75%). Under the frozen rule, all 233 screen-
+sensitive rows and 125 SHA-256-ranked screen-insensitive controls per character advance,
+for 483 full-audit rows. These rates are screen diagnostics, not H=8 treatment results.
+
+The full H={1,2,4,8} stage was then smoke-resumed and intentionally interrupted after
+three atomic checkpoints to expose its cost before leaving a multi-hour foreground
+process running. Two rows (`ironclad-0000`, `ironclad-0002`) hit the registered 120
+second H=8 ceiling and failed closed. `ironclad-0001` completed exactly: H=8 expanded
+64,527 unique states in 66.12 seconds, with value span 93−48, and its H=1 and H=8
+optimal sets were not disjoint. The interrupted fourth row produced no disposition and
+will restart; the three completed rows will be skipped on resume. Current artifact:
+`results/controlled_h_v2_frozen_full.json`, 3/483 rows, `complete=false`.
+
+This checkpoint is neither a passed nor failed release gate. It establishes a material
+feasibility risk—2/3 initial rows timed out—and a rough worst-case duration near 16
+hours if every remaining row consumes its full ceiling. Do not alter the frozen
+protocol in response. Resume the same stage, preserve every timeout, and run release
+selection only after all 483 dispositions exist. Model inference remains stopped.
+
+Post-change verification passed all four direct test files (**188/188**: benchmark 63,
+combat 62, run 36, stats 27). The no-API mock pipeline passed for both characters in
+structured and raw formats. Python compilation and `git diff --check` passed; the final
+changed-file credential, private-key, private-IP, and user-path scan was clean.
+
 ## 2026-08-31 — Controlled-H v2 exploratory screen finds treatment strength; inference remains stopped
 
 **No model, API, GPU, or cluster inference ran.** This was local CPU oracle work to
