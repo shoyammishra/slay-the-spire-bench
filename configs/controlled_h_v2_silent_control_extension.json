@@ -1,0 +1,43 @@
+{
+  "protocol_id": "controlled-h-v2-silent-control-extension-2026-09-04",
+  "instrument_version": "controlled-decision-horizon-v2",
+  "status": "frozen-after-v2-failure-before-extension-oracle-run",
+  "base_protocol": {
+    "protocol_id": "controlled-h-v2-fixtures-2026-08-31",
+    "protocol_digest": "78a768f7fb27ecfba3d8c2cb4bee47ce3284c427fe6ea22b2a6dd64c70c5f110",
+    "screen_artifact_sha256": "036b8dcac8badf178d02f0216fb4ad8f5e5196816e0f25aeec68bc3bb075bc89",
+    "full_artifact_sha256": "94f376b546bbbabe82db01c182c9f034f786cc8dc7c99d3552ddffb37f25aca1"
+  },
+  "observed_base_outcome": {
+    "release_gate_passed": false,
+    "character": "silent",
+    "h1_h8_insensitive_required": 75,
+    "h1_h8_insensitive_available": 70,
+    "shortfall": 5
+  },
+  "selection": {
+    "character": "silent",
+    "source_pool": "exact_prompt_invariant_nonzero_h4_span_screen_insensitive",
+    "exclude_base_advanced_fixtures": true,
+    "rank_namespace_protocol_id": "controlled-h-v2-fixtures-2026-08-31",
+    "rank": "sha256(rank_namespace_protocol_id:fixture_id)",
+    "offset_after_base_advanced": 125,
+    "fixture_count": 50
+  },
+  "full_oracle": {
+    "horizons": [1, 2, 4, 8],
+    "node_budget_per_fixture_h": 2000000,
+    "wall_seconds_per_fixture_h": 120.0
+  },
+  "supplementation": {
+    "purpose": "repair Silent control feasibility without changing the frozen v2 result",
+    "original_v2_gate_remains_failed": true,
+    "may_supply_only_exact_h1_h8_insensitive_silent_fixtures": true,
+    "combined_silent_control_target": 75,
+    "model_behavior_used_for_selection": false
+  },
+  "failure_policy": {
+    "full_oracle_budget_failure": "account-and-exclude",
+    "extension_shortfall": "fail-closed-without-changing-this-protocol"
+  }
+}

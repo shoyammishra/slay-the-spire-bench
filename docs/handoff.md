@@ -73,7 +73,17 @@ Single source of truth stays where it already lives (see §2).
   Silent disjoint screens. The frozen rule advances 483 rows. The full H={1,2,4,8}
   artifact is checkpointed at 3/483: two H=8 timeouts and one exact 66.12-second,
   64,527-state insensitive row. The interrupted fourth row has no disposition and will
-  restart. Resume the same command; do not tune the protocol from these outcomes.
+  restart. **Superseded 2026-09-04:** the resumed audit has now completed; see the next
+  bullet. This checkpoint remains historical provenance.
+- **Controlled-H v2 outcome and Silent extension (2026-09-04):** the full audit
+  completed 483/483 rows. Ironclad yielded 96 sensitive, 118 controls, and 53 timeouts;
+  Silent yielded 59 sensitive, 70 controls, and 87 timeouts. The registered release
+  failed closed solely because Silent had 70/75 required controls; it emitted zero
+  fixtures. A separately labelled extension is frozen at
+  `configs/controlled_h_v2_silent_control_extension.json` (digest `43d9c7b3…7995`):
+  audit the next 50 original-rank Silent screen-insensitive candidates under unchanged
+  exact-oracle budgets. It may repair a combined release but never relabel v2 as passed.
+  No model inference is authorized until that extension and combined gate pass.
 
 - **Active supersession (2026-08-30):** the open-model matrix now has 28 canonical
   aggregates (7 configurations × 2 characters × 2 formats), including the complete
@@ -281,7 +291,7 @@ chain-of-thought — is only catchable by smoke).
 4. Complete the registered multi-family evidence, conformance checks, agency ablation,
    and trace release for the ICML 2027 internal freeze on 2027-01-15.
 
-**Controlled-H resume point (2026-08-31):**
+**Controlled-H resume point (2026-09-04):**
 
 1. ~~Add per-fixture atomic checkpointing~~ — done; each completed row atomically
    replaces the schema-2.0 audit, and node/time limits fail closed.
@@ -294,11 +304,15 @@ chain-of-thought — is only catchable by smoke).
 4. ~~Freeze seed/encounter/deck/HP strata, candidate count, the staged H=1/H=4-to-H=8
    advancement rule, time/node ceilings, exclusions, character balance, and full
    candidate-funnel reporting.~~ — done; do not optimize for model failures.
-5. Generate and audit the 200 fixtures under that frozen protocol. The 800-candidate
-   manifest and H={1,4} screen are complete; resume the full audit at 3/483. Only after all
-   registered gates pass should a separately authorized cheap 30-fixture model pilot
-   and power simulation run.
-6. Keep all paid/API/cluster/model calls stopped until the gates pass and the user
+5. ~~Complete the frozen v2 full audit and release gate.~~ — done; 483/483 rows were
+   accounted, but the balanced release failed closed because Silent supplied 70/75
+   controls. Ironclad passed independently; do not call v2 passed.
+6. Run the frozen 50-row Silent-control extension and audit a separately labelled
+   combined fixture release. If it cannot supply five additional exact insensitive
+   controls, fail closed and version a redesigned Silent family rather than extending
+   this tranche again. Only after the combined gate passes should a separately
+   authorized cheap 30-fixture model pilot and power simulation run.
+7. Keep all paid/API/cluster/model calls stopped until the gates pass and the user
    authorizes the concrete run.
 
 The older numbered table below is retained as project history. Any row that depends on

@@ -1,5 +1,45 @@
 # Experiment Log
 
+## 2026-09-04 — Frozen controlled-H v2 full audit fails Silent-control quota; extension frozen
+
+**No model, API, GPU, or cluster inference ran.** The local exact-oracle full stage
+completed all 483/483 advanced fixtures under the frozen v2 digest `78a768…f110`.
+Ironclad dispositions were 96 exact sensitive, 118 exact controls, and 53 registered
+budget failures. Silent dispositions were 59 exact sensitive, 70 exact controls, and
+87 budget failures. By advancement source, the 125 ranked screen-insensitive Silent
+rows yielded 53 controls, 22 H=1/H=8-sensitive rows, and 50 timeouts; the 91 screen-
+sensitive Silent rows yielded 17 controls, 37 sensitive rows, and 37 timeouts. Total
+recorded exact-oracle wall time across completed horizons was 19,661.67 seconds.
+
+The release command completed and correctly failed closed. Its sole shortfall is
+Silent H=1/H=8-insensitive controls: 70 available versus 75 required. The candidate
+selection contains 195 rows, but `release_gate_passed=false`, `released_fixture_count=0`,
+and the release fixture artifact is empty. Ironclad passed both quotas; this does not
+convert the registered balanced gate into an Ironclad-only pass. Ignored local
+artifacts are `results/controlled_h_v2_frozen_full.json`,
+`results/controlled_h_v2_frozen_release_audit.json`, and
+`results/controlled_h_v2_frozen_release_fixtures.json`.
+
+Before any extension oracle row was evaluated, a separate Silent-control repair was
+frozen in `configs/controlled_h_v2_silent_control_extension.json`, protocol
+`controlled-h-v2-silent-control-extension-2026-09-04`, digest `43d9c7b3…7995`.
+It selects exactly the next 50 original-v2-ranked candidates from the 177 unused,
+eligible H=1/H=4-insensitive Silent rows, excluding all base-advanced fixtures. It
+uses the unchanged full-oracle budgets and may supplement only exact insensitive
+Silent controls. The original v2 outcome remains failed regardless of extension
+success. Model inference remains stopped.
+
+Pre-launch verification passed all four direct test files (**189/189**: benchmark 64,
+combat 62, run 36, stats 27), Python compilation, source-artifact hash validation,
+`git diff --check`, and a targeted public-repository security scan. The extension was
+then launched as a hidden, resumable local process. Its first atomic checkpoint
+completed exactly at all four horizons with prompt invariance and no budget failure;
+the row was H=1/H=8-sensitive and therefore supplied no repair control. The ignored
+live artifact is `results/controlled_h_v2_silent_control_extension_full.json` (1/50 at
+this checkpoint). The launch provenance records `git_dirty=true` because the frozen
+extension implementation and documentation are not yet committed; no model, paid API,
+GPU, or cluster work is involved.
+
 ## 2026-08-31 — Frozen controlled-H manifest and H={1,4} screen complete; full audit checkpointed
 
 **No model, API, GPU, or cluster inference ran.** The frozen protocol

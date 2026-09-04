@@ -1,5 +1,43 @@
 # Decision Log
 
+## 2026-09-04 — Preserve the failed v2 gate; freeze a Silent-control extension
+
+**Problem.** The frozen controlled-H v2 full audit completed all 483 advanced rows.
+Ironclad supplied 96 exact H=1/H=8-sensitive fixtures and 118 exact controls. Silent
+supplied 59 sensitive fixtures but only 70 exact controls; 87 Silent rows exceeded the
+registered H=8 wall-time ceiling. The registered two-character release therefore
+missed only the Silent 75-control quota, by five, and failed closed. Changing the quota,
+reclassifying timeouts, or silently adding hand-picked replacements would invalidate
+the preregistration.
+
+**Options considered.** (a) lower the Silent control quota to 70; (b) publish an
+Ironclad-only controlled-H result; (c) preserve v2 as failed and freeze a separately
+labelled feasibility extension from the unused deterministic candidate pool; or (d)
+generate an outcome-tuned replacement family. Option (a) changes a visible gate,
+option (b) weakens replication, and option (d) creates avoidable researcher degrees of
+freedom.
+
+**Decision: (c).** The v2 release audit remains `release_gate_passed=false` and emits
+zero release fixtures. Protocol `controlled-h-v2-silent-control-extension-2026-09-04`,
+digest `43d9c7b3…7995`, audits exactly 50 Silent candidates: the next SHA-256-ranked rows
+after the 125 originally advanced from the exact, prompt-invariant, nonzero-span,
+H=1/H=4-insensitive screen pool. Ranking remains under the original v2 protocol ID;
+all originally advanced rows are excluded. The extension reuses the frozen states and
+the identical H={1,2,4,8}, 2,000,000-node, 120-second exact-oracle contract. Every
+timeout remains an exclusion. Extension rows may supply only exact H=1/H=8-insensitive
+Silent controls to a separately labelled combined release; they cannot make the
+original v2 gate a pass. No model behavior enters selection, and model inference
+remains stopped until the combined fixture gate is audited.
+
+**Trade-offs, invalidation, and reversal.** The extension was chosen after observing
+the five-control shortfall, so the combined release is an explicitly sequential
+feasibility repair rather than a pristine single-stage preregistration. Fifty rows
+provide margin against the observed 53/125 control yield and 50/125 timeout rate in
+the original ranked Silent-control tranche, but cost additional local oracle time.
+No model results or historical benchmarks are invalidated because controlled-H model
+inference has not begun. If the extension also misses, fail closed and redesign the
+Silent oracle/state family under a new version; do not extend this tranche again.
+
 ## 2026-08-31 — Freeze the controlled-H v2 candidate funnel before release-oracle work
 
 **Problem.** The exploratory v2 screen proved that the intervention can produce

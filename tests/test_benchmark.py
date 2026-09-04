@@ -1287,6 +1287,52 @@ def test_controlled_horizon_frozen_funnel_is_deterministic_and_fails_closed():
     print("[PASS] frozen controlled-H funnel is deterministic and fails closed")
 
 
+def test_controlled_horizon_silent_extension_is_digest_locked_and_next_ranked():
+    import copy
+    from scripts.controlled_horizon_pilot import load_frozen_protocol
+    from scripts.controlled_horizon_silent_extension import (
+        load_extension_protocol, select_extension_candidates)
+
+    base, _base_digest = load_frozen_protocol()
+    extension, digest = load_extension_protocol()
+    assert digest == "43d9c7b37e41b1dbf3e3a066dfe0b868e063df54a35e6808dc9863aa9d617995"
+    assert extension["supplementation"]["original_v2_gate_remains_failed"]
+    assert extension["selection"]["fixture_count"] == 50
+
+    base = copy.deepcopy(base)
+    base["candidate_generation"]["characters"] = ["silent"]
+    base["screen"]["screen_insensitive_advances_per_character"] = 1
+    extension = copy.deepcopy(extension)
+    extension["selection"]["fixture_count"] = 2
+    extension["selection"]["offset_after_base_advanced"] = 1
+
+    action = {"action": "end_turn", "card_index": -1, "target_index": -1}
+    rows = []
+    for ordinal in range(5):
+        rows.append({
+            "fixture": {
+                "fixture_id": f"synthetic-silent-{ordinal}",
+                "character": "silent",
+            },
+            "prompt_only_h_changes": True,
+            "error": None,
+            "oracles": {
+                "1": {"optimal_actions": [action], "zero_span": False},
+                "4": {"optimal_actions": [action], "zero_span": False},
+            },
+        })
+    first = select_extension_candidates(rows, base, extension)
+    second = select_extension_candidates(list(reversed(rows)), base, extension)
+    assert first["rank_ordered_fixture_ids"] == second["rank_ordered_fixture_ids"]
+    assert first["selection_count"] == 2
+    assert first["available_unadvanced_pool_size"] == 4
+    ranked = sorted(first["decisions"], key=lambda item: item["rank"])
+    assert first["rank_ordered_fixture_ids"] == [
+        item["fixture_id"] for item in ranked[:2]]
+    assert sum(item["extension_selected"] for item in first["decisions"]) == 2
+    print("[PASS] Silent extension is digest-locked and selects the next rank slice")
+
+
 def test_controlled_horizon_memoized_oracle_matches_full_tree():
     from slay_bench.controlled_horizon import create_fixture, exact_action_values
 
@@ -1456,6 +1502,7 @@ if __name__ == "__main__":
         test_controlled_horizon_pilot_generator_is_model_blind_and_deterministic,
         test_controlled_horizon_frozen_protocol_is_digest_locked_and_balanced,
         test_controlled_horizon_frozen_funnel_is_deterministic_and_fails_closed,
+        test_controlled_horizon_silent_extension_is_digest_locked_and_next_ranked,
         test_controlled_horizon_memoized_oracle_matches_full_tree,
         test_controlled_horizon_oracle_wall_time_fails_closed,
         test_controlled_horizon_checkpoint_write_is_atomic,
