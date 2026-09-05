@@ -113,7 +113,9 @@ Buy information cheapest-first:
 1. unit tests, exactness audit, and the combined 200-fixture release — complete;
 2. freeze a model-blind 30-fixture pilot (15 per character; four sensitive + 11
    controls), Qwen3-32B, structured format, all four H, and balanced query order —
-   complete under protocol digest `4a56e3c5…1004`;
+   complete under active protocol digest `465bab1d…104f` (the earlier no-inference
+   mock digest was superseded when the deployment revision and serving stack were
+   pinned);
 3. run all 120 calls through the exact stack with a no-inference mock, preserving
    prompts, hashes, raw responses, parsed traces, and checkpoint resume — complete;
 4. run the prospective power table and freeze the conservative pilot-bootstrap gate —

@@ -6,6 +6,7 @@ import argparse
 import collections
 import datetime as dt
 import hashlib
+import importlib.metadata
 import json
 import statistics
 import sys
@@ -41,6 +42,28 @@ from slay_bench.controlled_horizon import (  # noqa: E402
 
 
 PILOT_PROTOCOL_PATH = ROOT / "configs" / "controlled_h_v2_model_pilot.json"
+
+
+def _package_version(package: str) -> str | None:
+    try:
+        return importlib.metadata.version(package)
+    except importlib.metadata.PackageNotFoundError:
+        return None
+
+
+def validate_serving_stack(protocol: dict,
+                           versions: dict[str, str | None] | None = None) -> None:
+    versions = versions or {
+        package: _package_version(package)
+        for package in ("vllm", "transformers")
+    }
+    expected = protocol["inference"]["serving_stack"]
+    for package, key in (("vllm", "vllm_version"),
+                         ("transformers", "transformers_version")):
+        if versions.get(package) != expected[key]:
+            raise ValueError(
+                f"{package} runtime {versions.get(package)!r} differs from "
+                f"frozen version {expected[key]!r}")
 
 
 def load_pilot_protocol(path: Path = PILOT_PROTOCOL_PATH) -> tuple[dict, str]:
@@ -275,7 +298,10 @@ def _summarize(rows: list[dict], protocol: dict) -> dict:
 
 def run_pilot(protocol: dict, protocol_digest: str, llm, provider: str,
               release_audit: dict, fixtures: dict, oracle_rows: dict,
-              output: Path, cluster_compute: bool = False) -> dict:
+              output: Path, cluster_compute: bool = False,
+              max_new_queries: int | None = None) -> dict:
+    if max_new_queries is not None and max_new_queries < 1:
+        raise ValueError("max_new_queries must be positive")
     selection = select_pilot_fixtures(release_audit, protocol)
     prior = json.loads(output.read_text(encoding="utf-8")) if output.exists() else None
     if prior and (prior.get("protocol_digest") != protocol_digest
@@ -287,6 +313,7 @@ def run_pilot(protocol: dict, protocol_digest: str, llm, provider: str,
         "created_at_utc", dt.datetime.now(dt.timezone.utc).isoformat())
     rows = list((prior or {}).get("rows", []))
     completed = {(row["fixture_id"], row["horizon"]) for row in rows}
+    new_queries = 0
     if len(completed) != len(rows):
         raise ValueError("pilot checkpoint contains duplicate queries")
 
@@ -308,6 +335,13 @@ def run_pilot(protocol: dict, protocol_digest: str, llm, provider: str,
                 "model_inference": provider != "mock",
                 "paid_api": False,
                 "cluster_compute": cluster_compute,
+                "model_repository": protocol["inference"]["model_repository"],
+                "model_revision": protocol["inference"]["model_revision"],
+                "serving_stack": protocol["inference"]["serving_stack"],
+                "runtime_versions": {
+                    package: _package_version(package)
+                    for package in ("vllm", "transformers", "torch")
+                },
             },
             "selection": selection,
             "completed_queries": len(rows),
@@ -369,7 +403,11 @@ def run_pilot(protocol: dict, protocol_digest: str, llm, provider: str,
             }
             rows.append(row)
             completed.add((fixture_id, horizon))
+            new_queries += 1
             _atomic_write_json(output, report())
+            if (max_new_queries is not None
+                    and new_queries >= max_new_queries):
+                return report()
     final = report()
     _atomic_write_json(output, final)
     return final
@@ -393,6 +431,9 @@ def main() -> None:
     parser.add_argument("--authorize-model-inference", action="store_true")
     parser.add_argument("--cluster-compute", action="store_true",
                         help="Record that the local provider is served on a cluster")
+    parser.add_argument(
+        "--max-new-queries", type=int,
+        help="Checkpoint after this many new calls; use 1 for the real-stack smoke")
     parser.add_argument("--out", type=Path, required=True)
     args = parser.parse_args()
     protocol, digest = load_pilot_protocol(args.protocol)
@@ -402,6 +443,8 @@ def main() -> None:
         parser.error("provider differs from the frozen pilot protocol")
     if args.provider == "mock" and args.cluster_compute:
         parser.error("mock smoke cannot be labelled as cluster compute")
+    if args.provider != "mock":
+        validate_serving_stack(protocol)
     release_audit, fixtures, oracle_rows = _load_sources(
         protocol, args.combined_protocol, args.release_audit,
         args.release_fixtures, args.base_full_audit,
@@ -419,7 +462,8 @@ def main() -> None:
             base_url=args.base_url)
     report = run_pilot(
         protocol, digest, llm, args.provider, release_audit,
-        fixtures, oracle_rows, args.out, cluster_compute=args.cluster_compute)
+        fixtures, oracle_rows, args.out, cluster_compute=args.cluster_compute,
+        max_new_queries=args.max_new_queries)
     print(json.dumps({
         "protocol_id": report["protocol_id"],
         "protocol_digest": report["protocol_digest"],

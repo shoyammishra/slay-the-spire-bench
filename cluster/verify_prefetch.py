@@ -27,7 +27,7 @@ NOT set HF_HUB_OFFLINE=1 for this call.
 USAGE
 -----
     export HF_HOME=/scratch/$USER/hf
-    python cluster/verify_prefetch.py Qwen/Qwen3-235B-A22B-FP8
+    python cluster/verify_prefetch.py Qwen/Qwen3-32B <revision-sha>
 
 Exit 0 = complete and byte-exact (safe to submit). Exit 1 = incomplete; rerun
 `hf download <repo>`, which fetches only the gaps.
@@ -37,16 +37,16 @@ import sys
 
 
 def main(argv):
-    if len(argv) != 2:
+    if len(argv) not in (2, 3):
         print(__doc__.strip().split("USAGE")[-1])
         return 2
     repo = argv[1]
+    requested_revision = argv[2] if len(argv) == 3 else None
 
     hf_home = os.environ.get("HF_HOME")
     if not hf_home:
-        print("ERROR: HF_HOME is not set. On Sharanga: export HF_HOME=/scratch/$USER/hf")
-        print("(Without it the cache defaults to ~/.cache/huggingface, and HOME is")
-        print(" capped at 40 GiB -- a large model will wedge against the quota.)")
+        print("ERROR: HF_HOME is not set. Point it at the cluster's scratch storage.")
+        print("Without it, a large model may exhaust the home-directory quota.")
         return 1
     if os.environ.get("HF_HUB_OFFLINE"):
         print("ERROR: HF_HUB_OFFLINE is set; this check must read the remote manifest.")
@@ -69,11 +69,16 @@ def main(argv):
     if not revs:
         print(f"NOT PREFETCHED: {snaps} has no revision directory")
         return 1
-    if len(revs) > 1:
-        print(f"note: {len(revs)} revisions cached; checking the newest ({revs[-1]})")
-    snapshot = os.path.join(snaps, revs[-1])
+    revision = requested_revision or revs[-1]
+    if revision not in revs:
+        print(f"NOT PREFETCHED: requested revision {revision} is absent from {snaps}")
+        return 1
+    if not requested_revision and len(revs) > 1:
+        print(f"note: {len(revs)} revisions cached; checking {revision}")
+    snapshot = os.path.join(snaps, revision)
 
-    info = HfApi().model_info(repo, files_metadata=True)
+    info = HfApi().model_info(
+        repo, revision=requested_revision, files_metadata=True)
     missing, mismatched, total, expected = [], [], 0, 0
     for s in info.siblings:
         if s.size is None:          # no metadata (e.g. a directory entry) -> skip
@@ -94,7 +99,7 @@ def main(argv):
         incomplete = [f for f in os.listdir(blobs) if f.endswith(".incomplete")]
 
     print(f"repo          : {repo}")
-    print(f"revision      : {revs[-1]}")
+    print(f"revision      : {revision}")
     print(f"files         : {len(info.siblings)}  missing: {len(missing)}  "
           f"size-mismatch: {len(mismatched)}")
     print(f"local total   : {total / 1e9:.1f} GB   (manifest {expected / 1e9:.1f} GB)")

@@ -1410,13 +1410,24 @@ def test_controlled_horizon_model_pilot_is_locked_balanced_and_model_blind():
     import copy
     import hashlib
     from scripts.controlled_horizon_model_pilot import (
-        load_pilot_protocol, select_pilot_fixtures)
+        load_pilot_protocol, select_pilot_fixtures, validate_serving_stack)
 
     protocol, digest = load_pilot_protocol()
-    assert digest == "4a56e3c5762e8caf228747961d2b7984d9273e2efebbda29d8cb529996851004"
+    assert digest == "465bab1dc23dddf5c5566c91943efaebc44ac3ab316ffb2003f15e01046a104f"
     assert protocol["inference"]["expected_query_count"] == 120
     assert protocol["decision_policy"]["confirmatory_matrix_reuses_pilot_responses"] is False
     assert protocol["pilot_gate"]["observed_effect_sign_used_for_go_no_go"] is False
+    expected_stack = protocol["inference"]["serving_stack"]
+    validate_serving_stack(protocol, {
+        "vllm": expected_stack["vllm_version"],
+        "transformers": expected_stack["transformers_version"],
+    })
+    try:
+        validate_serving_stack(protocol, {
+            "vllm": "wrong", "transformers": expected_stack["transformers_version"]})
+        raise AssertionError("mismatched serving stack was accepted")
+    except ValueError as exc:
+        assert "vllm" in str(exc)
 
     protocol = copy.deepcopy(protocol)
     dispositions = []
@@ -1474,6 +1485,70 @@ def test_controlled_horizon_pilot_scores_only_frozen_oracle_values():
     assert invalid["parse_ok"] and not invalid["schema_ok"] and not invalid["legal"]
     assert invalid["normalized_quality"] is None
     print("[PASS] model pilot scores against frozen values and rejects bad schema")
+
+
+def test_controlled_horizon_pilot_query_budget_checkpoints_and_resumes():
+    import copy
+    import hashlib
+    from pathlib import Path
+    from tempfile import TemporaryDirectory
+    from scripts.controlled_horizon_model_pilot import (
+        load_pilot_protocol, run_pilot)
+    from slay_bench.benchmark import MockLLM
+    from slay_bench.controlled_horizon import create_fixture
+
+    protocol, _digest = load_pilot_protocol()
+    protocol = copy.deepcopy(protocol)
+    dispositions = []
+    fixtures = {}
+    oracle_rows = {}
+    for char_index, character in enumerate(("ironclad", "silent")):
+        for sensitive, count in ((True, 4), (False, 11)):
+            for ordinal in range(count):
+                fixture_id = f"budget-{character}-{sensitive}-{ordinal}"
+                dispositions.append({
+                    "fixture_id": fixture_id,
+                    "character": character,
+                    "h1_h8_sensitive": sensitive,
+                    "released": True,
+                })
+                fixture, _state = create_fixture(
+                    character, 70000 + char_index * 100 + len(fixtures),
+                    ("Cultist",))
+                fixture.fixture_id = fixture_id
+                fixtures[fixture_id] = fixture
+                oracle_rows[fixture_id] = {"oracles": {
+                    str(horizon): {
+                        "exact": True,
+                        "best_value": 1.0,
+                        "worst_value": 0.0,
+                        "action_values": {"end_turn:-1:-1": 1.0},
+                    }
+                    for horizon in protocol["inference"]["horizons"]
+                }}
+    ids = sorted(item["fixture_id"] for item in dispositions)
+    protocol["pilot_sample"]["selected_fixture_ids_sha256"] = hashlib.sha256(
+        ("\n".join(ids) + "\n").encode("utf-8")).hexdigest()
+    release = {
+        "release_gate_passed": True,
+        "selection": {"dispositions": dispositions},
+    }
+    llm = MockLLM([
+        '{"action":"end_turn","card_index":-1,"target_index":-1}'
+    ])
+    with TemporaryDirectory() as directory:
+        output = Path(directory) / "pilot.json"
+        first = run_pilot(
+            protocol, "test-protocol-digest", llm, "mock", release,
+            fixtures, oracle_rows, output, max_new_queries=1)
+        assert first["completed_queries"] == 1 and not first["complete"]
+        second = run_pilot(
+            protocol, "test-protocol-digest", llm, "mock", release,
+            fixtures, oracle_rows, output, max_new_queries=1)
+        assert second["completed_queries"] == 2 and not second["complete"]
+        assert len({(row["fixture_id"], row["horizon"])
+                    for row in second["rows"]}) == 2
+    print("[PASS] controlled-H query budget checkpoints once and resumes")
 
 
 def test_controlled_horizon_memoized_oracle_matches_full_tree():
@@ -1649,6 +1724,7 @@ if __name__ == "__main__":
         test_controlled_horizon_combined_release_is_locked_and_control_only,
         test_controlled_horizon_model_pilot_is_locked_balanced_and_model_blind,
         test_controlled_horizon_pilot_scores_only_frozen_oracle_values,
+        test_controlled_horizon_pilot_query_budget_checkpoints_and_resumes,
         test_controlled_horizon_memoized_oracle_matches_full_tree,
         test_controlled_horizon_oracle_wall_time_fails_closed,
         test_controlled_horizon_checkpoint_write_is_atomic,

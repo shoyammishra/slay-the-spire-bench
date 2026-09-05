@@ -20,8 +20,17 @@
   "inference": {
     "model_family": "qwen3",
     "model_repository": "Qwen/Qwen3-32B",
+    "model_revision": "9216db5781bf21249d130ec9da846c4624c16137",
     "served_model_name": "qwen3-32b",
     "provider": "local",
+    "serving_stack": {
+      "engine": "vllm",
+      "vllm_version": "0.8.5.post1",
+      "transformers_version": "4.51.3",
+      "tensor_parallel_size": 1,
+      "max_model_len": 16384,
+      "gpu_memory_utilization": 0.95
+    },
     "prompt_format": "structured",
     "horizons": [1, 2, 4, 8],
     "horizon_query_order": "balanced four-sequence Latin rotation assigned by sha256(protocol_id:query-order:fixture_id) rank within character",

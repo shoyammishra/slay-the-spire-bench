@@ -1,5 +1,39 @@
 # Decision Log
 
+## 2026-09-04 — Pin the CSIS deployment before controlled-H model inference
+
+**Problem.** Sharanga entered an approximately 15-day maintenance window, so the
+Qwen3-32B pilot must move to BITS CSIS. The initial pilot freeze named a Hugging Face
+repository but not an immutable revision or complete serving stack. Redownloading
+`main` could therefore change the evaluated weights, and the legacy CSIS helper uses
+broad account-level stale-process cleanup that is inappropriate for a shared system.
+
+**Options considered.** (a) wait for Sharanga; (b) download the current unpinned model
+and use the generic launcher; (c) amend the still model-free pilot protocol with an
+immutable model revision and serving stack, then add a dedicated CSIS launcher with
+job-owned cleanup and a one-query checkpoint gate.
+
+**Decision: (c).** The active pilot digest is `465bab1d…104f`, superseding the
+no-inference digest `4a56e3c5…1004` before any model call. It pins
+`Qwen/Qwen3-32B` revision `9216db57…6137`, vLLM 0.8.5.post1, Transformers 4.51.3,
+TP=1, maximum model length 16,384, and GPU memory utilization .95. The download script
+verifies the exact remote manifest. The Slurm job validates source hashes, the cached
+revision, and runtime versions before serving. Its default `smoke` phase makes exactly
+one frozen pilot call and atomically checkpoints it; after inspection, `full` resumes
+the remaining 119 calls and applies the frozen power gate. Cleanup targets only the
+process group created by that job. Cluster login details, user paths, and raw logs
+remain uncommitted.
+
+**Trade-offs, invalidation, and reversal.** The deployment pin changes the protocol
+digest and requires rerunning the no-inference mock under the active digest; the prior
+mock remains historical stack validation and contains no model evidence. The fixture
+selection and statistical gates are unchanged because the protocol ID and model-blind
+selection rule are unchanged. CSIS and Sharanga results must not be mixed unless they
+use this exact weight revision and serving contract. Reverse by freezing a new digest
+before inference; never relabel outputs from a different stack. Preparing files and
+download commands does not submit a job; the user performs the explicit CSIS download
+and Slurm submissions.
+
 ## 2026-09-04 — Freeze the controlled-H cheap-model pilot before inference
 
 **Problem.** The separately labelled combined release passed its 200-fixture oracle

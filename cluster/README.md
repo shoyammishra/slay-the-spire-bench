@@ -7,6 +7,11 @@ the benchmark against it over `localhost`, using the repo's `--provider local`
 adapter. Full cluster policy is in the department's CSIS cluster SOP (internal
 doc, not committed to this public repo — keep your copy locally).
 
+For the current controlled-H Qwen3-32B pilot, use the dedicated, revision-pinned
+runbook in `cluster/CSIS_CONTROLLED_H_PILOT.md`. Its launcher avoids the legacy
+shared helper's broad stale-process cleanup and supports a one-query checkpoint smoke
+before resuming the remaining 119 frozen pilot calls.
+
 > **Login IP, support email, and room are intentionally omitted** — this is a
 > public repo. Get the real login-node IP and support contact from the
 > department's CSIS cluster SOP (the internal PDF the professor shared), and

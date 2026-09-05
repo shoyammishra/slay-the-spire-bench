@@ -1,5 +1,35 @@
 # Experiment Log
 
+## 2026-09-04 — CSIS controlled-H deployment prepared; no cluster job submitted
+
+**No model, API, GPU, or cluster inference ran.** In response to Sharanga's expected
+15-day maintenance window, the pilot deployment was moved to BITS CSIS and frozen
+before redownloading weights. The official Hugging Face model metadata resolved
+`Qwen/Qwen3-32B` to immutable revision
+`9216db5781bf21249d130ec9da846c4624c16137`. Adding that revision and the validated
+CSIS vLLM/Transformers/one-A100 serving contract changed the active protocol digest
+from the historical no-inference `4a56e3c5…1004` to `465bab1d…104f`; fixture IDs and
+statistical gates did not change.
+
+The new login-node prefetch script downloads and manifest-verifies only the pinned
+revision. The dedicated Slurm launcher checks all four ignored source artifacts,
+offline cache presence, runtime versions, and the exact server arguments before a
+call. It uses a unique per-job localhost port and terminates only its recorded vLLM
+process group. `PILOT_PHASE=smoke` checkpoints one real query; `PILOT_PHASE=full`
+resumes the same output through 120/120 and then runs the frozen power analysis. The
+runner now records the model revision, expected serving contract, and actual package
+versions and supports a positive `--max-new-queries` checkpoint budget.
+
+Local validation passed all four direct test files (**194/194**: benchmark 68, combat
+62, run 36, stats 28), including a two-step one-query checkpoint/resume regression.
+A complete 120-query real-artifact mock under the active digest had 100% parsing and
+legality per character and H with zero truncations; its quality values are diagnostics,
+not model evidence. Python compilation and the prospective-power command passed. Bash
+syntax validation could not run on the initial PATH, but both new files subsequently
+passed `bash -n` with the installed Git Bash executable. Repeating `bash -n` on the
+CSIS login node remains part of the operator preflight. No weight download or remote
+submission was attempted locally.
+
 ## 2026-09-04 — Controlled-H model-pilot protocol and no-inference stack pass
 
 **No model, API, GPU, or cluster inference ran.** The cheap-model pilot was frozen in
