@@ -79,18 +79,18 @@ ICML 2027 has not published official submission dates as of 2026-08-31. Recent I
 full-paper deadlines fell in late January. The dates below are internal planning
 targets, not official deadlines:
 
-| Internal target | Date |
-|---|---|
-| Controlled-H preregistration frozen | 2026-09-15 |
-| Fixture generator and 200 model-blind fixtures | 2026-10-15 |
-| Exact-oracle, treatment-strength, and baseline gate | 2026-10-31 |
-| Cheap-model pilot and power analysis | 2026-11-15 |
-| Authorized multi-family controlled-H matrix complete | 2026-12-15 |
-| Statistics, conformance, agency ablation, and traces frozen | 2027-01-05 |
-| Complete ICML-format manuscript | 2027-01-10 |
-| Internal paper and artifact freeze | **2027-01-15** |
-| Provisional abstract planning date | 2027-01-22 |
-| Provisional full-paper planning date | 2027-01-28 |
+| Internal target | Date | Status |
+|---|---|---|
+| Controlled-H preregistration frozen | 2026-09-15 | Completed 2026-08-31 |
+| Fixture generator and 200 model-blind fixtures | 2026-10-15 | Completed 2026-09-04 under the disclosed combined protocol |
+| Exact-oracle, treatment-strength, and baseline gate | 2026-10-31 | Completed 2026-09-04; combined fixture gate GO |
+| Cheap-model pilot and power analysis | 2026-11-15 | Next critical path |
+| Authorized multi-family controlled-H matrix complete | 2026-12-15 | Pending pilot and authorization |
+| Statistics, conformance, agency ablation, and traces frozen | 2027-01-05 | Pending |
+| Complete ICML-format manuscript | 2027-01-10 | Pending |
+| Internal paper and artifact freeze | **2027-01-15** | Pending |
+| Provisional abstract planning date | 2027-01-22 | Not an official deadline |
+| Provisional full-paper planning date | 2027-01-28 | Not an official deadline |
 
 Official dates replace the provisional dates immediately when ICML publishes its
 2027 call.

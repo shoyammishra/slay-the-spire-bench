@@ -1,5 +1,34 @@
 # Experiment Log
 
+## 2026-09-04 — Silent extension complete; combined 200-fixture release passes
+
+**No model, API, GPU, or cluster inference ran.** The frozen 50-row Silent-control
+extension completed with 22 exact H=1/H=8-insensitive controls, four exact sensitive
+rows, and 24 registered H=8 budget failures. Its final artifact has clean provenance
+at commit `fdac980`, protocol digest `43d9c7b3…7995`, and SHA-256
+`2a73203b…40961`. Together with the 70 base Silent controls, the extension supplied
+ample feasibility margin (92 available versus 75 required).
+
+The combined release was frozen separately in
+`configs/controlled_h_v2_combined_release.json`, protocol
+`controlled-h-v2-plus-silent-extension-release-2026-09-04`, digest
+`71461857…db99b`. It binds both full-audit source hashes, preserves
+`original_v2_release_gate_passed=false`, and permits extension rows to supply Silent
+controls only. Deterministic original-namespace ranking selected 185 base rows and 15
+extension controls. The release passed with 200/200 unique fixtures: exactly 25
+sensitive + 75 controls for Ironclad and 25 sensitive + 75 controls for Silent;
+`sensitive_fraction=0.25` and `shortfalls=[]`.
+
+An independent audit of every selected row confirmed: no oracle errors; exactness at
+H={1,2,4,8}; structured/raw prompt invariance; nonzero H=8 value span; positive H=1-
+mismatch regret for all 50 sensitive rows; exact character/stratum and source counts;
+and unique fixture IDs matching the released fixture payload. Ignored local artifacts
+are `results/controlled_h_v2_combined_release_audit.json` (SHA-256
+`402474bd…71e5c`) and `results/controlled_h_v2_combined_release_fixtures.json`
+(SHA-256 `2955d976…c7f27`). The fixture/oracle gate is now GO for designing and freezing
+the cheap model pilot. Model inference itself remains stopped pending its protocol,
+power analysis, exact-stack smoke, and explicit compute authorization.
+
 ## 2026-09-04 — Frozen controlled-H v2 full audit fails Silent-control quota; extension frozen
 
 **No model, API, GPU, or cluster inference ran.** The local exact-oracle full stage

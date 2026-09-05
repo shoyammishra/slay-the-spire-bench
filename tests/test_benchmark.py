@@ -1333,6 +1333,78 @@ def test_controlled_horizon_silent_extension_is_digest_locked_and_next_ranked():
     print("[PASS] Silent extension is digest-locked and selects the next rank slice")
 
 
+def test_controlled_horizon_combined_release_is_locked_and_control_only():
+    import copy
+    from scripts.controlled_horizon_combined_release import (
+        load_combined_protocol, select_combined_release)
+    from scripts.controlled_horizon_pilot import (
+        load_frozen_protocol, select_frozen_release)
+
+    base, _base_digest = load_frozen_protocol()
+    combined, digest = load_combined_protocol()
+    assert digest == "71461857bc2296e09769f8c886b0618ea3651757d438ff02bb4d8ab2380db99b"
+    assert not combined["selection"]["extension_may_supply_h1_h8_sensitive"]
+    assert combined["failure_policy"]["original_v2_gate_remains_failed"]
+
+    base = copy.deepcopy(base)
+    base["release"].update({
+        "fixtures_per_character": 2,
+        "h1_h8_sensitive_per_character": 1,
+        "h1_h8_insensitive_per_character": 1,
+        "minimum_sensitive_fraction": 0.2,
+    })
+    combined = copy.deepcopy(combined)
+    combined["selection"].update({
+        "fixtures_per_character": 2,
+        "h1_h8_sensitive_per_character": 1,
+        "h1_h8_insensitive_per_character": 1,
+    })
+    action_a = {"action": "end_turn", "card_index": -1, "target_index": -1}
+    action_b = {"action": "play", "card_index": 0, "target_index": 0}
+
+    def row(fixture_id, character, sensitive):
+        def oracle(action, regret):
+            return {
+                "exact": True,
+                "optimal_actions": [action],
+                "zero_span": False,
+                "baselines": {"h1_mismatched_oracle": {"regret": regret}},
+            }
+        return {
+            "fixture": {"fixture_id": fixture_id, "character": character},
+            "prompt_only_h_changes": True,
+            "error": None,
+            "oracles": {
+                "1": oracle(action_a, 0),
+                "2": oracle(action_a, 0),
+                "4": oracle(action_a, 0),
+                "8": oracle(action_b if sensitive else action_a,
+                            1 if sensitive else 0),
+            },
+        }
+
+    base_rows = [
+        row("base-ic-sensitive", "ironclad", True),
+        row("base-ic-control", "ironclad", False),
+        row("base-silent-sensitive", "silent", True),
+    ]
+    extension_rows = [
+        row("extension-silent-control", "silent", False),
+        row("extension-silent-sensitive", "silent", True),
+    ]
+    assert not select_frozen_release(base_rows, base)["release_gate_passed"]
+    release = select_combined_release(
+        base_rows, extension_rows, base, combined)
+    assert release["release_gate_passed"]
+    assert len(release["selected_fixture_ids"]) == 4
+    assert release["selected_source_counts"] == {
+        "base": 3, "silent_control_extension": 1}
+    assert release["allowed_extension_control_fixture_ids"] == [
+        "extension-silent-control"]
+    assert "extension-silent-sensitive" not in release["selected_fixture_ids"]
+    print("[PASS] combined release is locked and accepts extension controls only")
+
+
 def test_controlled_horizon_memoized_oracle_matches_full_tree():
     from slay_bench.controlled_horizon import create_fixture, exact_action_values
 
@@ -1503,6 +1575,7 @@ if __name__ == "__main__":
         test_controlled_horizon_frozen_protocol_is_digest_locked_and_balanced,
         test_controlled_horizon_frozen_funnel_is_deterministic_and_fails_closed,
         test_controlled_horizon_silent_extension_is_digest_locked_and_next_ranked,
+        test_controlled_horizon_combined_release_is_locked_and_control_only,
         test_controlled_horizon_memoized_oracle_matches_full_tree,
         test_controlled_horizon_oracle_wall_time_fails_closed,
         test_controlled_horizon_checkpoint_write_is_atomic,

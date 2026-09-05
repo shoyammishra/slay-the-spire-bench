@@ -1,5 +1,40 @@
 # Decision Log
 
+## 2026-09-04 — Accept a separately labelled 200-fixture combined controlled-H release
+
+**Problem.** The frozen Silent-control extension completed all 50 rows and produced
+22 exact controls, four exact H=1/H=8-sensitive rows, and 24 registered timeouts. This
+is enough to repair the original five-control shortfall, but simply rerunning the v2
+release command or relabelling v2 as passed would erase the sequential extension from
+the provenance.
+
+**Options considered.** (a) overwrite the original v2 release outcome; (b) take the
+first five observed extension controls; (c) freeze both source hashes and apply the
+original character/sensitivity quotas and rank rule to the union, while permitting
+extension rows to contribute only Silent controls. Options (a) and (b) respectively
+misstate the registered outcome and introduce completion-order selection.
+
+**Decision: (c).** Protocol
+`controlled-h-v2-plus-silent-extension-release-2026-09-04`, digest
+`71461857…db99b`, binds the complete base and extension artifacts by SHA-256. It keeps
+the original v2 gate false, excludes every extension timeout and sensitive row, and
+reruns the original SHA-256 rank-within-character-and-sensitivity selection over base
+rows plus the 22 eligible extension controls. The combined gate passes with exactly
+200 unique fixtures: 25 sensitive + 75 controls for each character. The selected set
+contains 185 base fixtures and 15 extension controls. An independent per-fixture audit
+confirmed exact H={1,2,4,8} oracles, prompt invariance, nonzero H=8 spans, positive H=1
+mismatch regret on every sensitive row, character/stratum counts, source counts, and
+fixture-ID uniqueness. This authorizes pilot-protocol design, not model inference;
+paid/API/GPU/cluster execution still requires explicit user authorization.
+
+**Trade-offs, invalidation, and reversal.** The release is scientifically usable only
+under its combined label and with the sequential feasibility repair disclosed. It is
+not evidence that the original v2 preregistration passed, and its fixed 25% sensitive
+composition is not a natural prevalence estimate. No prior model result is invalidated
+because no controlled-H model has run. Reverse only if a later audit finds a source-
+hash, oracle, prompt, or selection defect; that would invalidate the combined release
+and require a versioned fixture rebuild before inference.
+
 ## 2026-09-04 — Preserve the failed v2 gate; freeze a Silent-control extension
 
 **Problem.** The frozen controlled-H v2 full audit completed all 483 advanced rows.

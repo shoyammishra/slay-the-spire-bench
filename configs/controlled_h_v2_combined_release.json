@@ -1,0 +1,38 @@
+{
+  "protocol_id": "controlled-h-v2-plus-silent-extension-release-2026-09-04",
+  "instrument_version": "controlled-decision-horizon-v2",
+  "status": "frozen-before-combined-release-selection",
+  "base_protocol": {
+    "protocol_id": "controlled-h-v2-fixtures-2026-08-31",
+    "protocol_digest": "78a768f7fb27ecfba3d8c2cb4bee47ce3284c427fe6ea22b2a6dd64c70c5f110",
+    "full_artifact_sha256": "94f376b546bbbabe82db01c182c9f034f786cc8dc7c99d3552ddffb37f25aca1",
+    "release_gate_passed": false
+  },
+  "silent_control_extension": {
+    "protocol_id": "controlled-h-v2-silent-control-extension-2026-09-04",
+    "protocol_digest": "43d9c7b37e41b1dbf3e3a066dfe0b868e063df54a35e6808dc9863aa9d617995",
+    "full_artifact_sha256": "2a73203b860489aa86064bb8e4c6691eea989e4536c5bfe86e8c19d1c4c40961",
+    "completed_fixture_rows": 50,
+    "exact_h1_h8_insensitive_rows": 22,
+    "exact_h1_h8_sensitive_rows": 4,
+    "budget_failure_rows": 24
+  },
+  "selection": {
+    "characters": ["ironclad", "silent"],
+    "fixtures_per_character": 100,
+    "h1_h8_sensitive_per_character": 25,
+    "h1_h8_insensitive_per_character": 75,
+    "rank_namespace_protocol_id": "controlled-h-v2-fixtures-2026-08-31",
+    "rank_within_character_and_sensitivity": "sha256(rank_namespace_protocol_id:fixture_id)",
+    "extension_may_supply_character": "silent",
+    "extension_may_supply_h1_h8_sensitive": false,
+    "base_rows_remain_eligible_under_original_release_contract": true
+  },
+  "failure_policy": {
+    "source_hash_mismatch": "fail-closed",
+    "source_incomplete": "fail-closed",
+    "quota_shortfall": "fail-closed-with-zero-release-fixtures",
+    "original_v2_gate_remains_failed": true,
+    "model_behavior_used_for_selection": false
+  }
+}

@@ -83,7 +83,16 @@ Single source of truth stays where it already lives (see §2).
   `configs/controlled_h_v2_silent_control_extension.json` (digest `43d9c7b3…7995`):
   audit the next 50 original-rank Silent screen-insensitive candidates under unchanged
   exact-oracle budgets. It may repair a combined release but never relabel v2 as passed.
-  No model inference is authorized until that extension and combined gate pass.
+  **Completed later 2026-09-04:** the extension yielded 22 controls, four sensitive
+  rows, and 24 timeouts across all 50 dispositions.
+- **Combined controlled-H fixture gate GO (2026-09-04):** the separately frozen
+  combined protocol `controlled-h-v2-plus-silent-extension-release-2026-09-04`
+  (digest `71461857…db99b`) passed with 200 unique fixtures, exactly 25 sensitive +
+  75 controls per character. It selected 185 base rows and 15 extension controls; an
+  independent audit passed every exactness, prompt, span, mismatch, balance, source,
+  and uniqueness check. The original v2 gate remains failed and the sequential repair
+  must be disclosed. Next freeze the model-pilot sampling and power plan; no model
+  inference is yet authorized.
 
 - **Active supersession (2026-08-30):** the open-model matrix now has 28 canonical
   aggregates (7 configurations × 2 characters × 2 formats), including the complete
@@ -307,13 +316,13 @@ chain-of-thought — is only catchable by smoke).
 5. ~~Complete the frozen v2 full audit and release gate.~~ — done; 483/483 rows were
    accounted, but the balanced release failed closed because Silent supplied 70/75
    controls. Ironclad passed independently; do not call v2 passed.
-6. Run the frozen 50-row Silent-control extension and audit a separately labelled
-   combined fixture release. If it cannot supply five additional exact insensitive
-   controls, fail closed and version a redesigned Silent family rather than extending
-   this tranche again. Only after the combined gate passes should a separately
-   authorized cheap 30-fixture model pilot and power simulation run.
-7. Keep all paid/API/cluster/model calls stopped until the gates pass and the user
-   authorizes the concrete run.
+6. ~~Run the frozen 50-row Silent-control extension and audit a separately labelled
+   combined fixture release.~~ — done; the extension supplied 22 controls, and the
+   combined 200-fixture gate passed all registered and independent checks.
+7. Freeze the cheap-model pilot protocol and power analysis, then run an exact-stack
+   smoke. The fixture gate alone does not authorize inference.
+8. Keep all paid/API/cluster/model calls stopped until the pilot protocol passes and
+   the user authorizes the concrete run.
 
 The older numbered table below is retained as project history. Any row that depends on
 the retired cross-task horizon construct is superseded by this critical path and the
