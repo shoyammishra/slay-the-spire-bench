@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import argparse
 import collections
+import copy
 import datetime as dt
 import hashlib
 import importlib.metadata
@@ -33,10 +34,12 @@ from scripts.controlled_horizon_silent_extension import (  # noqa: E402
 )
 from slay_bench.benchmark import MockLLM  # noqa: E402
 from slay_bench.controlled_horizon import (  # noqa: E402
+    CONTROLLED_ACTION_SCORING_VERSION,
     CONTROLLED_HORIZON_VERSION,
     ControlledAction,
     ControlledFixture,
     build_prompt,
+    canonicalize_action_for_values,
     load_fixture,
 )
 
@@ -214,6 +217,9 @@ def score_precomputed_oracle(oracle_row: dict, horizon: int,
         schema_ok = True
     except (AttributeError, TypeError, ValueError):
         chosen = ControlledAction("invalid")
+    response_action = chosen
+    chosen, normalization = canonicalize_action_for_values(
+        chosen, oracle["action_values"])
     key = f"{chosen.action}:{chosen.card_index}:{chosen.target_index}"
     chosen_value = oracle["action_values"].get(key)
     legal = schema_ok and chosen_value is not None
@@ -225,10 +231,16 @@ def score_precomputed_oracle(oracle_row: dict, horizon: int,
             chosen_value - oracle["worst_value"]) / span
     return {
         "chosen_action": {
+            "action": response_action.action,
+            "card_index": response_action.card_index,
+            "target_index": response_action.target_index,
+        },
+        "scored_action": {
             "action": chosen.action,
             "card_index": chosen.card_index,
             "target_index": chosen.target_index,
         },
+        "action_normalization": normalization,
         "parse_ok": parse_ok,
         "schema_ok": schema_ok,
         "legal": legal,
@@ -296,6 +308,48 @@ def _summarize(rows: list[dict], protocol: dict) -> dict:
     }
 
 
+def rescore_checkpoint(report: dict, protocol: dict, protocol_digest: str,
+                       oracle_rows: dict) -> dict:
+    """Apply the versioned semantic-action correction without model inference."""
+    if report.get("protocol_digest") != protocol_digest:
+        raise ValueError("pilot checkpoint protocol digest differs from the freeze")
+    if report.get("provider") != protocol["inference"]["provider"]:
+        raise ValueError("only the frozen local-provider checkpoint may be rescored")
+    rows = report.get("rows")
+    if not isinstance(rows, list) or not rows:
+        raise ValueError("pilot checkpoint has no rows to rescore")
+    if report.get("completed_queries") != len(rows):
+        raise ValueError("pilot checkpoint row count is inconsistent")
+    query_keys = [(row.get("fixture_id"), row.get("horizon")) for row in rows]
+    if len(set(query_keys)) != len(query_keys):
+        raise ValueError("pilot checkpoint contains duplicate queries")
+    normalized = 0
+    legality_changes = 0
+    for row in rows:
+        fixture_id = row.get("fixture_id")
+        horizon = row.get("horizon")
+        if fixture_id not in oracle_rows:
+            raise ValueError(f"missing frozen oracle for {fixture_id}")
+        if "score_before_action_normalization" not in row:
+            row["score_before_action_normalization"] = copy.deepcopy(row["score"])
+        before_legal = bool(row["score_before_action_normalization"].get("legal"))
+        row["score"] = score_precomputed_oracle(
+            oracle_rows[fixture_id], horizon, row.get("response_parsed"))
+        normalized += row["score"]["action_normalization"] is not None
+        legality_changes += before_legal != row["score"]["legal"]
+    report["action_scoring_version"] = CONTROLLED_ACTION_SCORING_VERSION
+    report["scoring_correction"] = {
+        "kind": "non_targeted_card_target_index_normalization",
+        "model_inference_performed": False,
+        "rows_rescored": len(rows),
+        "rows_normalized": normalized,
+        "legality_changes": legality_changes,
+        "original_scores_preserved_per_row": True,
+    }
+    report["summary"] = _summarize(rows, protocol)
+    return report
+
+
 def run_pilot(protocol: dict, protocol_digest: str, llm, provider: str,
               release_audit: dict, fixtures: dict, oracle_rows: dict,
               output: Path, cluster_compute: bool = False,
@@ -309,6 +363,12 @@ def run_pilot(protocol: dict, protocol_digest: str, llm, provider: str,
                   or prior.get("provenance", {}).get("cluster_compute")
                   != cluster_compute):
         raise ValueError("existing pilot checkpoint differs from this invocation")
+    if (prior and prior.get("rows")
+            and prior.get("action_scoring_version")
+            != CONTROLLED_ACTION_SCORING_VERSION):
+        raise ValueError(
+            "existing pilot checkpoint uses the superseded action scorer; "
+            "run once with --rescore-existing before resuming inference")
     created_at = (prior or {}).get(
         "created_at_utc", dt.datetime.now(dt.timezone.utc).isoformat())
     rows = list((prior or {}).get("rows", []))
@@ -325,11 +385,12 @@ def run_pilot(protocol: dict, protocol_digest: str, llm, provider: str,
         raise ValueError("pilot checkpoint contains duplicate queries")
 
     def report() -> dict:
-        return {
+        current = {
             "result_schema_version": "2.0",
             "run_kind": "controlled-h-model-pilot" if provider != "mock"
                         else "controlled-h-no-inference-smoke",
             "instrument_version": protocol["instrument_version"],
+            "action_scoring_version": CONTROLLED_ACTION_SCORING_VERSION,
             "protocol_id": protocol["protocol_id"],
             "protocol_digest": protocol_digest,
             "created_at_utc": created_at,
@@ -357,6 +418,9 @@ def run_pilot(protocol: dict, protocol_digest: str, llm, provider: str,
             "summary": _summarize(rows, protocol),
             "rows": rows,
         }
+        if prior and "scoring_correction" in prior:
+            current["scoring_correction"] = prior["scoring_correction"]
+        return current
 
     decision_by_id = {
         item["fixture_id"]: item for item in selection["decisions"]}
@@ -444,11 +508,35 @@ def main() -> None:
     parser.add_argument("--cluster-compute", action="store_true",
                         help="Record that the local provider is served on a cluster")
     parser.add_argument(
+        "--rescore-existing", action="store_true",
+        help="Correct an existing checkpoint from saved responses; make no model calls")
+    parser.add_argument(
         "--max-new-queries", type=int,
         help="Checkpoint after this many new calls; use 1 for the real-stack smoke")
     parser.add_argument("--out", type=Path, required=True)
     args = parser.parse_args()
     protocol, digest = load_pilot_protocol(args.protocol)
+    release_audit, fixtures, oracle_rows = _load_sources(
+        protocol, args.combined_protocol, args.release_audit,
+        args.release_fixtures, args.base_full_audit,
+        args.extension_full_audit, args.base_protocol,
+        args.extension_protocol)
+    if args.rescore_existing:
+        if not args.out.exists():
+            parser.error("--rescore-existing requires an existing --out checkpoint")
+        report = rescore_checkpoint(
+            json.loads(args.out.read_text(encoding="utf-8")),
+            protocol, digest, oracle_rows)
+        _atomic_write_json(args.out, report)
+        print(json.dumps({
+            "protocol_id": report["protocol_id"],
+            "protocol_digest": report["protocol_digest"],
+            "completed_queries": report["completed_queries"],
+            "action_scoring_version": report["action_scoring_version"],
+            "scoring_correction": report["scoring_correction"],
+            "summary": report["summary"],
+        }, sort_keys=True))
+        return
     if args.provider != "mock" and not args.authorize_model_inference:
         parser.error("non-mock pilot requires --authorize-model-inference")
     if args.provider != "mock" and args.provider != protocol["inference"]["provider"]:
@@ -457,11 +545,6 @@ def main() -> None:
         parser.error("mock smoke cannot be labelled as cluster compute")
     if args.provider != "mock":
         validate_serving_stack(protocol)
-    release_audit, fixtures, oracle_rows = _load_sources(
-        protocol, args.combined_protocol, args.release_audit,
-        args.release_fixtures, args.base_full_audit,
-        args.extension_full_audit, args.base_protocol,
-        args.extension_protocol)
     if args.provider == "mock":
         llm = MockLLM([
             '{"action":"end_turn","card_index":-1,"target_index":-1,'

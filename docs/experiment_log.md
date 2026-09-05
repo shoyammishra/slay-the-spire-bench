@@ -1,5 +1,35 @@
 # Experiment Log
 
+## 2026-09-04 — Qwen3-32B pilot stopped at 37/120; scorer defect isolated
+
+The resumed CSIS pilot reached an atomic checkpoint of 37/120 before it was stopped
+for an instrument audit. The stored rows contained 36 parse/schema successes, 20
+reported legal actions, and one truncated parse failure. The apparent legal rate
+(20/37) conflicted with mean normalized quality near the oracle ceiling, triggering
+the required per-sample audit rather than a model conclusion.
+
+All 16 schema-valid rejections supplied target zero for a non-targeted skill or power.
+For every rejected fixture/H/card tuple, the frozen oracle contains the corresponding
+`play:<card>:-1` action; it does not contain `play:<card>:0`. The prompt never documents
+that internal sentinel and illustrates a play with target zero, while the combat engine
+semantically ignores targets for non-targeted cards. Thus the 20/37 figure is an
+instrument artifact, not evidence of model illegality. Under the versioned narrow
+normalization, the same saved responses score 36/37 legal (97.3%); the single
+truncation remains a real failure. No Silent query had run yet.
+
+No replacement model calls were made. `controlled-action-scoring-v2.1` adds an
+explicit, lossless checkpoint migration: it keeps each original score, records raw
+and canonical actions plus the normalization reason, and recomputes only from saved
+parsed responses and frozen oracle values. Targeted-card indices remain exact. The
+original affected scores are quarantined; the 37 model responses remain usable for
+this non-confirmatory feasibility pilot after migration. Resume is blocked in code
+until the old checkpoint is explicitly rescored and inspected.
+
+Post-change validation passed all four direct test files (**196/196**: benchmark 70,
+combat 62, run 36, stats 28), Python compilation, `git diff --check`, and a fresh
+120-query no-inference controlled-H mock under the unchanged model-call protocol
+digest. The power tool rejected that mock as model-variance evidence, as designed.
+
 ## 2026-09-04 — CSIS deployment prepared; first submission scheduler-rejected
 
 **Operational addendum — first smoke submission rejected before execution.** The
@@ -14,14 +44,17 @@ one-query smoke passed all gates and shut down cleanly. Its first full-resume at
 then exceeded the legacy 300-second HTTP timeout twice on the next, still-uncheckpointed
 query. Because retrying a timed-out generation can leave the server finishing the old
 request while a duplicate is queued, the explicit job was canceled before exhausting
-all five attempts. The accepted smoke row remains intact; no additional row was
-recorded. The CSIS launcher now freezes a 900-second request timeout and exactly one
-network attempt. Every new row records those transport settings, while the existing
-smoke row is labelled with the known 300-second/five-attempt defaults. This operational
-change does not alter prompts, decoding, fixtures, or scoring; it prevents duplicate
+all five attempts. The next clean resume exposed the authoritative atomic checkpoint
+at 8/120: seven additional responses had completed and been persisted before the
+timeout. Those accepted rows remain valid; only the ninth query was uncheckpointed.
+The CSIS launcher now freezes a 900-second request timeout and exactly one network
+attempt. Every new row records those transport settings, while the existing eight rows
+are labelled with the known 300-second/five-attempt defaults. This operational change
+does not alter prompts, decoding, fixtures, or scoring; it prevents duplicate
 unobserved generations and preserves the active protocol digest.
 
-**No model, API, GPU, or cluster inference ran.** In response to Sharanga's expected
+**Deployment-preparation phase only:** no model, API, GPU, or cluster inference ran
+during the changes described in this paragraph. In response to Sharanga's expected
 15-day maintenance window, the pilot deployment was moved to BITS CSIS and frozen
 before redownloading weights. The official Hugging Face model metadata resolved
 `Qwen/Qwen3-32B` to immutable revision
@@ -39,7 +72,7 @@ resumes the same output through 120/120 and then runs the frozen power analysis.
 runner now records the model revision, expected serving contract, and actual package
 versions and supports a positive `--max-new-queries` checkpoint budget.
 
-Local validation passed all four direct test files (**194/194**: benchmark 68, combat
+Local validation at that stage passed all four direct test files (**194/194**: benchmark 68, combat
 62, run 36, stats 28), including a two-step one-query checkpoint/resume regression.
 A complete 120-query real-artifact mock under the active digest had 100% parsing and
 legality per character and H with zero truncations; its quality values are diagnostics,

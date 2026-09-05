@@ -1503,6 +1503,85 @@ def test_controlled_horizon_pilot_scores_only_frozen_oracle_values():
     print("[PASS] model pilot scores against frozen values and rejects bad schema")
 
 
+def test_controlled_horizon_pilot_normalizes_only_non_targeted_card_targets():
+    from scripts.controlled_horizon_model_pilot import score_precomputed_oracle
+
+    oracle_row = {"oracles": {"2": {
+        "exact": True,
+        "best_value": 10.0,
+        "worst_value": 0.0,
+        "action_values": {
+            "end_turn:-1:-1": 0.0,
+            "play:0:-1": 7.0,
+            "play:1:0": 10.0,
+            "play:1:1": 2.0,
+        },
+    }}}
+    skill = score_precomputed_oracle(
+        oracle_row, 2,
+        {"action": "play", "card_index": 0, "target_index": 0})
+    assert skill["legal"] and skill["chosen_action"]["target_index"] == 0
+    assert skill["scored_action"]["target_index"] == -1
+    assert skill["action_normalization"] == "ignored_target_for_non_targeted_card"
+    wrong_enemy = score_precomputed_oracle(
+        oracle_row, 2,
+        {"action": "play", "card_index": 1, "target_index": 2})
+    assert not wrong_enemy["legal"]
+    assert wrong_enemy["scored_action"]["target_index"] == 2
+    assert wrong_enemy["action_normalization"] is None
+    print("[PASS] pilot normalizes only irrelevant non-targeted-card targets")
+
+
+def test_controlled_horizon_checkpoint_rescore_preserves_original_score():
+    import copy
+    from scripts.controlled_horizon_model_pilot import (
+        load_pilot_protocol, rescore_checkpoint)
+
+    protocol, digest = load_pilot_protocol()
+    fixture_id = "synthetic-rescore"
+    response = {"action": "play", "card_index": 0, "target_index": 0}
+    original_score = {
+        "chosen_action": response,
+        "parse_ok": True,
+        "schema_ok": True,
+        "legal": False,
+        "chosen_value": None,
+        "optimal_value": 10.0,
+        "worst_value": 0.0,
+        "regret": None,
+        "normalized_quality": None,
+        "oracle_exact": True,
+    }
+    report = {
+        "protocol_digest": digest,
+        "provider": protocol["inference"]["provider"],
+        "completed_queries": 1,
+        "rows": [{
+            "fixture_id": fixture_id,
+            "horizon": 1,
+            "character": "ironclad",
+            "response_parsed": response,
+            "score": copy.deepcopy(original_score),
+            "diagnostics": {"truncated": False},
+        }],
+    }
+    oracle_rows = {fixture_id: {"oracles": {"1": {
+        "exact": True,
+        "best_value": 10.0,
+        "worst_value": 0.0,
+        "action_values": {"play:0:-1": 10.0},
+    }}}}
+    corrected = rescore_checkpoint(report, protocol, digest, oracle_rows)
+    row = corrected["rows"][0]
+    assert row["score_before_action_normalization"] == original_score
+    assert row["score"]["legal"] and row["score"]["normalized_quality"] == 1.0
+    assert corrected["scoring_correction"]["model_inference_performed"] is False
+    assert corrected["scoring_correction"]["legality_changes"] == 1
+    again = rescore_checkpoint(corrected, protocol, digest, oracle_rows)
+    assert again["rows"][0]["score_before_action_normalization"] == original_score
+    print("[PASS] checkpoint rescore is explicit, lossless, and idempotent")
+
+
 def test_controlled_horizon_pilot_query_budget_checkpoints_and_resumes():
     import copy
     import hashlib
@@ -1558,6 +1637,7 @@ def test_controlled_horizon_pilot_query_budget_checkpoints_and_resumes():
             protocol, "test-protocol-digest", llm, "mock", release,
             fixtures, oracle_rows, output, max_new_queries=1)
         assert first["completed_queries"] == 1 and not first["complete"]
+        assert first["action_scoring_version"] == "controlled-action-scoring-v2.1"
         second = run_pilot(
             protocol, "test-protocol-digest", llm, "mock", release,
             fixtures, oracle_rows, output, max_new_queries=1)
@@ -1740,6 +1820,8 @@ if __name__ == "__main__":
         test_controlled_horizon_combined_release_is_locked_and_control_only,
         test_controlled_horizon_model_pilot_is_locked_balanced_and_model_blind,
         test_controlled_horizon_pilot_scores_only_frozen_oracle_values,
+        test_controlled_horizon_pilot_normalizes_only_non_targeted_card_targets,
+        test_controlled_horizon_checkpoint_rescore_preserves_original_score,
         test_controlled_horizon_pilot_query_budget_checkpoints_and_resumes,
         test_controlled_horizon_memoized_oracle_matches_full_tree,
         test_controlled_horizon_oracle_wall_time_fails_closed,

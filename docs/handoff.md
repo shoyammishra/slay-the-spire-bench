@@ -106,6 +106,16 @@ Single source of truth stays where it already lives (see §2).
   bootstrap-variance gate. With Sharanga unavailable for roughly 15 days, the active
   execution target is BITS CSIS; use `cluster/CSIS_CONTROLLED_H_PILOT.md`. Pilot
   responses are not confirmatory.
+- **Controlled-H pilot scorer repair (2026-09-04):** the first live Ironclad segment
+  was stopped at 37/120 after reporting 20 legal rows. Audit showed all 16
+  schema-valid rejections were legal non-targeted cards serialized with target zero;
+  the undocumented oracle sentinel was `-1`. Action scorer
+  `controlled-action-scoring-v2.1` narrowly normalizes only when the frozen action
+  vocabulary proves `play:<same-card>:-1` is legal, preserves original scores, and
+  keeps targeted attacks exact. The corrected checkpoint is 36/37 legal with one
+  genuine truncation. Pull the repair, explicitly rescore and inspect the ignored
+  checkpoint without inference, then—and only if the corrected gates remain viable—
+  resume. Pilot responses remain non-confirmatory and the repair must be disclosed.
 
 - **Active supersession (2026-08-30):** the open-model matrix now has 28 canonical
   aggregates (7 configurations × 2 characters × 2 formats), including the complete
@@ -119,7 +129,7 @@ Single source of truth stays where it already lives (see §2).
   configs) are on this laptop and folded into all docs. Every remaining `—` cell in the
   legacy result tables was *intentional*, not pending. Nothing is running on the cluster.
 - **Engine + harness are post-audit stable**: 5 full audits (2026-06-10 → 06-12) found and
-  fixed ~130 bugs; **194/194 tests pass** (as of 2026-09-04); mock pipeline green for both characters × both
+  fixed ~130 bugs; **196/196 tests pass** (as of 2026-09-05); mock pipeline green for both characters × both
   formats.
 - **The two D&B-blocking gaps from the novelty review are closed** (≥3 model families +
   a reasoning model).

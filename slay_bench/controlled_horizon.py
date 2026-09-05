@@ -21,6 +21,7 @@ from .prompt_builder import combat_state_raw, combat_state_structured, system_pr
 
 
 CONTROLLED_HORIZON_VERSION = "controlled-decision-horizon-v2"
+CONTROLLED_ACTION_SCORING_VERSION = "controlled-action-scoring-v2.1"
 DEFAULT_HORIZONS = (1, 2, 4, 8)
 
 
@@ -226,6 +227,27 @@ def load_fixture(fixture: ControlledFixture):
 
 def _action_key(action: ControlledAction) -> str:
     return f"{action.action}:{action.card_index}:{action.target_index}"
+
+
+def canonicalize_action_for_values(
+        action: ControlledAction,
+        action_values: Dict[str, float]) -> Tuple[ControlledAction, Optional[str]]:
+    """Map a response action onto the frozen semantic action vocabulary.
+
+    Combat execution ignores ``target_index`` for skills and powers.  The exact
+    oracle represents those non-targeted plays with ``-1``, while the combat prompt
+    historically illustrated every play with target ``0`` and did not document the
+    sentinel.  Accept that irrelevant field only when the frozen action vocabulary
+    proves that the selected card is non-targeted.  Targeted attacks retain exact
+    target checking, including in multi-enemy states.
+    """
+    if _action_key(action) in action_values:
+        return action, None
+    if action.action == "play":
+        non_targeted = ControlledAction("play", action.card_index, -1)
+        if _action_key(non_targeted) in action_values:
+            return non_targeted, "ignored_target_for_non_targeted_card"
+    return action, None
 
 
 def legal_actions(state) -> List[ControlledAction]:
@@ -455,6 +477,8 @@ def score_response(state, fixture_id: str, horizon: int, response: dict,
         )
     except (TypeError, ValueError):
         chosen = ControlledAction("invalid")
+    chosen, _normalization = canonicalize_action_for_values(
+        chosen, oracle.action_values)
     key = _action_key(chosen)
     chosen_value = oracle.action_values.get(key)
     legal = chosen_value is not None

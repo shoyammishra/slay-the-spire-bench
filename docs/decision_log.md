@@ -1,5 +1,41 @@
 # Decision Log
 
+## 2026-09-04 — Correct non-targeted action scoring before resuming the model pilot
+
+**Problem.** The live Qwen3-32B pilot was stopped at 37/120 after the original scorer
+reported only 20 legal responses. A per-sample boundary audit found that all 16
+schema-valid rejections chose a legal non-targeted card but supplied
+`target_index=0`. The combat prompt illustrates plays with target zero and never
+documents the oracle's internal `-1` sentinel for skills and powers. The engine ignores
+the target for those cards, but the pilot scorer required an exact serialized key such
+as `play:1:-1`. For example, fixture `...-0022` at H=2 and H=8 rejected
+`play:1:0` even though the same-card frozen actions `play:1:-1` were legal.
+
+**Options considered.** (a) treat the 16 responses as model-illegal; (b) change the
+prompt to demand `-1` and repeat the model queries; (c) normalize only an irrelevant
+target when the frozen action vocabulary proves that the selected card has the legal
+form `play:<same-card>:-1`, while retaining exact target checks for attacks.
+
+**Decision: (c).** Action scoring version `controlled-action-scoring-v2.1` preserves
+the parsed response action, records the canonical scored action and normalization
+reason, and applies no inference-time change. A dedicated `--rescore-existing` path
+preserves each original score, deterministically recomputes all saved rows from their
+raw parsed responses and frozen oracle values, and marks the artifact as corrected.
+The runner refuses to resume an older nonempty checkpoint until that explicit migration
+has run. Wrong targets for targeted cards remain illegal.
+
+**Trade-offs, invalidation, and reversal.** The original legality, regret, and quality
+fields for affected pilot rows are invalid and quarantined; the model responses,
+prompts, weights, decoding, fixture selection, and exact oracle values remain valid and
+need no re-inference. On the 37-row observation, all 16 schema-valid rejections
+normalize to frozen legal actions, changing legal count from 20/37 to 36/37; the one
+truncated parse failure remains a failure. This is a post-output pilot instrument
+repair and must be disclosed; pilot responses remain non-confirmatory. The model-call
+protocol digest stays `465bab1d…104f` because no query contract changed, while the
+scoring version and code provenance distinguish computed numbers. Confirmatory runs
+must begin with v2.1. Reverse by restoring exact-key scoring only if the prompt is
+versioned to expose the sentinel and all affected model responses are recollected.
+
 ## 2026-09-04 — Pin the CSIS deployment before controlled-H model inference
 
 **Problem.** Sharanga entered an approximately 15-day maintenance window, so the

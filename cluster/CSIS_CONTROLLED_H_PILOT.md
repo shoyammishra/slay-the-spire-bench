@@ -79,7 +79,31 @@ Proceed only if there is exactly one checkpointed query, it parsed, it was legal
 it was not truncated, the vLLM process exited with the job, and no source-hash or
 model-revision check failed.
 
-## 4. Resume the remaining 119 queries
+## 4. Repair a pre-v2.1 checkpoint without inference
+
+This step is required only for a nonempty checkpoint created before action scorer
+`controlled-action-scoring-v2.1`. Back up the ignored artifact, then run the explicit
+deterministic migration from the repository root on the login node:
+
+```bash
+cp results/controlled_h_v2_model_pilot_qwen3_32b_csis.json \
+  results/controlled_h_v2_model_pilot_qwen3_32b_csis_pre_v2_1.json
+python scripts/controlled_horizon_model_pilot.py \
+  --rescore-existing \
+  --release-audit results/controlled_h_v2_combined_release_audit.json \
+  --release-fixtures results/controlled_h_v2_combined_release_fixtures.json \
+  --base-full-audit results/controlled_h_v2_frozen_full.json \
+  --extension-full-audit results/controlled_h_v2_silent_control_extension_full.json \
+  --out results/controlled_h_v2_model_pilot_qwen3_32b_csis.json
+```
+
+This command performs no model call and preserves every original score under
+`score_before_action_normalization`. Inspect the printed correction counts and summary.
+Do not resume if the artifact is not marked
+`controlled-action-scoring-v2.1`, if its completed-query count changed, or if any
+unexpected normalization occurred.
+
+## 5. Resume the remaining queries
 
 ```bash
 sbatch --export=ALL,PILOT_PHASE=full cluster/csis_controlled_h_pilot.sbatch
@@ -89,7 +113,7 @@ The same atomic result file is resumed; the first query is not repeated. On succ
 completion the job also writes the frozen pilot-informed power analysis. Do not launch
 a second full job concurrently against the same output path.
 
-## 5. Retrieve the evidence
+## 6. Retrieve the evidence
 
 From PowerShell on the laptop:
 
