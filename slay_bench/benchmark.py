@@ -42,6 +42,7 @@ class LLMInterface(ABC):
     # a truncation — the signal that distinguishes "thought past the budget"
     # from "emitted malformed JSON" when a parse failure occurs.
     last_finish_reason: Optional[str] = None
+    last_raw_response: Optional[str] = None
 
     @abstractmethod
     def complete(self, system: str, user: str, **kwargs) -> str:
@@ -50,6 +51,7 @@ class LLMInterface(ABC):
     def complete_json(self, system: str, user: str, **kwargs) -> dict:
         """Call complete() and parse JSON from the response."""
         raw = self.complete(system, user, **kwargs)
+        self.last_raw_response = raw
         # Strip <think>...</think> blocks (reasoning models like qwen3)
         import re as _re
         text = _re.sub(r'<think>.*?</think>', '', raw, flags=_re.DOTALL).strip()

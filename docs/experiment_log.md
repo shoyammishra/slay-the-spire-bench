@@ -1,5 +1,49 @@
 # Experiment Log
 
+## 2026-09-04 — Controlled-H model-pilot protocol and no-inference stack pass
+
+**No model, API, GPU, or cluster inference ran.** The cheap-model pilot was frozen in
+`configs/controlled_h_v2_model_pilot.json`, protocol
+`controlled-h-v2-model-pilot-2026-09-04`, digest `4a56e3c5…1004`. It validates and
+binds the clean combined audit (`6cd43d31…8c737`) and fixture
+(`2b086a97…2461d`) artifacts, selects 30 fixtures without model behavior (15 per
+character; four sensitive + 11 controls), and fixes Qwen3-32B, structured prompts,
+H={1,2,4,8}, temperature 0, 8,000 maximum tokens, and 120 total queries. The selected
+fixture-ID digest is `bf9ecf69…baf4f`.
+
+The first complete mock exposed query-position imbalance from independently hashing
+each fixture's H order. Before any model inference, that design was superseded by a
+frozen four-sequence Latin rotation assigned by hash rank within character. The final
+mock artifact `results/controlled_h_v2_model_pilot_mock_latin.json` completed 120/120
+queries, with 100% parsing and legality overall, per character, and per character/H;
+zero truncations; full prompts, hashes, raw responses, and parsed traces; and every H
+appearing three or four times in every query position per character. Mock quality is
+diagnostic only. Re-running the completed artifact exercised checkpoint resume without
+new queries. A non-mock invocation without `--authorize-model-inference` failed before
+writing an artifact, as required.
+
+The prospective power command first failed before artifact creation because the new
+standalone script lacked the repository-path bootstrap (`ModuleNotFoundError:
+scripts`); that packaging defect was fixed and regression-tested. The successful
+artifact `results/controlled_h_v2_power_prospective.json` reports the normal-
+approximation requirement for a two-sided alpha of .05, 80% power, and absolute mean
+paired difference .10: 18, 50, 97, and 197 fixtures per character for paired SDs .15,
+.25, .35, and .50 respectively. Thus the frozen 100-per-character release is adequate
+only if the pilot's conservative bootstrap SD bound is approximately .35 or below.
+The real pilot will use the 95th percentile of 5,000 deterministic fixture-bootstrap
+SDs separately by character; its observed effect direction cannot influence GO/NO-GO,
+and its responses cannot enter the confirmatory matrix.
+
+Post-change validation passed all four direct test files (**193/193**: benchmark 67,
+combat 62, run 36, stats 28), Python compilation, and the no-API mock pipeline for
+both characters in structured and raw formats. `git diff --check` passed and the
+changed-file credential, private-key, private-IP, and local-user-path scan was clean.
+An earlier aggregate validation invocation used the Windows legacy output encoding,
+which aborted two Unicode-printing harness tests, and then supplied an unsupported
+`--output` CLI flag; it produced no model evidence. The identical tests passed with
+UTF-8 forced, and the four smoke runs passed with the supported `--out-dir` and
+`--run-tag` interface.
+
 ## 2026-09-04 — Silent extension complete; combined 200-fixture release passes
 
 **No model, API, GPU, or cluster inference ran.** The frozen 50-row Silent-control

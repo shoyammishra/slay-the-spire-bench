@@ -108,6 +108,7 @@ def test_mock_llm_responses():
     r2 = mock.complete_json("sys", "user2")
     assert r1 == {"plays": [0], "reasoning": "test"}
     assert r2 == {"action": "end_turn", "reasoning": "done"}
+    assert mock.last_raw_response == '{"action": "end_turn", "reasoning": "done"}'
     assert len(mock._calls) == 2
     print(f"[PASS] MockLLM: {len(mock._calls)} calls recorded")
 
@@ -1405,6 +1406,76 @@ def test_controlled_horizon_combined_release_is_locked_and_control_only():
     print("[PASS] combined release is locked and accepts extension controls only")
 
 
+def test_controlled_horizon_model_pilot_is_locked_balanced_and_model_blind():
+    import copy
+    import hashlib
+    from scripts.controlled_horizon_model_pilot import (
+        load_pilot_protocol, select_pilot_fixtures)
+
+    protocol, digest = load_pilot_protocol()
+    assert digest == "4a56e3c5762e8caf228747961d2b7984d9273e2efebbda29d8cb529996851004"
+    assert protocol["inference"]["expected_query_count"] == 120
+    assert protocol["decision_policy"]["confirmatory_matrix_reuses_pilot_responses"] is False
+    assert protocol["pilot_gate"]["observed_effect_sign_used_for_go_no_go"] is False
+
+    protocol = copy.deepcopy(protocol)
+    dispositions = []
+    for character in ("ironclad", "silent"):
+        for sensitive, count in ((True, 4), (False, 11)):
+            for ordinal in range(count):
+                dispositions.append({
+                    "fixture_id": f"synthetic-{character}-{sensitive}-{ordinal}",
+                    "character": character,
+                    "h1_h8_sensitive": sensitive,
+                    "released": True,
+                })
+    ids = sorted(item["fixture_id"] for item in dispositions)
+    protocol["pilot_sample"]["selected_fixture_ids_sha256"] = hashlib.sha256(
+        ("\n".join(ids) + "\n").encode("utf-8")).hexdigest()
+    release = {
+        "release_gate_passed": True,
+        "selection": {"dispositions": dispositions},
+    }
+    first = select_pilot_fixtures(release, protocol)
+    release["selection"]["dispositions"].reverse()
+    second = select_pilot_fixtures(release, protocol)
+    assert first == second
+    assert len(first["selected_fixture_ids"]) == 30
+    for character in ("ironclad", "silent"):
+        character_rows = [item for item in first["decisions"]
+                          if item["character"] == character]
+        for position in range(4):
+            counts = {
+                horizon: sum(item["horizon_query_order"][position] == horizon
+                             for item in character_rows)
+                for horizon in (1, 2, 4, 8)
+            }
+            assert max(counts.values()) - min(counts.values()) <= 1
+    print("[PASS] controlled-H model pilot is locked, balanced, and model-blind")
+
+
+def test_controlled_horizon_pilot_scores_only_frozen_oracle_values():
+    from scripts.controlled_horizon_model_pilot import score_precomputed_oracle
+
+    oracle_row = {"oracles": {"8": {
+        "exact": True,
+        "best_value": 10.0,
+        "worst_value": 0.0,
+        "action_values": {"end_turn:-1:-1": 0.0, "play:0:0": 10.0},
+    }}}
+    scored = score_precomputed_oracle(
+        oracle_row, 8,
+        {"action": "play", "card_index": "0", "target_index": 0})
+    assert scored["parse_ok"] and scored["schema_ok"] and scored["legal"]
+    assert scored["normalized_quality"] == 1.0 and scored["regret"] == 0.0
+    invalid = score_precomputed_oracle(
+        oracle_row, 8,
+        {"action": "play", "card_index": True, "target_index": 0})
+    assert invalid["parse_ok"] and not invalid["schema_ok"] and not invalid["legal"]
+    assert invalid["normalized_quality"] is None
+    print("[PASS] model pilot scores against frozen values and rejects bad schema")
+
+
 def test_controlled_horizon_memoized_oracle_matches_full_tree():
     from slay_bench.controlled_horizon import create_fixture, exact_action_values
 
@@ -1576,6 +1647,8 @@ if __name__ == "__main__":
         test_controlled_horizon_frozen_funnel_is_deterministic_and_fails_closed,
         test_controlled_horizon_silent_extension_is_digest_locked_and_next_ranked,
         test_controlled_horizon_combined_release_is_locked_and_control_only,
+        test_controlled_horizon_model_pilot_is_locked_balanced_and_model_blind,
+        test_controlled_horizon_pilot_scores_only_frozen_oracle_values,
         test_controlled_horizon_memoized_oracle_matches_full_tree,
         test_controlled_horizon_oracle_wall_time_fails_closed,
         test_controlled_horizon_checkpoint_write_is_atomic,

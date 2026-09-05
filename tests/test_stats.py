@@ -300,6 +300,56 @@ def test_removal_metric_is_quarantined_from_analysis_and_composites():
     print("[PASS] constant-target removal is quarantined from stats and horizon composite")
 
 
+def test_controlled_horizon_prospective_power_is_monotone_and_known_answer():
+    from scripts.controlled_horizon_power import (
+        analyze_pilot, bootstrap_sd_upper, normal_approx_power, required_n)
+    from scripts.controlled_horizon_model_pilot import load_pilot_protocol
+
+    assert normal_approx_power(0.1, 0.35, 100, 0.05) > 0.80
+    assert normal_approx_power(0.1, 0.35, 100, 0.05) \
+        > normal_approx_power(0.1, 0.35, 50, 0.05)
+    assert normal_approx_power(0.1, 0.25, 100, 0.05) \
+        > normal_approx_power(0.1, 0.5, 100, 0.05)
+    assert required_n(0.1, 0.35, 0.05, 0.8) == 97
+    differences = [-0.4, -0.2, 0.0, 0.2, 0.4]
+    first = bootstrap_sd_upper(differences, 200, 42)
+    second = bootstrap_sd_upper(differences, 200, 42)
+    assert first == second and first > 0
+
+    protocol, digest = load_pilot_protocol()
+    empty_summary = {
+        "truncation_rate": None,
+        "by_character": {
+            character: {
+                "parse_rate": None,
+                "legal_rate": None,
+                "by_horizon": {
+                    str(horizon): {"parse_rate": None}
+                    for horizon in protocol["inference"]["horizons"]
+                },
+            }
+            for character in protocol["pilot_sample"]["characters"]
+        },
+    }
+    incomplete = {
+        "protocol_id": protocol["protocol_id"],
+        "protocol_digest": digest,
+        "provider": "local",
+        "complete": False,
+        "completed_queries": 0,
+        "summary": empty_summary,
+        "rows": [],
+    }
+    assert analyze_pilot(incomplete, protocol)["go_for_registered_matrix"] is False
+    incomplete["protocol_digest"] = "0" * 64
+    try:
+        analyze_pilot(incomplete, protocol)
+        raise AssertionError("tampered pilot digest was accepted")
+    except ValueError as exc:
+        assert "digest" in str(exc)
+    print("[PASS] controlled-H prospective power is deterministic and monotone")
+
+
 if __name__ == "__main__":
     tests = [
         test_sign_flip_is_exact_and_hits_its_floor,
@@ -329,6 +379,7 @@ if __name__ == "__main__":
         test_variance_shares_refuse_unbalanced_designs,
         test_discover_models_parses_filenames_and_skips_diagnostics,
         test_removal_metric_is_quarantined_from_analysis_and_composites,
+        test_controlled_horizon_prospective_power_is_monotone_and_known_answer,
     ]
     passed = failed = 0
     for test in tests:

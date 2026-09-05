@@ -1,5 +1,42 @@
 # Decision Log
 
+## 2026-09-04 — Freeze the controlled-H cheap-model pilot before inference
+
+**Problem.** The separately labelled combined release passed its 200-fixture oracle
+gate, but running a model immediately would leave the pilot sample, query ordering,
+feasibility thresholds, variance estimator, and reuse policy adjustable after seeing
+model behavior. A first no-inference mock also showed that independently hashing each
+fixture's four H queries produced avoidable query-position imbalance.
+
+**Options considered.** (a) run all 200 fixtures immediately; (b) choose 30 fixtures
+after inspecting model outputs; (c) freeze a model-blind 30-fixture pilot, balance H
+order before inference, and use the responses only for interface feasibility and
+variance sizing. For order, independently shuffled H values and a hash-assigned Latin
+rotation were considered.
+
+**Decision: (c).** Protocol `controlled-h-v2-model-pilot-2026-09-04`, digest
+`4a56e3c5…1004`, binds the clean combined audit and fixture hashes. It selects 15
+fixtures per character by SHA-256 rank: four H=1/H=8-sensitive and 11 controls. The
+fixed model is `Qwen/Qwen3-32B` (served as `qwen3-32b`), with the local provider,
+structured prompts, H={1,2,4,8}, temperature 0, and 8,000 maximum output tokens: 120
+queries total. A four-sequence Latin rotation is assigned by hash rank within each
+character, leaving each H in each query position three or four times. The primary
+pilot estimand is the mean paired normalized-quality difference H=8 minus H=1,
+reported separately by character; observed effect sign is not a GO/NO-GO criterion.
+The gate instead requires query completeness, parse/legality and truncation thresholds,
+and a conservative bootstrap variance estimate that permits 80% power for an absolute
+0.10 difference within the 100-fixture-per-character release. Pilot responses will
+not be reused in confirmatory inference.
+
+**Trade-offs, invalidation, and reversal.** Thirty fixtures limit variance precision,
+so the 95th percentile of 5,000 deterministic fixture-bootstrap SDs is used rather
+than the point estimate. Structured format makes this a cheap interface/power pilot,
+not a format comparison. Replacing the model, provider, prompt, sample, query order,
+or thresholds requires a new protocol digest before inference. The discarded mock
+ordering contained no model output and invalidates no evidence. This freeze authorizes
+implementation and no-inference smoke testing only; model/API/GPU/cluster execution
+still requires explicit user authorization.
+
 ## 2026-09-04 — Accept a separately labelled 200-fixture combined controlled-H release
 
 **Problem.** The frozen Silent-control extension completed all 50 rows and produced

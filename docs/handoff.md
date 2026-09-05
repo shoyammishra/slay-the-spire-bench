@@ -91,8 +91,17 @@ Single source of truth stays where it already lives (see §2).
   75 controls per character. It selected 185 base rows and 15 extension controls; an
   independent audit passed every exactness, prompt, span, mismatch, balance, source,
   and uniqueness check. The original v2 gate remains failed and the sequential repair
-  must be disclosed. Next freeze the model-pilot sampling and power plan; no model
-  inference is yet authorized.
+  must be disclosed.
+- **Controlled-H model pilot frozen and mock-validated (2026-09-04):** protocol
+  `controlled-h-v2-model-pilot-2026-09-04` (digest `4a56e3c5…1004`) selects 15
+  fixtures per character (four sensitive + 11 controls), fixes Qwen3-32B and one
+  structured response at H={1,2,4,8}, and uses a hash-assigned balanced Latin query
+  order. The 120-query no-inference mock completed with 100% parse/legality and zero
+  truncations; checkpoint resume and the non-mock authorization guard passed. The
+  prospective .10-effect power requirements are N=18/50/97/197 per character at
+  paired SD=.15/.25/.35/.50. Next run the real 120-query Qwen3-32B pilot only after
+  explicit compute authorization, then apply the frozen interface and conservative
+  bootstrap-variance gate. Pilot responses are not confirmatory.
 
 - **Active supersession (2026-08-30):** the open-model matrix now has 28 canonical
   aggregates (7 configurations × 2 characters × 2 formats), including the complete
@@ -106,7 +115,7 @@ Single source of truth stays where it already lives (see §2).
   configs) are on this laptop and folded into all docs. Every remaining `—` cell in the
   legacy result tables was *intentional*, not pending. Nothing is running on the cluster.
 - **Engine + harness are post-audit stable**: 5 full audits (2026-06-10 → 06-12) found and
-  fixed ~130 bugs; **188/188 tests pass** (as of 2026-08-31); mock pipeline green for both characters × both
+  fixed ~130 bugs; **193/193 tests pass** (as of 2026-09-04); mock pipeline green for both characters × both
   formats.
 - **The two D&B-blocking gaps from the novelty review are closed** (≥3 model families +
   a reasoning model).

@@ -2,8 +2,8 @@
 
 **Protocol:** `controlled-decision-horizon-v2`
 **Implementation:** `slay_bench/controlled_horizon.py`
-**Status:** Fixture protocol frozen; release-oracle audit in progress; model evidence
-**PENDING EXPERIMENT**
+**Status:** Combined 200-fixture release passed; cheap-model pilot frozen and
+mock-validated; model evidence **PENDING EXPERIMENT**
 
 V2 supersedes v1 before model inference. V1 admitted identical model prompts with
 different oracle labels because hidden draw order affected future value. V2 appends a
@@ -11,24 +11,19 @@ canonical full-observability continuation block at every H, including pile order
 combat/enemy runtime state, and deterministic RNG stream state. Only H may differ
 within a fixture/format treatment contrast.
 
-An exploratory 2026-08-31 oracle screen found exact H=1/H=8-sensitive examples for
-both characters, so the intervention is constructively attainable. It also produced an
-insensitive Silent state and a Silent H=8 timeout. Because the generator and staged
-selection were refined while oracle results were visible, those diagnostics do not
-constitute the frozen fixture audit or authorize model inference. The complete numbers
-and resume boundary are in `docs/experiment_log.md` and `docs/handoff.md`.
-
-The release protocol is now frozen in
-`configs/controlled_h_v2_preregistration.json` (SHA-256
-`78a768f7fb27ecfba3d8c2cb4bee47ce3284c427fe6ea22b2a6dd64c70c5f110`).
-It attempts 400 candidates per character with deterministic seed, encounter, deck, HP,
-turn, and prefix strata and no outcome-driven replacement. A cheap exact H={1,4}
-screen advances every disjoint candidate plus 125 hash-ranked insensitive controls per
-character. The full H={1,2,4,8} audit then fills a fixed release quota of 25 sensitive
-and 75 control fixtures per character. Any generation, exactness, time, node, prompt,
-span, mismatch, or quota failure is retained in the funnel and fails closed under the
-registered disposition. Because the release is deliberately sensitivity-stratified,
-its 25% ratio is not a prevalence estimate; report rates over the full candidate funnel.
+The original frozen v2 funnel audited all 483 advanced rows but failed closed because
+Silent produced 70 of the required 75 controls. That registered outcome remains a
+failure. A separately frozen, fully disclosed Silent-control extension audited the
+next 50 eligible original-rank candidates and yielded 22 controls, four sensitive
+rows, and 24 timeouts. The combined protocol
+`controlled-h-v2-plus-silent-extension-release-2026-09-04` (digest
+`71461857…db99b`) binds both source artifacts and reruns the original model-blind rank
+rule over eligible rows. It passed with 200 unique fixtures: exactly 25 sensitive and
+75 controls per character, using 185 base rows and 15 extension controls. An
+independent per-fixture audit passed exactness, prompt invariance, nonzero-span,
+mismatch-regret, balance, source, and uniqueness checks. The 25% sensitive ratio is a
+designed stratum, not a prevalence estimate, and the sequential repair must accompany
+every use of this release.
 
 ## Question
 
@@ -81,7 +76,7 @@ States whose optimal set never changes test execution, not lookahead. The comple
 800-candidate funnel and release fixture JSON must be preserved before running evaluated
 models. No model-specific fixture selection is permitted.
 
-Run the frozen stages with:
+Historical base stages were run with:
 
 ```powershell
 python scripts/controlled_horizon_funnel.py manifest --out results/controlled_h_v2_frozen_manifest.json
@@ -89,6 +84,10 @@ python scripts/controlled_horizon_funnel.py screen --out results/controlled_h_v2
 python scripts/controlled_horizon_funnel.py full --screen-audit results/controlled_h_v2_frozen_screen.json --out results/controlled_h_v2_frozen_full.json
 python scripts/controlled_horizon_funnel.py release --full-audit results/controlled_h_v2_frozen_full.json --fixtures-out results/controlled_h_v2_release_fixtures.json --out results/controlled_h_v2_release_audit.json
 ```
+
+The original release command correctly emitted no fixtures. The usable 200-row
+artifact comes only from the separately labelled combined-release procedure recorded
+in `docs/experiment_log.md`.
 
 ## Baselines and falsifiers
 
@@ -111,12 +110,18 @@ action across H, the instrument has no treatment strength.
 
 Buy information cheapest-first:
 
-1. unit tests and exactness audit on H=1/2;
-2. 10 fixtures × both characters × all H with mock and greedy baselines;
-3. oracle sizing for H=8; prune fixtures only by predeclared, model-blind criteria;
-4. one cheap open model, 30 fixtures, one format;
-5. power simulation from the observed within-fixture variance;
-6. registered model matrix.
+1. unit tests, exactness audit, and the combined 200-fixture release — complete;
+2. freeze a model-blind 30-fixture pilot (15 per character; four sensitive + 11
+   controls), Qwen3-32B, structured format, all four H, and balanced query order —
+   complete under protocol digest `4a56e3c5…1004`;
+3. run all 120 calls through the exact stack with a no-inference mock, preserving
+   prompts, hashes, raw responses, parsed traces, and checkpoint resume — complete;
+4. run the prospective power table and freeze the conservative pilot-bootstrap gate —
+   complete;
+5. after explicit compute authorization, run the real Qwen3-32B pilot and use it only
+   for interface feasibility and variance sizing;
+6. seek separate authorization for the registered multi-family matrix only if the
+   frozen pilot gate passes. Pilot responses are not reused confirmatorily.
 
 No API, GPU, or cluster call is authorized by this document. All model runs remain
 **PENDING EXPERIMENT**.
