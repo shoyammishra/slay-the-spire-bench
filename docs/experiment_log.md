@@ -9,6 +9,18 @@ GPU time, and produced no model query. The launcher now requests the established
 64 GiB amount. Cancel only that explicit pending job, pull the corrected commit, and
 resubmit the one-query smoke; do not alter the frozen model or inference protocol.
 
+**Operational addendum — full resume stopped on client timeouts.** The corrected
+one-query smoke passed all gates and shut down cleanly. Its first full-resume attempt
+then exceeded the legacy 300-second HTTP timeout twice on the next, still-uncheckpointed
+query. Because retrying a timed-out generation can leave the server finishing the old
+request while a duplicate is queued, the explicit job was canceled before exhausting
+all five attempts. The accepted smoke row remains intact; no additional row was
+recorded. The CSIS launcher now freezes a 900-second request timeout and exactly one
+network attempt. Every new row records those transport settings, while the existing
+smoke row is labelled with the known 300-second/five-attempt defaults. This operational
+change does not alter prompts, decoding, fixtures, or scoring; it prevents duplicate
+unobserved generations and preserves the active protocol digest.
+
 **No model, API, GPU, or cluster inference ran.** In response to Sharanga's expected
 15-day maintenance window, the pilot deployment was moved to BITS CSIS and frozen
 before redownloading weights. The official Hugging Face model metadata resolved

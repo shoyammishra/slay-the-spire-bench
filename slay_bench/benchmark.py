@@ -233,11 +233,15 @@ class LocalLLM(LLMInterface):
     """
 
     def __init__(self, model: str, base_url: str = "http://localhost:8000/v1",
-                 api_key: Optional[str] = None, timeout: float = 300.0):
+                 api_key: Optional[str] = None, timeout: float = 300.0,
+                 max_attempts: int = 5):
+        if max_attempts < 1:
+            raise ValueError("max_attempts must be positive")
         self.model = model
         self.base_url = base_url.rstrip("/")
         self._api_key = api_key
         self.timeout = timeout
+        self.max_attempts = max_attempts
 
     def complete(self, system: str, user: str, **kwargs) -> str:
         import os, time, urllib.request, urllib.error
@@ -253,7 +257,7 @@ class LocalLLM(LLMInterface):
             "max_tokens": kwargs.get("max_tokens", 8000),
         }).encode()
         last_err = None
-        for attempt in range(5):
+        for attempt in range(self.max_attempts):
             try:
                 req = urllib.request.Request(
                     url,
@@ -273,9 +277,12 @@ class LocalLLM(LLMInterface):
                 # Everything else (4xx/5xx) is a real server error — surface it
                 # with the response body so a misconfigured endpoint is obvious.
                 if e.code == 429:
-                    wait = 2 ** attempt
-                    print(f"    [rate limit] retry {attempt+1}/5 in {wait}s...", flush=True)
-                    time.sleep(wait)
+                    print(f"    [rate limit] attempt "
+                          f"{attempt+1}/{self.max_attempts}", flush=True)
+                    if attempt + 1 < self.max_attempts:
+                        wait = 2 ** attempt
+                        print(f"    retrying in {wait}s...", flush=True)
+                        time.sleep(wait)
                 else:
                     body = ""
                     try:
@@ -287,9 +294,12 @@ class LocalLLM(LLMInterface):
                     ) from e
             except Exception as e:  # noqa: BLE001 — transient network/timeout: retry
                 last_err = e
-                wait = 2 ** attempt
-                print(f"    [network error] retry {attempt+1}/5 in {wait}s: {e}", flush=True)
-                time.sleep(wait)
+                print(f"    [network error] attempt {attempt+1}/{self.max_attempts}: "
+                      f"{e}", flush=True)
+                if attempt + 1 < self.max_attempts:
+                    wait = 2 ** attempt
+                    print(f"    retrying in {wait}s...", flush=True)
+                    time.sleep(wait)
         raise RateLimitExhausted(str(last_err))
 
 

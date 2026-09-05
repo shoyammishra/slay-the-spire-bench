@@ -92,6 +92,8 @@ fi
 export HF_HOME="${HF_HOME:-${HOME}/scratch/hf_cache}"
 export HF_HUB_OFFLINE=1
 export TRANSFORMERS_OFFLINE=1
+export LOCAL_TIMEOUT=900
+export LOCAL_MAX_ATTEMPTS=1
 mkdir -p results
 
 python - "${MODEL_REPO}" "${MODEL_REVISION}" <<'PY'

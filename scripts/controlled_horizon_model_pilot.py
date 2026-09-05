@@ -312,6 +312,13 @@ def run_pilot(protocol: dict, protocol_digest: str, llm, provider: str,
     created_at = (prior or {}).get(
         "created_at_utc", dt.datetime.now(dt.timezone.utc).isoformat())
     rows = list((prior or {}).get("rows", []))
+    if provider == "local":
+        for row in rows:
+            row.setdefault("transport", {
+                "request_timeout_seconds": 300.0,
+                "network_attempts": 5,
+                "provenance": "backfilled from pre-instrumentation LocalLLM defaults",
+            })
     completed = {(row["fixture_id"], row["horizon"]) for row in rows}
     new_queries = 0
     if len(completed) != len(rows):
@@ -398,6 +405,11 @@ def run_pilot(protocol: dict, protocol_digest: str, llm, provider: str,
                     "truncated": finish_reason == "length" or bool(
                         isinstance(response, dict)
                         and response.get("truncated_think")),
+                },
+                "transport": {
+                    "request_timeout_seconds": getattr(llm, "timeout", None),
+                    "network_attempts": getattr(llm, "max_attempts", None),
+                    "provenance": "recorded at query execution",
                 },
                 "score": score,
             }

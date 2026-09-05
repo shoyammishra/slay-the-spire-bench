@@ -129,7 +129,10 @@ def build_llm(provider: str, model: str, base_url: str = None):
         # times out, then re-sends the same prompt and times out again. Bump via
         # $LOCAL_TIMEOUT (seconds) from the sbatch for self-hosted reasoning models.
         timeout = float(os.environ.get("LOCAL_TIMEOUT", "300"))
-        return LocalLLM(model=model, base_url=url, api_key=key, timeout=timeout)
+        max_attempts = int(os.environ.get("LOCAL_MAX_ATTEMPTS", "5"))
+        return LocalLLM(
+            model=model, base_url=url, api_key=key, timeout=timeout,
+            max_attempts=max_attempts)
     else:
         sys.exit(f"Unknown provider: {provider}")
 

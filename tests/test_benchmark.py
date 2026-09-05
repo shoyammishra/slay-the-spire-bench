@@ -745,6 +745,7 @@ def test_local_llm_builds_openai_request():
     # trailing slash on base_url is stripped, endpoint appended exactly once
     assert captured["url"] == "http://localhost:8000/v1/chat/completions"
     assert captured["timeout"] == 123
+    assert llm.max_attempts == 5
     assert captured["body"]["model"] == "qwen3-32b"
     assert captured["body"]["temperature"] == 0.7
     assert captured["body"]["max_tokens"] == 4096
@@ -796,12 +797,27 @@ def test_build_llm_local_provider():
 
     # default when neither --base-url nor $LOCAL_BASE_URL is set
     prev = os.environ.pop("LOCAL_BASE_URL", None)
+    prev_timeout = os.environ.pop("LOCAL_TIMEOUT", None)
+    prev_attempts = os.environ.pop("LOCAL_MAX_ATTEMPTS", None)
     try:
         d = build_llm("local", "m")
         assert d.base_url == "http://localhost:8000/v1"
+        assert d.timeout == 300 and d.max_attempts == 5
+        os.environ["LOCAL_TIMEOUT"] = "900"
+        os.environ["LOCAL_MAX_ATTEMPTS"] = "1"
+        frozen = build_llm("local", "m")
+        assert frozen.timeout == 900 and frozen.max_attempts == 1
     finally:
         if prev is not None:
             os.environ["LOCAL_BASE_URL"] = prev
+        if prev_timeout is not None:
+            os.environ["LOCAL_TIMEOUT"] = prev_timeout
+        else:
+            os.environ.pop("LOCAL_TIMEOUT", None)
+        if prev_attempts is not None:
+            os.environ["LOCAL_MAX_ATTEMPTS"] = prev_attempts
+        else:
+            os.environ.pop("LOCAL_MAX_ATTEMPTS", None)
     print("[PASS] build_llm wires the local provider with the right base_url")
 
 
