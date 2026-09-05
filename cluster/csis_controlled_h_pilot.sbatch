@@ -13,7 +13,7 @@
 #SBATCH --time=08:00:00
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-task=8
-#SBATCH --mem=96G
+#SBATCH --mem=64G
 #SBATCH --output=slay_h_pilot_%j.out
 #SBATCH --error=slay_h_pilot_%j.err
 

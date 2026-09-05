@@ -1,6 +1,13 @@
 # Experiment Log
 
-## 2026-09-04 — CSIS controlled-H deployment prepared; no cluster job submitted
+## 2026-09-04 — CSIS deployment prepared; first submission scheduler-rejected
+
+**Operational addendum — first smoke submission rejected before execution.** The
+initial CSIS smoke remained pending with scheduler reason `MaxMemPerLimit`: its 96 GiB
+host-memory request exceeded the partition limit. It started no process, consumed no
+GPU time, and produced no model query. The launcher now requests the established CSIS
+64 GiB amount. Cancel only that explicit pending job, pull the corrected commit, and
+resubmit the one-query smoke; do not alter the frozen model or inference protocol.
 
 **No model, API, GPU, or cluster inference ran.** In response to Sharanga's expected
 15-day maintenance window, the pilot deployment was moved to BITS CSIS and frozen
