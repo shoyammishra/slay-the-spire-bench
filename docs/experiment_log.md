@@ -22,12 +22,15 @@ sensitive + 75 controls for Ironclad and 25 sensitive + 75 controls for Silent;
 An independent audit of every selected row confirmed: no oracle errors; exactness at
 H={1,2,4,8}; structured/raw prompt invariance; nonzero H=8 value span; positive H=1-
 mismatch regret for all 50 sensitive rows; exact character/stratum and source counts;
-and unique fixture IDs matching the released fixture payload. Ignored local artifacts
-are `results/controlled_h_v2_combined_release_audit.json` (SHA-256
-`402474bd…71e5c`) and `results/controlled_h_v2_combined_release_fixtures.json`
-(SHA-256 `2955d976…c7f27`). The fixture/oracle gate is now GO for designing and freezing
-the cheap model pilot. Model inference itself remains stopped pending its protocol,
-power analysis, exact-stack smoke, and explicit compute authorization.
+and unique fixture IDs matching the released fixture payload. After the implementation
+checkpoint, the release was regenerated from clean commit `1c6f0e5`; both artifacts
+record `git_dirty=false` and retain the identical 185-base/15-extension selection.
+Ignored local artifacts are `results/controlled_h_v2_combined_release_audit.json`
+(SHA-256 `6cd43d31…8c737`) and
+`results/controlled_h_v2_combined_release_fixtures.json` (SHA-256
+`2b086a97…2461d`). The fixture/oracle gate is now GO for designing and freezing the
+cheap model pilot. Model inference itself remains stopped pending its protocol, power
+analysis, exact-stack smoke, and explicit compute authorization.
 
 ## 2026-09-04 — Frozen controlled-H v2 full audit fails Silent-control quota; extension frozen
 
