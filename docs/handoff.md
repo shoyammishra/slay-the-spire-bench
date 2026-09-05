@@ -13,6 +13,89 @@ Single source of truth stays where it already lives (see §2).
 
 ## 1. Project status snapshot (2026-07-12)
 
+- **Full audit with automatic completion checks (2026-09-05):** latest
+  inspected checkpoint is 160/1,020, with 123 exact rows and 37 preserved
+  timeouts. The source receipt and checkpoint bindings remain valid. A hidden
+  local supervisor now waits for full completion, runs the release gate, and
+  independently audits any emitted fixtures; it stops on incomplete worker
+  exit or source drift. Read ignored
+  `results/controlled_h_v2_expansion_supervisor_status.json` for live status.
+  Do not start a duplicate worker/supervisor or modify execution source files.
+  No release outcome or model authorization follows from partial counts.
+
+- **Full expansion audit running locally (2026-09-05):** screening completed
+  800/800 exact with no oracle/prompt errors, advancing 782 fresh plus 238
+  old candidates (1,020 total). The first full row passed H=8 in 93.95 s;
+  the remaining audit is running in a hidden local Python process, with PID
+  metadata in ignored `results/controlled_h_v2_expansion_background.json`.
+  Monitor the atomic full checkpoint and explicit process only; never start
+  a second writer. Preserve all budget failures and await every disposition
+  before running release. This supersedes the screen-running entries below.
+  No model/cluster work is authorized or running; original pilot NO-GO remains.
+
+- **Expansion screen running (2026-09-05):** the production one-row screen
+  gate passed and the remaining fresh candidates are being audited locally
+  at H={1,4}, checkpointing to the ignored expansion screen artifact. This
+  supersedes the not-started status below. An ignored execution receipt binds
+  the uncommitted source bytes. Inspect completion and every disposition,
+  then run the one-row full-oracle smoke before the remaining H=8 workload.
+  No model or cluster work has started; the original pilot remains NO-GO.
+
+- **Expansion freeze and runner (2026-09-05):** protocol
+  `controlled-h-v2-expansion-2026-09-05` (`bfe8c130…1288b`) binds seven sources
+  and targets 252 fixtures per character. It reuses 334 eligible rows,
+  excludes 30 pilot IDs, audits 238 untouched old screen candidates, and adds
+  800 fresh candidates. Manifest generation passed 800/800 with no overlap or
+  failures; a two-fixture H1/H4 smoke passed. Next execute the staged oracle
+  procedure in `docs/controlled_h_expansion_runbook.md` when the concrete
+  workload is accepted. The full expansion is not running. The original pilot
+  remains NO-GO; final confirmatory inference/analysis is not frozen or authorized.
+
+- **Follow-up planning (2026-09-05):** the audited pilot remains NO-GO. See
+  `docs/controlled_h_followup_plan.md` for the proposed separate fixture
+  expansion, retaining the .10 effect and 25/75 mixture. N=252 per character
+  is a provisional two-primary-test planning case, not a frozen multi-family
+  run. Excluding pilot fixtures leaves shortages of 83 Ironclad controls and
+  8 sensitive/108 controls for Silent. Next define the hypothesis family and
+  freeze a candidate-expansion protocol before additional oracle/model work.
+  Current protocols and artifacts remain unchanged; no new compute ran.
+
+- **Remote inventory resolution (2026-09-05):** user-supplied Git output shows
+  only untracked scheduler/vLLM logs, with empty staged and unstaged tracked
+  diffs. This explains the pilot's broad `git_dirty=true` flag and supersedes
+  the request for a remote change inventory below. Preserve the flag and note
+  that the inventory was obtained post-run; no current source modification is
+  indicated. The independently reproduced pilot power NO-GO remains unchanged.
+
+- **Retrieved pilot audit (2026-09-05):** all 120 saved prompts, raw-response
+  parses, scores, engine legal-action vocabularies, query order, and summaries
+  passed offline checks against the frozen source artifacts. The pilot power
+  output reproduces exactly: NO-GO, N=158 Ironclad and 207 Silent. This supersedes
+  artifact-pending entries below. The only truncation is H=2; every H1/H8 pair
+  is complete. Remote provenance remains open because the artifact records
+  `git_dirty=true` at `db20055` without identifying changes. Obtain that change
+  inventory before closing provenance or freezing a follow-up design. No matrix
+  inference is authorized; pilot effects remain non-confirmatory.
+
+- **Pilot power NO-GO (2026-09-05, user-reported; artifact audit pending):** the
+  completed power output passes all interface gates but requires 158 Ironclad
+  and 207 Silent fixtures, exceeding the frozen ceiling of 100 per character.
+  Bootstrap upper SDs are .4480 and .5133. This supersedes the pending-power
+  step below. Keep the registered matrix stopped; retrieve and independently
+  audit the completed artifacts before diagnosing variance or proposing a
+  separately frozen follow-up design. Negative pilot H8-minus-H1 means are
+  exploratory only and do not determine GO/NO-GO.
+
+- **Latest pilot status (2026-09-05, user-reported; artifact audit pending):** the
+  CSIS Qwen3-32B pilot completed 120/120 queries. Ironclad parsing/legality are
+  59/60, Silent 60/60, and there is one truncation overall (0.833%). The reported
+  interface counts pass the frozen thresholds, including Ironclad H=2 at 14/15.
+  This supersedes the 37-query operational stop below. Retrieve and audit the
+  completed response and power artifacts, verify scoring-v2.1 provenance, and
+  evaluate the frozen paired bootstrap variance gate before declaring pilot GO.
+  Pilot responses remain non-confirmatory; no full matrix is authorized by this
+  completion report.
+
 - **Submission supersession (2026-08-31):** the active venue strategy is a four-page,
   non-archival PTA at NeurIPS 2026 workshop submission due **2026-09-05 AoE**, alongside
   an ICML 2027 main-track build centered on the controlled-H intervention. The

@@ -2,8 +2,15 @@
 
 **Protocol:** `controlled-decision-horizon-v2`
 **Implementation:** `slay_bench/controlled_horizon.py`
-**Status:** Combined 200-fixture release passed; cheap-model pilot frozen and
-mock-validated; model evidence **PENDING EXPERIMENT**
+**Status (superseded 2026-09-05):** Combined 200-fixture release passed; real
+120-query pilot completed and was audited. All interface gates pass, but the
+power gate fails (required N=158 Ironclad / 207 Silent, ceiling 100 each).
+Confirmatory model evidence remains **PENDING EXPERIMENT**. The run plan and
+100-per-character target below describe the original protocol; the failed
+gate must not be relabelled. A separately labelled fixture expansion is now
+frozen and its full oracle audit is running; see
+`../controlled_h_expansion_runbook.md`. The confirmatory model inference and
+analysis protocol remains unfrozen.
 
 V2 supersedes v1 before model inference. V1 admitted identical model prompts with
 different oracle labels because hidden draw order affected future value. V2 appends a

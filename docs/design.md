@@ -8,6 +8,18 @@
 
 ## Controlled-H fixture and oracle boundary
 
+**2026-09-05 expansion addendum:** the completed model pilot failed its power
+gate. `scripts/controlled_horizon_expansion.py` and
+`configs/controlled_h_v2_expansion.json` implement a separate source-hash-bound
+fixture expansion, preserving the engine, prompt, and exact-oracle contracts.
+It excludes pilot fixtures, retains old eligibility/source restrictions,
+audits untouched old screen candidates plus a fixed fresh pool, and targets
+252 fixtures per character or zero on a failed release. Checkpoints validate
+recipes, uniqueness, stage/budget/source bindings, and completeness before
+resuming; completed failures are not retried. See
+`controlled_h_expansion_runbook.md`. The original 100-per-character design
+below is preserved as historical protocol context.
+
 `controlled-decision-horizon-v2` uses deterministic replay recipes rather than a
 second general-purpose `GameState` deserializer. A recipe records character, seed,
 enemy IDs, initial deck, initial HP, and the exact action prefix. Regeneration must

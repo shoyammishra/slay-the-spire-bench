@@ -1,5 +1,272 @@
 # Experiment Log
 
+## 2026-09-05 — User-authorized repository checkpoint during the oracle audit
+
+The user requested commit and push of the accumulated pilot audit, follow-up
+planning, frozen expansion runner/protocol, regression tests, and documentation.
+Precommit validation reran all four direct suites: 199/199 pass (73 benchmark,
+62 combat, 36 run, 28 stats). The previously passed four-format/character mock
+checks remain applicable because execution code has not changed since them.
+The source receipt was rechecked and every running-audit implementation hash
+is unchanged. Ignored results, raw logs, process metadata, local supervision
+helpers, and credentials are excluded from the repository checkpoint.
+
+The oracle process remains active. Its checkpoint provenance samples the
+current Git HEAD/dirty state at each write, so committing during the run can
+change those metadata fields even though loaded code and source bytes remain
+identical. Preserve the pre-run source receipt and all artifacts; do not
+interpret the metadata transition as a new instrument version or restart.
+
+## 2026-09-05 — Full audit progress checked; unattended finalization armed
+
+The local full-oracle checkpoint advanced to 160/1,020 rows: 123 exact rows
+and 37 `OracleTimeBudgetExceeded` dispositions. There were no duplicate
+fixture IDs or source-receipt changes, and the full artifact still binds
+the completed screen hash. These are partial funnel counts, not a release
+outcome; all selected rows remain required. No model inference ran.
+
+An ignored local operational supervisor,
+`results/watch_controlled_h_expansion.py`, now polls the checkpoint and the
+explicit worker process every 30 seconds. It stops on source drift or worker
+exit before completeness. After 1,020/1,020 it runs the existing release CLI,
+then independently checks the release's exact row count, pilot exclusion,
+fixture/state uniqueness, source recipes, reconstructed legal-action sets,
+oracle extrema and optimal sets, nonzero spans, H-mismatch loss, both prompt
+formats' invariance, and 63/189 quotas per character. A failed release must
+emit zero fixtures. It never starts model calls or cluster work.
+
+Supervisor status and process metadata are ignored in
+`results/controlled_h_v2_expansion_supervisor_status.json` and
+`results/controlled_h_v2_expansion_supervisor_process.json`. The eventual
+independent check is
+`results/controlled_h_v2_expansion_independent_release_audit.json`.
+One-shot inspection, compilation, and injected waiting/stopped/source-drift
+checks passed; those branches forbid release execution. Synthetic tests also
+passed a 504-row balanced release, duplicate rejection, and zero-fixture
+NO-GO handling. These mocks ran without oracle searches and do not constitute
+an actual release. The production runner/source receipt was not changed.
+
+## 2026-09-05 — Expansion screen complete; full oracle audit running locally
+
+The production H={1,4} screen completed 800/800 fresh fixtures: all exact,
+zero oracle errors, and zero prompt-invariance failures. The registered
+advancement rule selects 782 fresh candidates (226 screen-disjoint and
+556 ranked screen-insensitive); 18 exact rows fail screen eligibility.
+Together with the 238 untouched old screen candidates, the full stage
+contains 1,020 rows. Summed recorded oracle time was 639.9238 seconds,
+excluding generation, checkpointing, and other overhead. The screen SHA-256
+is `14eb6b0d7b12eabb198219980fa5a0132a7755a04737574e278328435938a043`;
+the completion/source/recipe/budget check is saved under ignored
+`results/controlled_h_v2_expansion_screen_gate.json`.
+
+The PowerShell wrapper returned status 1 while redirecting the runner's
+normal stderr progress messages (`NativeCommandError`). Its stdout and
+atomic artifact both show successful 800-row completion; the full integrity
+check passed. This is a shell-output handling anomaly, not an oracle failure.
+No screen row was discarded or repeated to change the result.
+
+The first production full-stage row, fresh Ironclad suffix 0000, then passed
+all H={1,2,4,8} exactness and prompt checks. Its H=1/H=4 action values match
+the screen. H=8 took 93.9477 seconds and expanded 88,676 unique nodes, with
+nonzero span. The source receipt still matched every captured implementation
+file, and the full checkpoint binds the complete screen hash.
+
+After this gate, the remaining full audit was launched locally via a hidden
+background Python process, with one writer and no query limit. It resumes
+`results/controlled_h_v2_expansion_full.json`; process metadata is ignored in
+`results/controlled_h_v2_expansion_background.json`, and stdout/stderr use the
+matching full-stage log names. The original smoke row is not rerun. All
+1,020 selected rows must have dispositions before release; timeouts remain
+failures under unchanged budgets. At launch, 1/1,020 rows were checkpointed.
+No model/API/GPU/cluster inference ran. The full stage is running, not passed;
+the follow-up release and original pilot power gate must not be conflated.
+
+## 2026-09-05 — Production expansion screen started locally
+
+Following the user's instruction to continue, the production screen first
+checkpointed one fresh Ironclad row at H={1,4}. It passed exactness and
+structured/raw prompt invariance with no error; summed oracle time was
+.4253 seconds. The same output was then resumed for the remaining fresh
+candidates under the unchanged expansion digest `bfe8c130…1288b`.
+The screen checkpoints to `results/controlled_h_v2_expansion_screen.json`;
+stdout/stderr logs remain ignored alongside it. No model/API/GPU/cluster
+inference ran. The full H={1,2,4,8} stage has not started at this entry.
+
+While the screen progressed, all 334 reusable source rows (198 Ironclad,
+136 Silent) passed a fresh offline audit: recipe/state reconstruction, legal
+action vocabularies, all four H oracle extrema and optimal sets, exactness,
+nonzero H=8 span, pilot-ID exclusion, structured/raw prompt invariance, and
+H-aware/H-mismatched baseline consistency. No new oracle search was required.
+The check summary is `results/controlled_h_v2_expansion_reuse_audit.json`.
+
+Because the new runner is still uncommitted, an ignored source receipt at
+`results/controlled_h_v2_expansion_execution_receipt.json` records Python
+version, base commit, and SHA-256 of the expansion protocol/runner, every
+engine Python module, and controlled-H support scripts before the resumed
+screen starts. Preserve this receipt with the results; it supplements the
+artifact's truthful `git_dirty=true` provenance without altering history.
+
+## 2026-09-05 — Expansion manifest, tiny oracle smoke, and runner validation
+
+No model/API/GPU/cluster inference ran. The separately frozen expansion
+(`bfe8c130…1288b`) generated 800/800 fresh candidates with zero failures and
+no seed, fixture-ID, or state-digest overlap against the old candidate pool.
+The source-bound inventory preserves 334 eligible unexposed rows and selects
+238 untouched old screen candidates for future full audit. All seven source
+artifact hashes match the freeze. The manifest is ignored at
+`results/controlled_h_v2_expansion_manifest.json`.
+
+A deliberately tiny model-free oracle smoke audited only the first fresh
+fixture per character at H={1,4}, using the registered screen budgets. Both
+rows were exact, error-free, and prompt-invariant in structured/raw formats.
+Measured per-H oracle times were Ironclad .006/.389 seconds and Silent
+.009/.734 seconds, respectively. These timings are smoke diagnostics, not
+full-run forecasts. The separate `smoke-screen` artifact is
+`results/controlled_h_v2_expansion_smoke_screen.json`; it cannot be mistaken
+for the production screen checkpoint or silently reused by it.
+
+The actual CLI screen/full/release path was exercised with an injected
+mock-budget-failure auditor: all 800 fresh screen failures and all 238 old
+full-stage failures were checkpointed, then release failed closed with zero
+fixtures. Synthetic fixtures separately tested a successful balanced release,
+rank determinism, zero-span exclusion, pilot leakage, and duplicate rejection.
+Mock artifacts are under ignored `results/expansion_mock_e2e/` and contain no
+new exact-oracle evidence. The full production screen/full audit has not run.
+
+Validation passed 199/199 direct tests (benchmark 73, combat 62, run 36,
+stats 28), Python compilation, and the no-API benchmark pipeline for both
+characters/formats with one sample per dimension. The three new regression
+tests cover freeze/source mutation, failure-preserving checkpoint resume and
+tampering, and fail-closed release selection. Mock outputs are isolated under
+`results/expansion_validation/`; existing result artifacts were not replaced.
+The diff review, whitespace check, and added-content credential/private-
+infrastructure scan passed. No old engine, prompt, scorer, or frozen protocol
+changed. The new runbook records the next steps and conservative budget bounds.
+
+## 2026-09-05 — Offline follow-up sizing and eligible-pool inventory
+
+No inference or new oracle search ran. The persisted combined-release
+dispositions and pilot selection were counted by character/sensitivity,
+excluding all 30 pilot fixture IDs for the proposed follow-up. Eligible
+sensitive/control counts are 92/106 Ironclad and 55/81 Silent. The historical
+118 exact Ironclad controls include suffix 0394, with H=8 best=worst=1045;
+it was correctly excluded by release selection, leaving 117 eligible before
+pilot exclusion. The existing 200-fixture release is unaffected.
+
+The original unadvanced screen-insensitive pool, excluding the completed
+Silent extension, contains 111 Ironclad and 127 Silent candidates. Their
+full-H eligibility is unknown. Under the audited conservative paired SDs,
+the existing power function yields balanced per-character planning sizes
+208 at alpha .05, 252 at .025, and 296 at .0125, rounded to preserve 25/75
+strata. These are marginal .10-effect, 80%-power calculations for the Qwen3
+pilot variance assumption, not a passed multi-family gate. N=252 needs 83
+new Ironclad controls and 8 sensitive/108 controls for Silent. At N=100,
+normal-approximation power is .6072 Ironclad and .4954 Silent.
+
+Reproducible sizing and source hashes are in ignored
+`results/controlled_h_followup_sizing.py` and
+`results/controlled_h_followup_sizing.json`. The recommendation and workload
+arithmetic are in `docs/controlled_h_followup_plan.md`. An initial documentation
+search used a Windows-incompatible wildcard path and was replaced with
+explicit file reads; no data or run was affected. No frozen protocol changed.
+
+## 2026-09-05 — Remote dirty flag explained by untracked execution logs
+
+The user supplied the remote `git status --short`, `git diff --stat`, and
+`git diff --cached --stat` output. Status lists only untracked scheduler
+stdout/stderr and vLLM logs; both tracked-diff commands produce no output.
+This explains how the runner's broad porcelain-status check records
+`git_dirty=true` without tracked source modifications. The specific concern
+about current remote source changes is resolved by this inventory; it is a
+post-run observation rather than a historical attestation of every query's
+execution state. Preserve the original artifact flag and the documented
+multi-segment run provenance. No rescoring, rerun, or power-gate change is
+warranted. The audited pilot remains NO-GO at N=158/207 versus 100 each.
+Raw remote inventory and logs remain outside committed documentation.
+
+## 2026-09-05 — Retrieved pilot audited; power NO-GO reproduced locally
+
+The completed response artifact SHA-256 is
+`a09cca822d4dec6010b0412ef8953cf6870717bce780fd6095ab6f429e98bd87`;
+the power artifact SHA-256 is
+`485431f102639157bc68027c872b7f31638c3fd540ad63d115441b9ed17f2393`.
+This supersedes the artifact-pending status below. An offline per-row audit
+validated all four frozen source hashes and protocol bindings, model revision
+and recorded runtime versions, the 30-fixture selection and exact 120-query
+Latin order, regenerated prompt bytes/hashes, reparsing of every raw response,
+all saved scores, and legality against freshly reconstructed engine states.
+Frozen oracle action vocabularies and value extrema matched; no exact search
+was rerun. All summaries and the pilot-informed power output reproduced exactly.
+The prospective grid differed only by at most 2.22e-16 in five floating-point
+power values; the initial exact-equality audit stopped there, then passed with
+a 1e-12 tolerance for that grid. Pilot power numbers needed no tolerance.
+
+Scoring v2.1 preserves original scores for the first 37 rows with exactly 16
+legality corrections. Across all 120 rows, 52 non-targeted actions normalize
+legally; targeted actions retain exact target checks. The sole failure is
+Ironclad fixture suffix 0064 at H=2, with finish reason `length`. All 30 H1/H8
+pairs are complete, so this truncation does not drive the variance gate.
+An always-end-turn diagnostic is legal on every row, illustrating that 100%
+legality is not capability evidence; normalized quality remains bounded [0,1].
+
+The registered NO-GO is confirmed: required N is 158 Ironclad and 207 Silent.
+Exploratory sensitive/control paired SDs are .4979/.3184 for Ironclad and
+.5373/.4146 for Silent (n=4/11 each). Both strata contribute variability;
+these small post-hoc strata do not justify dropping controls or changing gates.
+
+**Provenance limitation:** the artifact records commit `db20055` with
+`git_dirty=true`; the identity of remote uncommitted changes is not captured.
+Recorded vLLM 0.8.5.post1 and Transformers 4.51.3 match the freeze, but artifact
+metadata alone cannot independently attest the served weights or remote code.
+Eight rows record historical 300-second/five-attempt transport, and 112 record
+900-second/one-attempt transport, consistent with the documented resume history.
+Obtain the remote change inventory before considering provenance closed.
+
+The reproducible local audit script and detailed diagnostic JSON are ignored
+under `results/audit_retrieved_pilot.py` and
+`results/controlled_h_v2_retrieved_pilot_audit.json`. Original artifacts were not
+modified. No model calls, GPU work, or new oracle searches ran; repository tests
+were not rerun because production code was unchanged.
+
+## 2026-09-05 — User reports pilot power NO-GO for both characters
+
+The user supplied the completed `pilot_informed` power output after the completion
+summary below. Every interface gate is true, but
+`variance_powered_within_release=false` and `go_for_registered_matrix=false`.
+
+| Character | Paired fixtures | Mean H8 minus H1 quality | Observed paired SD | Bootstrap 95th-percentile SD | Required N per character |
+|---|---:|---:|---:|---:|---:|
+| Ironclad | 15 | -0.16752438690026228 | 0.35834252302890346 | 0.4480205586871241 | 158 |
+| Silent | 15 | -0.17437222066079047 | 0.4345429459843603 | 0.5132552694692751 | 207 |
+
+Both required sample sizes exceed the frozen 100-fixture-per-character ceiling
+for 80% power at two-sided alpha .05 and absolute paired quality difference .10.
+The estimator uses the 95th percentile of 5,000 fixture-bootstrap SDs; observed
+effect sign is not used for the gate. Negative pilot differences are exploratory
+diagnostics, not confirmatory horizon evidence. This supersedes the pending-power
+status below, but the real response/power artifacts and scoring-v2.1 provenance
+still await independent local audit. No new inference ran. The registered matrix
+stays stopped pending diagnosis; any subsequent design must be separately frozen
+and disclose that it follows this failed pilot gate.
+
+## 2026-09-05 — User reports controlled-H pilot complete; artifact audit pending
+
+The user supplied the completed CSIS pilot summary: 120/120 queries, 60 per
+character and 15 per character/H cell. Ironclad parsing and legality are both
+59/60 (98.33%); H=2 is 14/15 (93.33%) and the other H cells are 15/15.
+Silent parsing and legality are both 60/60 (100%). There is one truncation
+overall, 1/120 (0.833%). These reported counts satisfy the frozen completeness,
+per-character parse/legality, per-character/H parsing, and truncation thresholds.
+
+Reported mean normalized quality across all H queries is 0.7929387321518236
+for Ironclad and 0.7567620390869555 for Silent. These pooled pilot diagnostics
+are not the paired H=8-minus-H=1 estimand and imply no horizon effect.
+The real response and power artifacts have not been retrieved or independently
+audited locally. Scoring-v2.1 migration/provenance, per-row legality (including
+Silent's boundary rate), and the bootstrap variance/power gate remain to be
+verified. No overall pilot GO or confirmatory model result is established by
+this summary. No new inference was launched during this status update.
+
 ## 2026-09-04 — Qwen3-32B pilot stopped at 37/120; scorer defect isolated
 
 The resumed CSIS pilot reached an atomic checkpoint of 37/120 before it was stopped

@@ -1750,6 +1750,112 @@ def test_compute_free_turn_oracle_audit_reports_bounds():
     print("[PASS] compute-free turn oracle audit reports exactness by character")
 
 
+def test_controlled_h_expansion_freeze_and_source_hashes():
+    from pathlib import Path
+    from tempfile import TemporaryDirectory
+    import copy, hashlib
+    from scripts.controlled_horizon_expansion import load_protocol, load_sources, FROZEN_DIGEST
+    p, digest = load_protocol()
+    assert digest == FROZEN_DIGEST
+    assert p['release']['fixtures_per_character'] == 252
+    assert not p['primary_planning_scope']['model_execution_authorized']
+    with TemporaryDirectory() as directory:
+        root = Path(directory)
+        changed = copy.deepcopy(p)
+        changed['release']['fixtures_per_character'] = 100
+        path = root/'protocol.json'
+        path.write_text(json.dumps(changed), encoding='utf-8')
+        try:
+            load_protocol(path)
+            assert False, 'mutated freeze accepted'
+        except ValueError:
+            pass
+        source = root/'source.json'
+        source.write_text('{}', encoding='utf-8')
+        spec = {'sources':{'test':{'filename':'source.json','sha256':hashlib.sha256(source.read_bytes()).hexdigest()}}}
+        assert load_sources(spec,root) == {'test':{}}
+        source.write_text('{"changed":true}',encoding='utf-8')
+        try:
+            load_sources(spec,root)
+            assert False, 'modified source accepted'
+        except ValueError:
+            pass
+    print('[PASS] expansion freeze and sources fail closed on mutation')
+
+
+def test_controlled_h_expansion_resume_preserves_failures_and_rejects_tampering():
+    import copy
+    from dataclasses import asdict
+    from pathlib import Path
+    from tempfile import TemporaryDirectory
+    from slay_bench.controlled_horizon import create_fixture
+    from scripts.controlled_horizon_expansion import run_stage, load_protocol
+    p,digest=load_protocol()
+    fixtures=[create_fixture('ironclad',seed,('Cultist',),fixture_id=f'expansion-test-{seed}')[0]
+              for seed in (9100,10100)]
+    calls=[]
+    def fake(f,h,n,w):
+        calls.append(f.fixture_id)
+        return {'fixture':asdict(f),'error':{'type':'OracleTimeBudgetExceeded'},'oracles':{}}
+    with TemporaryDirectory() as directory:
+        path=Path(directory)/'checkpoint.json'
+        first=run_stage(p,digest,'screen',fixtures,p['screen'],path,{'bound':1},1,fake)
+        assert not first['complete'] and len(calls)==1
+        second=run_stage(p,digest,'screen',fixtures,p['screen'],path,{'bound':1},1,fake)
+        assert second['complete'] and len(calls)==2
+        run_stage(p,digest,'screen',fixtures,p['screen'],path,{'bound':1},1,fake)
+        assert len(calls)==2, 'budget failures were retried'
+        variants=[]
+        duplicate=copy.deepcopy(second); duplicate['rows'][1]=duplicate['rows'][0]; variants.append(duplicate)
+        wrong_recipe=copy.deepcopy(second); wrong_recipe['rows'][0]['fixture']['seed']+=1; variants.append(wrong_recipe)
+        wrong_count=copy.deepcopy(second); wrong_count['completed_fixture_rows']=1; variants.append(wrong_count)
+        wrong_binding=copy.deepcopy(second); wrong_binding['binding']={'bound':2}; variants.append(wrong_binding)
+        for tampered in variants:
+            path.write_text(json.dumps(tampered),encoding='utf-8')
+            try:
+                run_stage(p,digest,'screen',fixtures,p['screen'],path,{'bound':1},1,fake)
+                assert False, 'tampered checkpoint accepted'
+            except ValueError:
+                pass
+        assert len(calls)==2
+    print('[PASS] expansion resume retains failed dispositions and rejects checkpoint drift')
+
+
+def test_controlled_h_expansion_release_excludes_pilot_and_fails_closed():
+    import copy
+    from scripts.controlled_horizon_expansion import load_protocol, select_release
+    p,_=load_protocol()
+    p=copy.deepcopy(p)
+    p['release'].update(fixtures_per_character=2,h1_h8_sensitive_per_character=1,h1_h8_insensitive_per_character=1)
+    a={'action':'end_turn','card_index':-1,'target_index':-1}
+    b={'action':'play','card_index':0,'target_index':0}
+    rows=[]
+    for char in ('ironclad','silent'):
+        for sensitive in (False,True):
+            fid=f'{char}-{sensitive}'
+            rows.append({'fixture':{'fixture_id':fid,'character':char,'state_digest':fid},
+                'error':None,'prompt_only_h_changes':True,
+                'oracles':{str(h):{'exact':True,'zero_span':False,
+                    'optimal_actions':[b if h==8 and sensitive else a],
+                    'baselines':{'h1_mismatched_oracle':{'regret':1 if sensitive else 0}}}
+                    for h in (1,2,4,8)}})
+    passed,payload=select_release(p,rows[:2],rows[2:],set())
+    assert passed['release_gate_passed'] and len(payload)==4
+    reordered,reverse=select_release(p,list(reversed(rows)),[],set())
+    assert payload==reverse
+    failed,payload=select_release(p,rows[:-1],[],set())
+    assert not failed['release_gate_passed'] and payload==[]
+    zero=copy.deepcopy(rows); zero[0]['oracles']['8']['zero_span']=True
+    assert not select_release(p,zero,[],set())[0]['release_gate_passed']
+    for reused,new,excluded in ((rows,[],{rows[0]['fixture']['fixture_id']}),(rows,[rows[0]],set())):
+        try:
+            select_release(p,reused,new,excluded)
+            assert False, 'pilot/duplicate fixture accepted'
+        except ValueError:
+            pass
+    print('[PASS] expansion release rejects leakage, zero spans, and quota shortfalls')
+
+
 if __name__ == "__main__":
     tests = [
         test_structured_prompt,
@@ -1829,6 +1935,9 @@ if __name__ == "__main__":
         test_controlled_horizon_prompt_exposes_oracle_relevant_draw_order,
         test_turn_oracle_persists_exactness_and_fails_closed_on_budget,
         test_compute_free_turn_oracle_audit_reports_bounds,
+        test_controlled_h_expansion_freeze_and_source_hashes,
+        test_controlled_h_expansion_resume_preserves_failures_and_rejects_tampering,
+        test_controlled_h_expansion_release_excludes_pilot_and_fails_closed,
     ]
     passed = failed = 0
     for test in tests:

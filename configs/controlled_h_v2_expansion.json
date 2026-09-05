@@ -1,0 +1,152 @@
+{
+  "protocol_id": "controlled-h-v2-expansion-2026-09-05",
+  "instrument_version": "controlled-decision-horizon-v2",
+  "status": "frozen-after-pilot-power-failure-before-expansion-oracle-run",
+  "candidate_generation": {
+    "candidates_per_character": 400,
+    "characters": [
+      "ironclad",
+      "silent"
+    ],
+    "seed_base": 9050000,
+    "character_seed_offset": 1000000,
+    "seed_stride": 1009,
+    "encounters": [
+      [
+        "GremlinNob"
+      ],
+      [
+        "Lagavulin"
+      ],
+      [
+        "SlimeBoss"
+      ],
+      [
+        "Hexaghost"
+      ],
+      [
+        "Sentry",
+        "Sentry"
+      ]
+    ],
+    "hp_fractions": [
+      1.0,
+      0.75,
+      0.5
+    ],
+    "combat_turns": [
+      1,
+      2,
+      3
+    ],
+    "fixture_turn_plays": [
+      0,
+      1
+    ],
+    "deck_size": 10,
+    "replacement_after_generation_failure": false
+  },
+  "screen": {
+    "horizons": [
+      1,
+      4
+    ],
+    "node_budget_per_fixture_h": 250000,
+    "wall_seconds_per_fixture_h": 10.0,
+    "advance_all_disjoint_h1_h4": true,
+    "screen_insensitive_advances_per_character": 400,
+    "screen_insensitive_rank": "sha256(protocol_id:fixture_id)"
+  },
+  "full_oracle": {
+    "horizons": [
+      1,
+      2,
+      4,
+      8
+    ],
+    "node_budget_per_fixture_h": 2000000,
+    "wall_seconds_per_fixture_h": 120.0
+  },
+  "release": {
+    "fixtures_per_character": 252,
+    "h1_h8_sensitive_per_character": 63,
+    "h1_h8_insensitive_per_character": 189,
+    "rank_within_character_and_sensitivity": "sha256(protocol_id:fixture_id)",
+    "minimum_sensitive_fraction": 0.2,
+    "require_nonzero_h8_oracle_span": true,
+    "require_prompt_invariance": true,
+    "require_exact_oracles_at_all_horizons": true,
+    "require_h1_mismatch_loss_on_sensitive_fixtures": true
+  },
+  "failure_policy": {
+    "generation_failure": "account-and-exclude-without-replacement",
+    "screen_budget_failure": "account-and-exclude",
+    "full_oracle_budget_failure": "account-and-exclude",
+    "zero_h8_span": "account-and-exclude-from-release",
+    "quota_shortfall": "fail-closed-without-changing-the-protocol",
+    "model_behavior_used_for_selection": false
+  },
+  "sources": {
+    "pilot": {
+      "filename": "controlled_h_v2_model_pilot_qwen3_32b_csis.json",
+      "sha256": "a09cca822d4dec6010b0412ef8953cf6870717bce780fd6095ab6f429e98bd87"
+    },
+    "power": {
+      "filename": "controlled_h_v2_power_qwen3_32b_csis.json",
+      "sha256": "485431f102639157bc68027c872b7f31638c3fd540ad63d115441b9ed17f2393"
+    },
+    "combined_audit": {
+      "filename": "controlled_h_v2_combined_release_audit.json",
+      "sha256": "6cd43d31c4b9fc48b474d72325aca20cd6603e916d882495768e37d262e8c737"
+    },
+    "combined_fixtures": {
+      "filename": "controlled_h_v2_combined_release_fixtures.json",
+      "sha256": "2b086a975388d5ce38acf76ac1c02500256ffbffbbcc082184d8f1774882461d"
+    },
+    "base_screen": {
+      "filename": "controlled_h_v2_frozen_screen.json",
+      "sha256": "036b8dcac8badf178d02f0216fb4ad8f5e5196816e0f25aeec68bc3bb075bc89"
+    },
+    "base_full": {
+      "filename": "controlled_h_v2_frozen_full.json",
+      "sha256": "94f376b546bbbabe82db01c182c9f034f786cc8dc7c99d3552ddffb37f25aca1"
+    },
+    "extension_full": {
+      "filename": "controlled_h_v2_silent_control_extension_full.json",
+      "sha256": "2a73203b860489aa86064bb8e4c6691eea989e4536c5bfe86e8c19d1c4c40961"
+    }
+  },
+  "expansion": {
+    "exclude_pilot_fixture_ids": true,
+    "reuse_only_combined_eligible_rows": true,
+    "audit_all_remaining_base_screen_insensitive": true,
+    "remaining_counts": {
+      "ironclad": 111,
+      "silent": 127
+    },
+    "fresh_candidates_per_character": 400,
+    "rank_namespace": "controlled-h-v2-expansion-2026-09-05",
+    "old_timeouts_retried": false,
+    "prior_extension_sensitive_rows_eligible": false,
+    "outcome_based_replacement": false,
+    "shortfall_policy": "stop-with-zero-release-fixtures"
+  },
+  "primary_planning_scope": {
+    "model": "Qwen/Qwen3-32B",
+    "prompt_format": "structured",
+    "estimand": "mean paired normalized_quality(H8)-normalized_quality(H1) within character",
+    "characters": [
+      "ironclad",
+      "silent"
+    ],
+    "two_sided_alpha_per_character": 0.025,
+    "familywise_alpha": 0.05,
+    "multiplicity": "Bonferroni two character-specific primary contrasts",
+    "target_marginal_power": 0.8,
+    "minimum_absolute_effect": 0.1,
+    "pilot_responses_reused": false,
+    "inference_protocol_frozen": false,
+    "model_execution_authorized": false,
+    "cross_model_contrasts_powered": false
+  }
+}

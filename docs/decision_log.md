@@ -1,5 +1,95 @@
 # Decision Log
 
+## 2026-09-05 — Freeze the separate model-free fixture expansion
+
+**Problem and options.** The follow-up needs more controls than existing
+eligible rows supply. Auditing only the remaining old screen pool is cheaper
+but may miss quotas; generating an entirely new release discards valid exact
+work. Choose a fixed union of old eligible rows, every untouched old
+screen-insensitive candidate, and 400 fresh candidates per character.
+
+**Decision.** Freeze `configs/controlled_h_v2_expansion.json`, digest
+`bfe8c1306661fb28eb336ec0e3306e4cee11dd47e0f6d2c16c4be83cd7f1288b`.
+Bind seven source hashes, exclude all 30 pilot fixtures, preserve prior source
+restrictions, and never retry old timeouts. New seeds start at 9050000 under
+the existing recipe distribution. Screen every fresh candidate at H={1,4};
+advance all eligible fresh candidates and all 238 untouched old screen
+controls to the unchanged full-oracle budgets. Rank the union in the new
+namespace and require 63 sensitive/189 controls per character, or emit zero.
+
+Planning scope is explicitly Qwen3-32B/structured with two primary
+character-specific .10-effect contrasts at alpha .025 each. It does not
+authorize inference or freeze missing-response analysis, final inference
+provenance, or cross-model tests. The broader multi-family program remains
+separate. Candidate count 400 per character reuses the established batch
+size and recipe coverage while limiting the fixed search workload; it is a
+feasibility choice, not a probabilistic guarantee of control yield.
+
+**Trade-offs, invalidation, and reversal.** This fixes a potentially expensive
+search before further outcomes, keeps exact work reusable, and documents
+post-pilot sample expansion. Prior prompt/scorer/engine contracts and existing
+results are unchanged; new fixture-population results require their own label.
+Smoke fixtures are the first fresh fixture per character, not outcome-selected.
+Any change to candidates, quotas, gates, or source restrictions after the
+smoke requires another versioned decision; preserve all failures. See
+`docs/controlled_h_expansion_runbook.md` for workload, limitations, and steps.
+
+## 2026-09-05 — Plan an expanded follow-up without overriding the pilot STOP
+
+**Problem.** The audited pilot fails its N<=100 power gate. A naive expansion
+to 208 per character ignores hypothesis-family scope and current control
+shortages. Exact control counts also overstate eligible Ironclad supply by
+one: fixture suffix 0394 has zero H=8 span.
+
+**Options and decision.** Compared accepting low power, relaxing the target or
+gate, repeating queries, and expanding independent fixtures. Recommend the
+last option, preserving .10, four H values, and the 25/75 target mixture.
+`docs/controlled_h_followup_plan.md` gives a provisional N=252 per character
+for two primary tests at alpha .025 each; it is not a frozen matrix protocol.
+Exclude the 30 pilot-exposed fixture IDs from the follow-up as a newly stated
+prospective safeguard, beyond the original prohibition on response reuse.
+This leaves 92/106 sensitive/control Ironclad fixtures and 55/81 Silent,
+short of N=252 quotas by 83 Ironclad controls and 8 sensitive/108 controls
+for Silent. A candidate-expansion freeze must precede additional oracle work.
+
+**Rationale and limitations.** Expansion preserves the scientific effect
+target, but costs more and changes the selected population. Two-test sizing
+does not power cross-model contrasts, all formats, or joint detection. It
+uses one model's small pilot and a normal approximation. Current unadvanced
+screen pools cannot be assumed to yield sufficient eligible controls.
+No source code, prompts, scoring, original protocol, or result is invalidated
+by this planning document. New fixtures require a separately labelled release;
+pilot NO-GO and extension history remain disclosed. Revise the planning size
+when the primary hypothesis family and fresh-model variance requirements are
+frozen, never by silently editing the failed protocol. No compute authorized.
+
+## 2026-09-05 — Apply the frozen pilot power STOP; audit before redesign
+
+**Problem.** User-reported completed pilot power output passes every interface
+gate but requires 158 Ironclad and 207 Silent fixtures under the registered
+conservative variance estimator, exceeding the release ceiling of 100 each.
+Full response and power artifacts remain unaudited locally.
+
+**Options considered.** Proceed with 100 fixtures despite the failed gate;
+relax the effect target or variance estimator after observing the pilot; or
+apply the frozen STOP and audit the artifacts before designing a follow-up.
+
+**Decision.** Apply the existing stop-and-diagnose policy. Do not launch the
+registered matrix or silently change its thresholds. First verify source and
+scoring provenance, paired rows, and reproducibility of the power output, then
+inspect per-fixture differences and sensitive/control strata diagnostically.
+Any expanded fixture release or altered design requires a separate prospective
+freeze, explicit disclosure of the failed pilot gate, validation, and compute
+authorization. No replacement design is selected here.
+
+**Rationale, trade-offs, invalidation, and reversal.** This preserves the
+registered decision rule while allowing diagnosis without new inference. It
+delays the matrix but invalidates neither the released exact fixtures nor
+the pilot responses. The pilot effect signs do not establish a confirmatory
+result and cannot be used to override the gate. Revise the recorded outcome
+only if artifact audit establishes a scoring or analysis defect; otherwise
+retain this NO-GO as history even if a separately registered follow-up passes.
+
 ## 2026-09-04 — Correct non-targeted action scoring before resuming the model pilot
 
 **Problem.** The live Qwen3-32B pilot was stopped at 37/120 after the original scorer
