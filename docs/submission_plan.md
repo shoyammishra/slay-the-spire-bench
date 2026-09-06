@@ -5,6 +5,49 @@
 **Authoritative for:** venue strategy, submission deadlines, manuscript separation,
 and the paper critical path.
 
+## Main-track readiness update (2026-09-05)
+
+The real 120-query Qwen3 pilot is complete and independently audited; it
+passed interface gates but failed the original N=100 power ceiling. The
+separately frozen expansion is now auditing 1,020 candidate rows. Completion
+does not itself supply confirmatory model evidence or guarantee a release:
+the gate must emit 504 eligible fixtures (252 per character, 63 sensitive and
+189 controls each), otherwise it stops. The historical milestone table below
+predates this pilot outcome and expansion.
+
+After a release GO, freeze the confirmatory inference and analysis protocol,
+including missing-pair handling, exact model revisions, budgets, primary
+hypothesis family, and variance/power gates. Current N=252 planning covers
+Qwen3-32B/structured with two character-specific tests; it does not establish
+power for other models, formats, or model-size contrasts. Run exact-stack
+smokes and separately authorized inference only after these gates. For a
+multi-family/scaling paper, obtain independently justified model coverage and
+power for the actual cross-model contrasts. Preserve the pilot and original
+release failures as disclosed history.
+
+The remaining manuscript work includes simulator conformance, relevant
+interface/rules controls, sensitive/control and raw-regret analyses, complete
+traces, uncertainty estimates, and agency ablations to support any claims
+about autonomous run behavior. Favor a precise bounded finding over requiring
+a negative H effect; null or mixed results may change the paper's thesis.
+
+**Conditional working schedule:** September for release/protocol completion;
+October for the main model evidence; November for replications and validity
+checks; December for full manuscript/reviewer-style audit; retain the January
+15, 2027 internal freeze. This is a planning estimate assuming adequate compute,
+a passing release, and no major new instrument defect, not an acceptance promise.
+Protocol writing, conformance work, and manuscript methods can proceed while
+the oracle audit runs.
+
+ICML 2027 remains the recommended main-track target. An official 2027 deadline
+could not be verified in the current check; late January remains provisional,
+supported only by the prior cycle's January 28, 2026 full-paper date on the
+[ICML 2026 dates page](https://icml.cc/Conferences/2026/Dates).
+The official [ICLR 2027 dates page](https://iclr.cc/Conferences/2027/Dates)
+lists September 18, 2026 abstracts and September 25 full papers, both AoE.
+Given the unresolved confirmatory evidence and validation, that earlier
+deadline is not the recommended target for this controlled-H main-track study.
+
 ## Decision
 
 Run two coordinated but scientifically distinct tracks:
