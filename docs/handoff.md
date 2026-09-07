@@ -13,6 +13,29 @@ Single source of truth stays where it already lives (see §2).
 
 ## 1. Project status snapshot (2026-07-12)
 
+- **Confirmation prepared (2026-09-07):** the separate Qwen3-32B/structured
+  protocol now freezes all 2,016 response slots, all-pair zero-on-invalid
+  analysis, two Bonferroni-adjusted stratified bootstrap tests, implementation
+  hashes, canonical real checkpoint, and pinned server-launch provenance.
+  All 2,016 mock slots completed and replay analysis passed; 209 tests and
+  four standard mock pipelines passed. Real Linux serving remains untested.
+  See `docs/controlled_h_confirmatory_runbook.md` for commands and gates.
+  CSIS transfer, allocation, smoke, and retrieval commands are in
+  `cluster/CSIS_CONTROLLED_H_CONFIRMATORY.md`; smoke and full run require the
+  same server/allocation under this freeze. Eight-hour fit is not established.
+  This supersedes the "next freeze" instruction below. No model/cluster
+  execution follows from this state; exact Linux stack smoke and explicit
+  authorization remain required. Pilot NO-GO and single-model scope remain.
+
+- **Expansion release GO (completed 2026-09-06; verified 2026-09-07):** all
+  1,020 full-oracle rows are accounted: 694 exact and 326 timeouts. The
+  separately labelled expansion emitted 504 unique fixtures, exactly 63
+  sensitive + 189 controls per character, and the independent audit passed
+  all 504. Saved artifact hashes were reverified; worker and supervisor have
+  exited. This supersedes all running/partial statuses below. Next freeze
+  confirmatory inference/analysis and validate its smoke/power gates; no model
+  execution is authorized by the fixture GO. Original pilot NO-GO remains.
+
 - **Full audit with automatic completion checks (2026-09-05):** latest
   inspected checkpoint is 160/1,020, with 123 exact rows and 37 preserved
   timeouts. The source receipt and checkpoint bindings remain valid. A hidden

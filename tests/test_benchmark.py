@@ -1856,6 +1856,162 @@ def test_controlled_h_expansion_release_excludes_pilot_and_fails_closed():
     print('[PASS] expansion release rejects leakage, zero spans, and quota shortfalls')
 
 
+def _confirmatory_mock_context():
+    from types import SimpleNamespace
+    from scripts.controlled_horizon_confirmatory import load_protocol
+    p,_=load_protocol()
+    p['inference']['expected_query_count']=8
+    fixtures={c:SimpleNamespace(character=c,fixture_id=c) for c in ('ironclad','silent')}
+    oracles={c:{'oracles':{str(h):{'action_values':{'end_turn:-1:-1':0.,'play:0:0':1.},
+                                'best_value':1.,'worst_value':0.,'exact':True}
+                            for h in (1,2,4,8)}} for c in fixtures}
+    prompts={c:{h:('system',f'user H={h}') for h in (1,2,4,8)} for c in fixtures}
+    return p,(fixtures,oracles,{c:False for c in fixtures},prompts)
+
+
+def test_confirmatory_freeze_and_balanced_schedule():
+    import copy
+    from pathlib import Path
+    from tempfile import TemporaryDirectory
+    from types import SimpleNamespace
+    from scripts.controlled_horizon_confirmatory import load_protocol,query_schedule,FROZEN_DIGEST
+    p,d=load_protocol(); assert d==FROZEN_DIGEST
+    from unittest.mock import patch
+    with patch('scripts.controlled_horizon_confirmatory.code_receipt',return_value={}):
+        try: load_protocol(); assert False,'implementation drift accepted'
+        except ValueError: pass
+    fixtures={f'{c}-{i}':SimpleNamespace(character=c) for c in ('ironclad','silent') for i in range(252)}
+    tags={f'{c}-{i}':i<63 for c in ('ironclad','silent') for i in range(252)}
+    schedule=query_schedule(p,fixtures,tags)
+    assert len(schedule)==2016 and len({(x['fixture_id'],x['horizon']) for x in schedule})==2016
+    for c in ('ironclad','silent'):
+        for h in (1,2,4,8):
+            for position in range(4):
+                assert sum(x['character']==c and x['horizon']==h and x['query_order_within_fixture']==position for x in schedule)==63
+    assert schedule==query_schedule(p,dict(reversed(list(fixtures.items()))),tags)
+    with TemporaryDirectory() as directory:
+        changed=copy.deepcopy(p); changed['transport']['network_attempts']=2
+        path=Path(directory)/'changed.json'; path.write_text(json.dumps(changed),encoding='utf-8')
+        try: load_protocol(path); assert False, 'modified freeze accepted'
+        except ValueError: pass
+    print('[PASS] confirmation freeze locks balanced 2016-query schedule')
+
+
+def test_confirmatory_immutable_rows_and_resume():
+    from pathlib import Path
+    from tempfile import TemporaryDirectory
+    from scripts.controlled_horizon_confirmatory import run,row_path
+    p,context=_confirmatory_mock_context()
+    llm=MockLLM(['{"action":"end_turn"}'])
+    with TemporaryDirectory() as directory:
+        out=Path(directory)/'run.json'
+        one=run(p,'test',context,out,llm)
+        assert len(one['completed_rows'])==1
+        original=row_path(out,0).read_bytes()
+        done=run(p,'test',context,out,llm,phase='run')
+        assert done['complete'] and len(done['completed_rows'])==8
+        assert row_path(out,0).read_bytes()==original
+        before=len(llm._calls)
+        run(p,'test',context,out,llm,phase='run')
+        assert len(llm._calls)==before
+        row=json.loads(row_path(out,0).read_text()); row['effective_quality']=.5
+        row_path(out,0).write_text(json.dumps(row),encoding='utf-8')
+        try: run(p,'test',context,out,llm,phase='run'); assert False,'tampered row accepted'
+        except ValueError: pass
+    print('[PASS] confirmation immutable row resume rejects checksum drift')
+
+
+def test_confirmatory_crash_resolution_and_transport_stop():
+    from pathlib import Path
+    from tempfile import TemporaryDirectory
+    from slay_bench.benchmark import LLMInterface
+    from scripts.controlled_horizon_confirmatory import run,row_path
+    class Crash(LLMInterface):
+        def complete(self,*args,**kwargs): raise KeyboardInterrupt()
+    class Broken(LLMInterface):
+        def complete(self,*args,**kwargs): raise OSError('synthetic transport failure')
+    p,context=_confirmatory_mock_context()
+    with TemporaryDirectory() as directory:
+        out=Path(directory)/'crash.json'
+        try: run(p,'test',context,out,Crash()); assert False,'crash ignored'
+        except KeyboardInterrupt: pass
+        assert json.loads(out.read_text())['pending'] is not None
+        llm=MockLLM(['{"action":"end_turn"}'])
+        before=len(llm._calls)
+        try: run(p,'test',context,out,llm); assert False,'ambiguous query retried'
+        except ValueError: pass
+        assert len(llm._calls)==before
+        resolved=run(p,'test',context,out,resolve_pending=True)
+        row=json.loads(row_path(out,0).read_text())
+        assert row['effective_quality']==0 and row['diagnostics']['execution_failure']=='ambiguous_query'
+        assert len(resolved['completed_rows'])==1 and resolved['pending'] is None
+        fail=Path(directory)/'transport.json'
+        r=run(p,'test',context,fail,Broken(),phase='run')
+        assert len(r['completed_rows'])==1 and not r['complete']
+        assert json.loads(row_path(fail,0).read_text())['diagnostics']['execution_failure']=='transport_failure'
+    print('[PASS] confirmation crash requires explicit no-inference resolution; transport stops')
+
+
+def test_confirmatory_orphan_recovery_authorization_and_lock():
+    from pathlib import Path
+    from tempfile import TemporaryDirectory
+    from scripts.controlled_horizon_confirmatory import run,row_path,exclusive_writer,query_schedule
+    p,context=_confirmatory_mock_context()
+    with TemporaryDirectory() as directory:
+        out=Path(directory)/'recover.json'; llm=MockLLM(['{"action":"end_turn"}'])
+        r=run(p,'test',context,out,llm)
+        r['completed_rows']=[]; r['pending']=query_schedule(p,context[0],context[2])[0]
+        out.write_text(json.dumps(r),encoding='utf-8')
+        before=len(llm._calls)
+        recovered=run(p,'test',context,out,llm)
+        assert len(recovered['completed_rows'])==1 and len(llm._calls)==before
+        real=Path(directory)/'unauthorized.json'
+        try: run(p,'test',context,real,llm,provider='local'); assert False,'unauthorized call accepted'
+        except ValueError: pass
+        assert not real.exists()
+        with exclusive_writer(out):
+            try:
+                with exclusive_writer(out): assert False,'second writer accepted'
+            except OSError: pass
+    print('[PASS] confirmation orphan row reconciles without retry; authorization and lock enforced')
+
+
+def test_confirmatory_invalid_and_truncated_effective_quality():
+    from scripts.controlled_horizon_confirmatory import effective_quality,make_row,query_schedule
+    p,context=_confirmatory_mock_context(); schedule=query_schedule(p,context[0],context[2]); q=schedule[0]; fid=q['fixture_id']
+    legal={'parse_ok':True,'schema_ok':True,'legal':True,'normalized_quality':.75}
+    assert effective_quality(legal)==.75 and effective_quality(legal,True)==0
+    assert effective_quality(dict(legal,legal=False))==0
+    for value in (float('nan'),float('inf'),1.01,-.1):
+        try: effective_quality(dict(legal,normalized_quality=value)); assert False,'invalid legal score accepted'
+        except ValueError: pass
+    row=make_row(q,context[3][fid],context[1][fid],[], '[]','stop')
+    assert row['effective_quality']==0 and not row['score']['legal']
+    row=make_row(q,context[3][fid],context[1][fid],{'action':'play','card_index':0,'target_index':0},'{}','length')
+    assert row['score']['normalized_quality']==1 and row['effective_quality']==0
+    print('[PASS] confirmation preserves raw quality and scores invalid/truncated responses zero')
+
+
+def test_confirmatory_dynamic_cost_prompt_invariance():
+    from scripts.controlled_horizon_confirmatory import load_protocol,prompt_contract
+    from slay_bench.controlled_horizon import ControlledFixture,load_fixture,legal_actions,build_prompt
+    fixture=ControlledFixture.from_dict(dict(
+        character='silent',deck_names=['Strike_G','Defend_G','Neutralize','Survivor','Flechettes',
+                                      'Prepared','Accuracy','Choke','Eviscerate','Piercing Wail'],
+        enemy_ids=['Lagavulin'],fixture_id='controlled-h-v2-fixtures-2026-08-31-silent-0146',
+        player_hp=35,prefix_actions=[dict(action='play',card_index=1,target_index=-1)],seed=1978314,
+        state_digest='2637609cfbbb06089c01219c13e5b77d7101c1832174c0b5dd1618e93b79de32',
+        version='controlled-decision-horizon-v2'))
+    p,_=load_protocol()
+    prompts=prompt_contract(fixture,p)
+    state=load_fixture(fixture); legal_actions(state)
+    assert prompts[1]==build_prompt(state,1,'structured')
+    assert prompts==prompt_contract(fixture,p)
+    assert len({u.replace(f'after exactly {h} decision transitions','after exactly <H> decision transitions')
+                for h,(_,u) in prompts.items()})==1
+    print('[PASS] confirmation dynamic costs match audited state and vary only H')
+
+
 if __name__ == "__main__":
     tests = [
         test_structured_prompt,
@@ -1938,6 +2094,12 @@ if __name__ == "__main__":
         test_controlled_h_expansion_freeze_and_source_hashes,
         test_controlled_h_expansion_resume_preserves_failures_and_rejects_tampering,
         test_controlled_h_expansion_release_excludes_pilot_and_fails_closed,
+        test_confirmatory_freeze_and_balanced_schedule,
+        test_confirmatory_immutable_rows_and_resume,
+        test_confirmatory_crash_resolution_and_transport_stop,
+        test_confirmatory_orphan_recovery_authorization_and_lock,
+        test_confirmatory_invalid_and_truncated_effective_quality,
+        test_confirmatory_dynamic_cost_prompt_invariance,
     ]
     passed = failed = 0
     for test in tests:

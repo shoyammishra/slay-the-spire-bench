@@ -1,0 +1,217 @@
+{
+  "protocol_id": "controlled-h-v2-qwen3-confirmatory-2026-09-07",
+  "status": "frozen-before-confirmatory-model-inference",
+  "instrument_version": "controlled-decision-horizon-v2",
+  "action_scoring_version": "controlled-action-scoring-v2.1",
+  "sources": {
+    "pilot": {
+      "filename": "controlled_h_v2_model_pilot_qwen3_32b_csis.json",
+      "sha256": "a09cca822d4dec6010b0412ef8953cf6870717bce780fd6095ab6f429e98bd87",
+      "kind": "result"
+    },
+    "power": {
+      "filename": "controlled_h_v2_power_qwen3_32b_csis.json",
+      "sha256": "485431f102639157bc68027c872b7f31638c3fd540ad63d115441b9ed17f2393",
+      "kind": "result"
+    },
+    "combined_audit": {
+      "filename": "controlled_h_v2_combined_release_audit.json",
+      "sha256": "6cd43d31c4b9fc48b474d72325aca20cd6603e916d882495768e37d262e8c737",
+      "kind": "result"
+    },
+    "combined_fixtures": {
+      "filename": "controlled_h_v2_combined_release_fixtures.json",
+      "sha256": "2b086a975388d5ce38acf76ac1c02500256ffbffbbcc082184d8f1774882461d",
+      "kind": "result"
+    },
+    "base_screen": {
+      "filename": "controlled_h_v2_frozen_screen.json",
+      "sha256": "036b8dcac8badf178d02f0216fb4ad8f5e5196816e0f25aeec68bc3bb075bc89",
+      "kind": "result"
+    },
+    "base_full": {
+      "filename": "controlled_h_v2_frozen_full.json",
+      "sha256": "94f376b546bbbabe82db01c182c9f034f786cc8dc7c99d3552ddffb37f25aca1",
+      "kind": "result"
+    },
+    "extension_full": {
+      "filename": "controlled_h_v2_silent_control_extension_full.json",
+      "sha256": "2a73203b860489aa86064bb8e4c6691eea989e4536c5bfe86e8c19d1c4c40961",
+      "kind": "result"
+    },
+    "release_audit": {
+      "kind": "result",
+      "filename": "controlled_h_v2_expansion_release_audit.json",
+      "sha256": "9f3cec7090d43be4b7420ad45934f17c32a6f67d33cf8750580e8380058d86b1"
+    },
+    "release_fixtures": {
+      "kind": "result",
+      "filename": "controlled_h_v2_expansion_release_fixtures.json",
+      "sha256": "ba48f7318322de9e71b426568cc3d20e1e7ec9d348d8a02b12255c341f92c18a"
+    },
+    "expansion_full": {
+      "kind": "result",
+      "filename": "controlled_h_v2_expansion_full.json",
+      "sha256": "81e85d8dfa403c5d0d1dc6e394a0fa808996709766a7bb0c2a14010a7183839c"
+    },
+    "independent_audit": {
+      "kind": "result",
+      "filename": "controlled_h_v2_expansion_independent_release_audit.json",
+      "sha256": "0102513cdc3848c706b843809f712ce52597e1015346015fafc7c0162b448914"
+    },
+    "expansion_protocol": {
+      "kind": "config",
+      "filename": "configs/controlled_h_v2_expansion.json",
+      "sha256": "bfe8c1306661fb28eb336ec0e3306e4cee11dd47e0f6d2c16c4be83cd7f1288b"
+    },
+    "pilot_protocol": {
+      "kind": "config",
+      "filename": "configs/controlled_h_v2_model_pilot.json",
+      "sha256": "465bab1dc23dddf5c5566c91943efaebc44ac3ab316ffb2003f15e01046a104f"
+    }
+  },
+  "release": {
+    "protocol_digest": "bfe8c1306661fb28eb336ec0e3306e4cee11dd47e0f6d2c16c4be83cd7f1288b",
+    "fixture_count": 504,
+    "characters": [
+      "ironclad",
+      "silent"
+    ],
+    "fixtures_per_character": 252,
+    "sensitive_per_character": 63,
+    "control_per_character": 189,
+    "pilot_fixture_reuse": false
+  },
+  "inference": {
+    "model_family": "qwen3",
+    "model_repository": "Qwen/Qwen3-32B",
+    "model_revision": "9216db5781bf21249d130ec9da846c4624c16137",
+    "served_model_name": "qwen3-32b",
+    "provider": "local",
+    "serving_stack": {
+      "engine": "vllm",
+      "vllm_version": "0.8.5.post1",
+      "transformers_version": "4.51.3",
+      "tensor_parallel_size": 1,
+      "max_model_len": 16384,
+      "gpu_memory_utilization": 0.95
+    },
+    "prompt_format": "structured",
+    "horizons": [
+      1,
+      2,
+      4,
+      8
+    ],
+    "horizon_query_order": "hash-ranked Latin rotation within character; fixtures interleaved by global hash rank",
+    "temperature": 0.0,
+    "max_tokens": 8000,
+    "responses_per_fixture_h": 1,
+    "expected_query_count": 2016,
+    "prompt_preparation": "confirmatory-v1: reconstruct fixture and refresh legal-action dynamic costs before each H; matches oracle-audit prompt preparation; separate from pilot model helper"
+  },
+  "transport": {
+    "timeout_seconds": 900.0,
+    "network_attempts": 1,
+    "retry_completed_or_ambiguous_queries": false,
+    "transport_failure": "record-zero-effective-quality-and-stop-invocation",
+    "inflight_crash": "block-resume-until-explicit-no-inference-failure-resolution",
+    "real_report_filename": "controlled_h_v2_confirmatory_qwen3_32b.json",
+    "server_provenance": "frozen Linux launcher receipt plus local live process command; endpoint and receipt bound across resume; operational attestation, not cryptographic proof of remote weights"
+  },
+  "analysis": {
+    "primary": "mean effective_quality(H8)-effective_quality(H1) separately by character",
+    "effective_quality": "raw normalized quality for parse/schema/legal nontruncated response; zero otherwise",
+    "missing_pair_policy": "retain all scheduled fixture pairs; no dropping; no inferential result before all slots accounted",
+    "execution_failure_claim_gate": 0,
+    "stratum_weights": {
+      "sensitive": 0.25,
+      "control": 0.75
+    },
+    "primary_hypotheses": 2,
+    "two_sided_alpha_per_character": 0.025,
+    "familywise_alpha": 0.05,
+    "multiplicity": "Bonferroni two character-specific primary tests",
+    "bootstrap_replicates": 100000,
+    "bootstrap_seed_by_character": {
+      "ironclad": 9072026,
+      "silent": 9072027
+    },
+    "bootstrap_sampling": "independent resampling within character/sensitivity stratum, preserving exact stratum counts",
+    "test": "two-sided centered-null bootstrap with common overall-mean shift; plus-one p correction",
+    "ci": "basic bootstrap 97.5 percent; nearest-rank empirical quantiles (ceil(B*p)-1)",
+    "reject_if": "p < 0.025 and all validity gates pass",
+    "effect_sign_used_for_gate": false,
+    "secondary": "per-fixture quality slope per log2H, raw regret conditional on valid action with denominators, horizon/stratum summaries, oracle-span and baseline diagnostics",
+    "secondary_inference": "exploratory only; no cross-model or cross-character pooled primary test"
+  },
+  "validity_gates": {
+    "minimum_parse_rate_per_character": 0.95,
+    "minimum_legal_rate_per_character": 0.95,
+    "minimum_parse_rate_per_character_horizon": 0.9,
+    "minimum_legal_rate_per_character_horizon": 0.9,
+    "maximum_truncation_rate": 0.01,
+    "maximum_execution_failures": 0,
+    "boundary_or_near_zero_variance": "suppress confirmatory claim pending per-sample and degenerate-policy audit",
+    "near_zero_paired_sd": 1e-08
+  },
+  "power": {
+    "method": "pilot-upper-SD normal-approximation planning only; not calibrated power for bootstrap test",
+    "minimum_absolute_effect": 0.1,
+    "target_marginal_power": 0.8,
+    "two_sided_alpha_per_character": 0.025,
+    "pilot_upper_sd": {
+      "ironclad": 0.4480205586871241,
+      "silent": 0.5132552694692751
+    },
+    "required_n_per_character": {
+      "ironclad": 191,
+      "silent": 251
+    },
+    "planned_n_per_character": 252,
+    "joint_power_guaranteed": false,
+    "other_models_formats_contrasts_powered": false
+  },
+  "authorization": {
+    "model_inference_requires_explicit_authorization": true,
+    "real_smoke_required_before_run": true,
+    "model_execution_authorized_by_this_freeze": false,
+    "pilot_no_go_preserved": true
+  },
+  "implementation_sha256": {
+    "scripts/controlled_horizon_combined_release.py": "f32f061f3cfa4f8e52e2f95df4bf397f5eaacef12f9d03280409dce83dd599b0",
+    "scripts/controlled_horizon_confirmatory.py": "b5ffd2fd5ad89ea2837ef2f4b46b840f72b3aad0b2ca48c17521eb720b4122d7",
+    "scripts/controlled_horizon_confirmatory_analysis.py": "8db69da14051306bc76402c014570dd3ac3018f6259cc154006e898752635908",
+    "scripts/controlled_horizon_confirmatory_server.py": "722dd9cfdfb9d4fda956f2a08901d92ee928ac4d610f707cca654a6aed3a7591",
+    "scripts/controlled_horizon_expansion.py": "320df504eb5addad03c2cdd67605d497050851bd8a8c9a6271d2228c547a1428",
+    "scripts/controlled_horizon_funnel.py": "c0d62baf3455e600b5fad234c5c6e027e9f3923b26ef08513c417a6895a5ab39",
+    "scripts/controlled_horizon_model_pilot.py": "cc4f655a55f45fee46b62c967acf6def1682e5d76ddbdc59c5ae68834fbdaa1d",
+    "scripts/controlled_horizon_pilot.py": "ae2b6adde5685c1172d024d14689405e3c20df2bfc4267c96648c3df86d1d645",
+    "scripts/controlled_horizon_power.py": "13c98876ee8d1e9a03b33862774b8e5e9f88ff57e0a07f8eeffa2403cb1361cf",
+    "scripts/controlled_horizon_silent_extension.py": "667dd9d26aa6fdb17605e1610ef6820e9d8dbce246681eca3a9462765c37a251",
+    "slay_bench/__init__.py": "4ad0a62672e65af39d690d92a3260eaefd18d50047460e7e5e71faa21a6c1a86",
+    "slay_bench/benchmark.py": "d2f7a710cab37a540246a6902880cc5d1a81c3be1e8ed0df08268e6032a59f0e",
+    "slay_bench/cards.py": "b19b7193e14bf8fab8d3107028ef293f9c2d97ac3c12f36c8c69df19c7679df1",
+    "slay_bench/cards_silent.py": "07ec4530c67cbbbe068d69dc28a136cb6b20e711f6d12fb11d37234c79d69afa",
+    "slay_bench/combat.py": "67de791250b75bad55b1f5381def6975faf521d4336d95c11701e8da01ed839c",
+    "slay_bench/controlled_horizon.py": "4634222f4385b116ad2546e4c7e1f3363ef6271b34858ae17ecd9c643be5052f",
+    "slay_bench/enemies.py": "e72b1762d0cd8dee81478a5e5b97f3e650ca24a01f006689afb1cdb94945c956",
+    "slay_bench/enemies_act2.py": "aefe3c95480e8ddba2461dff7ba5827e85c53c616b24780da9078ddd3077e579",
+    "slay_bench/enums.py": "dc3046c003a7e0b1bdd428b6628edee612475f419ebffead6c95b6840725270c",
+    "slay_bench/events.py": "e63ea13aa002422b7924b32021703b327355cbb7d5dd34ca392de5abf05194ac",
+    "slay_bench/events_pool.py": "bd8da8a86c7d25583d10f5bbe7df47ada09b10eae13cd2c1ba8db70a4f5d4f55",
+    "slay_bench/map_gen.py": "80f5d1a83a9dd50df89a2d225e4ad380d6d3a08488368c93a12553baa6011db9",
+    "slay_bench/nodes.py": "d0984830f9c00d863db2d3f7512ca78df12ec7688ee4e982f6d12dbbfdd05971",
+    "slay_bench/potions.py": "a98c6bf5a7b983ae566ffee8db57a4c74ed42630e2a6b37caa50f3eaea56c958",
+    "slay_bench/powers.py": "e8a4ecfe1c63e72c5a9550b844325a9289b7fe1a99920ab38a87588be807354f",
+    "slay_bench/prompt_builder.py": "cd851c5f19e5fa108b44ab4eaa1ce9d2677b264883809674a8435b891b96e12c",
+    "slay_bench/relics.py": "4f54be96454f7ce6e61a2e46c36e25cd07350bba632581f555b054a412425421",
+    "slay_bench/relics_full.py": "967033cf6aad8275b5685cb744b4cd16d96271a8dd7210ec4eb50c7bf2ddbf46",
+    "slay_bench/rewards.py": "24807ed3a5b2494d4861c843f44c5decb0b47bc7cb6a1c88462514251e311fd1",
+    "slay_bench/rng.py": "19a33064c5cf04c9879ef775f2e638e0a9313a38c2d7a044d323fb5b67afd9a5",
+    "slay_bench/run_loop.py": "b849e92452fd4dd4fbbf34c840448bf0189911b1144d519c309cd099335d2d75",
+    "slay_bench/state.py": "15ffa15f4760ec559ae3f692967a2dabd1d89557192f476b35b2d0b0681d4f5a",
+    "slay_bench/visualize.py": "702f8e8f84614c65b1bf5163b7d0486a2db728f41a6a9bba2ea230af8991aa8a"
+  },
+  "implementation_hash_convention": "UTF-8 universal-newline source; runner FROZEN_DIGEST literal replaced by <protocol-digest> to remove self-reference"
+}

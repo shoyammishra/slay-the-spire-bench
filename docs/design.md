@@ -1,5 +1,17 @@
 # Design
 
+**2026-09-07 confirmation addendum:** the independently audited 504-fixture
+expansion feeds `controlled_horizon_confirmatory.py` and its frozen config.
+All-slot effective quality, fixed-stratum bootstrap, and execution/interface
+claim gates are specified in `controlled_h_confirmatory_runbook.md`. Each H
+reconstructs its fixture and refreshes dynamic costs through `legal_actions`
+before prompt serialization, matching the oracle audit. This avoids the
+pilot helper's first-serialization side effect without changing dynamics,
+oracle values, or scorer v2.1. Pilot response pooling is prohibited. Source
+and implementation hashes, immutable per-query rows, an in-flight marker,
+and a fixed real report bind replay and resume; real serving remains untested.
+
+
 > **Construct boundary (2026-08-30):** the four evaluator types are heterogeneous
 > operations, not levels of a controlled planning-horizon variable. Do not aggregate or
 > connect them into a scalar/curve. The default run controller is a hybrid scripted

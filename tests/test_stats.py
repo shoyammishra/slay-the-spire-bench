@@ -350,6 +350,85 @@ def test_controlled_horizon_prospective_power_is_monotone_and_known_answer():
     print("[PASS] controlled-H prospective power is deterministic and monotone")
 
 
+def test_confirmatory_bootstrap_null_sign_and_reproducibility():
+    from scripts.controlled_horizon_confirmatory_analysis import stratified_bootstrap,nearest_rank
+    s=[-.5,.5]; c=[-.5,.5]*3
+    null=stratified_bootstrap(s,c,1000,42)
+    assert null['mean_h8_minus_h1']==0 and null['p_two_sided']==1
+    positive=stratified_bootstrap([.4,.5,.6],[.4,.5,.6]*3,2000,42)
+    negative=stratified_bootstrap([-.4,-.5,-.6],[-.4,-.5,-.6]*3,2000,42)
+    assert positive==stratified_bootstrap([.4,.5,.6],[.4,.5,.6]*3,2000,42)
+    assert positive['p_two_sided']==negative['p_two_sided']==1/2001
+    assert positive['basic_ci_low']>0 and negative['basic_ci_high']<0
+    assert nearest_rank(list(range(100)),.025)==2
+    assert nearest_rank(list(range(100)),.975)==97
+    print('[PASS] confirmation bootstrap null/sign symmetry/seed and quantiles')
+
+
+def test_confirmatory_bootstrap_preserves_strata_and_common_null():
+    from scripts.controlled_horizon_confirmatory_analysis import stratified_bootstrap
+    # Fixed stratum means differ but their weighted mean is exactly zero.
+    result=stratified_bootstrap([.75]*3,[-.25]*9,1000,77)
+    assert result['mean_h8_minus_h1']==0 and result['p_two_sided']==1
+    assert result['basic_ci_low']==result['basic_ci_high']==0
+    assert result['sensitive_n']==3 and result['control_n']==9
+    shifted=stratified_bootstrap([1.]*3,[0.]*9,1000,77)
+    assert shifted['mean_h8_minus_h1']==.25 and shifted['p_two_sided']==1/1001
+    print('[PASS] confirmation bootstrap keeps fixed strata and tests weighted null')
+
+
+def _confirmation_analysis_rows():
+    from scripts.controlled_horizon_confirmatory import load_protocol
+    p,_=load_protocol()
+    p['analysis']['bootstrap_replicates']=500
+    p['release'].update(fixtures_per_character=8,sensitive_per_character=2,control_per_character=6)
+    p['inference']['expected_query_count']=64
+    rows=[]
+    for c in ('ironclad','silent'):
+        for i in range(8):
+            for h in (1,2,4,8):
+                quality=.8 if h==1 else (.3+.05*i)
+                rows.append({'fixture_id':f'{c}-{i}','character':c,'h1_h8_sensitive':i<2,'horizon':h,
+                             'effective_quality':quality,'score':{'parse_ok':True,'legal':True},
+                             'diagnostics':{'truncated':False,'execution_failure':None}})
+    return p,rows
+
+
+def test_confirmatory_analysis_gates_do_not_drop_failures():
+    import copy
+    from scripts.controlled_horizon_confirmatory_analysis import analyze_rows
+    p,rows=_confirmation_analysis_rows()
+    good=analyze_rows(rows,p,True)
+    assert good['valid_for_primary_inference'] and good['rejected_primary_nulls']==2
+    assert not analyze_rows(rows,p,False)['valid_for_primary_inference']
+    bad=copy.deepcopy(rows); bad[0]['diagnostics']['execution_failure']='transport_failure'; bad[0]['effective_quality']=0
+    result=analyze_rows(bad,p,True)
+    assert not result['valid_for_primary_inference'] and result['rejected_primary_nulls']==0
+    assert result['by_character']['ironclad']['n_fixtures']==8
+    assert result['by_character']['ironclad']['mean_h8_minus_h1']!=good['by_character']['ironclad']['mean_h8_minus_h1']
+    assert not analyze_rows(rows[:-1],p,True)['valid_for_primary_inference']
+    try: analyze_rows(rows+[rows[0]],p,True); assert False,'duplicate accepted'
+    except ValueError: pass
+    print('[PASS] confirmation estimates retain failure slots and suppress invalid claims')
+
+
+def test_confirmatory_boundary_results_require_audit():
+    from scripts.controlled_horizon_confirmatory_analysis import analyze_rows
+    p,rows=_confirmation_analysis_rows()
+    for row in rows: row['effective_quality']=0
+    result=analyze_rows(rows,p,True)
+    assert not result['valid_for_primary_inference']
+    assert all(x['boundary_audit_required'] for x in result['by_character'].values())
+    assert all(x['p_two_sided']==1 for x in result['by_character'].values())
+    p,rows=_confirmation_analysis_rows()
+    for row in rows:
+        if row['horizon']==1: row['effective_quality']=1.
+    result=analyze_rows(rows,p,True)
+    assert not result['valid_for_primary_inference']
+    assert all(x['paired_sd']>0 and x['boundary_audit_required'] for x in result['by_character'].values())
+    print('[PASS] confirmation degenerate boundaries fail closed pending audit')
+
+
 if __name__ == "__main__":
     tests = [
         test_sign_flip_is_exact_and_hits_its_floor,
@@ -380,6 +459,10 @@ if __name__ == "__main__":
         test_discover_models_parses_filenames_and_skips_diagnostics,
         test_removal_metric_is_quarantined_from_analysis_and_composites,
         test_controlled_horizon_prospective_power_is_monotone_and_known_answer,
+        test_confirmatory_bootstrap_null_sign_and_reproducibility,
+        test_confirmatory_bootstrap_preserves_strata_and_common_null,
+        test_confirmatory_analysis_gates_do_not_drop_failures,
+        test_confirmatory_boundary_results_require_audit,
     ]
     passed = failed = 0
     for test in tests:

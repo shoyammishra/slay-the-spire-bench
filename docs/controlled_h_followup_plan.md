@@ -1,5 +1,11 @@
 # Controlled-H follow-up after pilot power failure
 
+**2026-09-07 supersession:** the expansion now passed independent audit with
+504 fixtures. The single-model inference/analysis contract is frozen and
+implemented; see `controlled_h_confirmatory_runbook.md`. The planning history
+below is retained. Real inference is not authorized by that freeze.
+
+
 **Date:** 2026-09-05. **Status:** planning recommendation, not an executable
 preregistration or compute authorization. The original pilot remains NO-GO.
 

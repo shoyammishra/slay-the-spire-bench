@@ -1,5 +1,44 @@
 # Decision Log
 
+## 2026-09-07 - Freeze expanded Qwen3 confirmation and all-slot analysis
+
+**Problem/options.** The 504-fixture expansion passed independently. Retaining
+only valid responses risks selection bias; pooling pilot responses breaks the
+prospective follow-up. Freeze a separate Qwen3-32B/structured, 2,016-slot run,
+with all 252 pairs per character and no pilot reuse. Preserve the pilot NO-GO.
+
+**Decision.** `configs/controlled_h_v2_confirmatory.json` and
+`controlled_h_confirmatory_runbook.md` bind source and implementation hashes,
+pinned serving provenance, balanced H order, immutable response files,
+no retries, and explicit ambiguous-slot resolution. Invalid/truncated model
+responses score zero; transport/ambiguous failures score zero for accounting
+and block claims. Two primary tests use stratified .25/.75 bootstrap means,
+100,000 fixed-seed replicates, centered-null two-sided p with plus-one
+correction, basic 97.5% intervals, and Bonferroni alpha .025 per character.
+Do not drop pairs or use observed effect sign as a gate. N=191/251 versus
+252 available passes normal-approximation planning only, not calibrated
+bootstrap/joint power. Boundary/near-zero results require independent audit.
+
+**Pre-freeze smoke correction.** The first full-release mock stopped before
+querying because the pilot prompt helper changed a dynamic Eviscerate cost
+between H values. The confirmation reconstructs and refreshes legal actions
+before each prompt, matching existing oracle-audit preparation; a fixture
+regression covers this. This is a separately labelled preparation contract.
+The final digest is
+`76bf7f917b46ffbe7d6deab859b961a28e4251e4cf875a17e12828d0795de1da`.
+Earlier intermediate digests were development candidates with no model calls.
+
+**Trade-offs/invalidation/reversal.** Existing engine/oracle/scorer and pilot
+artifacts stay unchanged; no response pooling across the pilot and follow-up.
+Pilot variance remains an approximate planning input under changed fixture
+population/preparation. Conservative execution gates can make a complete run
+non-confirmatory. One canonical report prevents routine replacement draws;
+local launch attestation cannot cryptographically prove weights. Linux exact
+stack smoke and explicit compute authorization remain prerequisites. Changes
+to source, protocol, server provenance, or failure policy require a disclosed
+new freeze before further inference; retain all failed attempts.
+
+
 ## 2026-09-05 — Freeze the separate model-free fixture expansion
 
 **Problem and options.** The follow-up needs more controls than existing

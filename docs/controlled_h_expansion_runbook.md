@@ -5,6 +5,14 @@ It does not submit cluster jobs or call a model. Protocol:
 `configs/controlled_h_v2_expansion.json`; digest
 `bfe8c1306661fb28eb336ec0e3306e4cee11dd47e0f6d2c16c4be83cd7f1288b`.
 
+**Completion supersession (verified 2026-09-07):** the audit completed on
+2026-09-06 with 694 exact rows and 326 timeouts across all 1,020 dispositions.
+Release passed with 504 fixtures (63 sensitive/189 controls per character),
+and the independent fixture audit passed. Both background processes exited.
+The running instructions below are historical execution context, not a
+request to restart completed work. Next is the confirmatory inference and
+analysis freeze; fixture GO does not authorize model execution.
+
 **Execution update, later 2026-09-05:** the production screen is complete
 (800/800 exact; 782 fresh advances). A one-row full-stage smoke passed all H,
 including exact H=8 in 93.95 s. The remaining 1,020-row full audit is now

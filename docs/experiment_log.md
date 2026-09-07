@@ -1,5 +1,96 @@
 # Experiment Log
 
+## 2026-09-07 - CSIS execution instructions prepared for authorized commit/push
+
+Added `cluster/CSIS_CONTROLLED_H_CONFIRMATORY.md` with source transfer,
+existing CSIS resource request, same-allocation server/smoke/run, and full
+checkpoint retrieval. All five Bash command blocks passed `bash -n` with
+Git Bash; frozen implementation/source receipt still validates unchanged.
+The eight-hour allocation is inherited from the pilot and is not a full-run
+runtime estimate. No cross-job server restart is supported by this freeze.
+Linux serving and cluster execution remain untested; no job was submitted.
+The user explicitly requested committing/pushing this work and providing
+commands. The earlier no-commit statement records the preceding turn only.
+
+## 2026-09-07 - Confirmation freeze, failed preflight, and complete offline validation
+
+Prepared the separately labelled Qwen3-32B confirmation on the independently
+released 504 fixtures, using the protocol and commands in
+`controlled_h_confirmatory_runbook.md`. No real model, API, GPU, or cluster
+inference ran. All source hashes and the 191/251 planning sample requirements
+reproduced against 252 available per character. Approximate marginal power
+is .903516 Ironclad / .802755 Silent under the pilot-upper-SD normal method;
+these are planning estimates, not calibrated bootstrap or joint power.
+
+The first full-release mock smoke failed in context validation before any
+query: the reused pilot helper detected a changing Eviscerate cost for Silent
+fixture 0146. Confirmation now refreshes legal-action costs before each
+independently reconstructed H prompt, matching oracle-audit preparation.
+A deterministic regression test covers that fixture. Independent review
+compared all 120 saved pilot prompts and found zero byte differences under
+the prepared contract, supporting continued use of the pilot variance input.
+The pilot artifacts and original NO-GO are unchanged.
+
+The corrected smoke saved 1/2,016 mock slots; resume completed 2,016/2,016.
+Full analysis verified every row checksum, prompt, parsed response, and
+recomputed score. The always-end-turn mock had 2,016 legal/parsed responses,
+zero truncations, and zero execution failures; these interface boundaries
+are expected for this fixed legal policy and were replay-audited per sample.
+The analysis correctly reports `valid_for_primary_inference=false` for mock
+data. Its quality effects are baseline behavior, not model capability.
+
+Validation: benchmark 79/79, combat 62/62, run 36/36, statistics 32/32
+(209 total); all four character/format standard mock pipelines passed with
+one sample per dimension. Tests cover checksums, orphan recovery, interrupted
+query resolution, transport stop, authorization, writer locks, source drift,
+invalid/truncated quality, bootstrap null/sign/mixture, missing/failure slots,
+and boundary suppression. Independent review found no remaining code blocker.
+`git diff --check` passed; new diff/untracked source review found no secret
+or private-infrastructure additions. Real Linux launcher, process checks,
+and vLLM startup were not tested on this Windows host and remain required
+before real inference. No commit or push was performed in this work.
+
+Ignored evidence:
+- Mock manifest SHA-256:
+  `7b214e4edb5873411a41efba0470995a3c54bff6e4b6e13cf92ca8d87c55d7e2`.
+- Mock analysis SHA-256:
+  `2d05388e16178d86b69d15c127aba5f81e730f1235b7ba1f40acb5fc0fc134f1`.
+- `results/controlled_h_v2_confirmatory_mock.json` and its `.rows` directory;
+  `results/controlled_h_v2_confirmatory_mock_analysis.json`;
+  `results/confirmation_test_*.log` and `results/confirmation_mock_*.log`.
+
+
+## 2026-09-07 — Verified completed expansion and independently audited release GO
+
+The full audit completed on 2026-09-06 at 16:56:38 UTC, with independent
+release verification recorded at 16:56:59 UTC; the artifacts were inspected
+again on 2026-09-07. All 1,020 selected rows have dispositions: 694 exact
+completions and 326 preserved `OracleTimeBudgetExceeded` failures. Ironclad
+contributed 501 rows (404 exact, 97 timeouts); Silent contributed 519
+(290 exact, 229 timeouts). These are funnel outcomes, not model results.
+
+The expansion release gate passed with zero shortfalls and 504 unique
+fixtures: 63 sensitive + 189 controls for each character. The supervisor's
+independent audit passed all 504 rows, including source recipes, uniqueness,
+pilot exclusion, reconstructed action vocabularies, oracle extrema/optimal
+sets, nonzero spans, mismatch losses, prompt invariance, and stratum counts.
+The source union contains 334 reusable rows and 1,020 newly audited rows;
+these source-union counts are not the composition of the selected release.
+
+The current inspection verified release flags, counts, uniqueness, absence
+of shortfalls, and both hashes against the independent audit:
+- Full audit SHA-256:
+  `81e85d8dfa403c5d0d1dc6e394a0fa808996709766a7bb0c2a14010a7183839c`.
+- Released fixture artifact SHA-256:
+  `ba48f7318322de9e71b426568cc3d20e1e7ec9d348d8a02b12255c341f92c18a`.
+
+Worker and supervisor processes have exited. No model/API/GPU/cluster
+inference ran. The original pilot power NO-GO remains historical; this GO
+applies only to the separately labelled expansion fixture release. Next
+freeze the confirmatory inference/analysis contract and pass its smoke and
+power gates before separately authorized model execution. No source code
+changed or oracle searches were rerun during this status verification.
+
 ## 2026-09-05 — User-authorized repository checkpoint during the oracle audit
 
 The user requested commit and push of the accumulated pilot audit, follow-up
