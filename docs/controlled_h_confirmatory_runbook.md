@@ -1,5 +1,11 @@
 # Controlled-H Qwen3 confirmation
 
+> **2026-09-08 supersession:** allocation 10611 ended after one saved smoke
+> response. Do not execute the historical interactive/same-server continuation
+> below. See `docs/controlled_h_batch_amendment.md` for the separately versioned
+> batch amendment and its validation status. Preserve the original evidence.
+
+
 Frozen 2026-09-07 before model inference. The separately audited expansion
 contains 504 fixtures, 252 per character (63 sensitive and 189 controls).
 `configs/controlled_h_v2_confirmatory.json` binds source hashes, implementation,

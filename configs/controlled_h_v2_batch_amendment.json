@@ -1,0 +1,54 @@
+{
+  "amendment_id": "controlled-h-v2-qwen3-batch-resume-2026-09-08",
+  "status": "frozen-before-batch-continuation",
+  "purpose": "Continue the immutable one-response-per-fixture-H confirmation across bounded server sessions without changing the original smoke artifact.",
+  "original_protocol": {
+    "protocol_id": "controlled-h-v2-qwen3-confirmatory-2026-09-07",
+    "protocol_digest": "76bf7f917b46ffbe7d6deab859b961a28e4251e4cf875a17e12828d0795de1da",
+    "expected_queries": 2016,
+    "completed_parent_queries": 1
+  },
+  "parent": {
+    "report_filename": "controlled_h_v2_confirmatory_qwen3_32b.json",
+    "report_sha256": "438fb5a18a2ee8f6dfc7f1631ca1bde287082dae91fd939b469af816836f9130",
+    "first_row_sha256": "710792f6743627e003ded1a8114e8cec83e3d3cfd3ad75e72b7b6e0669300a68",
+    "server_receipt_filename": "controlled_h_v2_confirmatory_server_10611.json",
+    "server_receipt_sha256": "571d4533ce948a6202f0a4630158bcdd348d0f6d91f7fa10a51c3b140fc66e2c",
+    "require_no_pending": true,
+    "require_legal_nontruncated_first_row": true
+  },
+  "journal": {
+    "real_filename": "controlled_h_v2_confirmatory_batch.json",
+    "real_session_prefix": "controlled_h_v2_confirmatory_batch_session_",
+    "session_digits": 4,
+    "coverage_start_index": 1,
+    "require_contiguous_nonoverlapping_coverage": true,
+    "allow_alternate_real_branches": false
+  },
+  "batch": {
+    "maximum_new_queries": 32,
+    "first_continuation_batch_queries": 1,
+    "first_continuation_global_index": 1,
+    "first_continuation_gate": "parse-schema-legal-nontruncated-no-execution-failure",
+    "request_timeout_seconds": 900.0,
+    "deadline_headroom_seconds": 180.0,
+    "network_attempts": 1,
+    "automatic_query_retry": false,
+    "ambiguous_query_policy": "explicit-no-inference-zero-effective-quality",
+    "transport_failure_policy": "record-zero-effective-quality-finalize-session",
+    "continue_after_accounted_failure": true,
+    "confirmatory_claim_requires_zero_execution_failures": true
+  },
+  "source_lock": {
+    "script": {
+      "filename": "scripts/confirmatory_batch.py",
+      "sha256": "3c49c981236ad752cc216656a190a9adb30456c39643489fef95123a018cb280"
+    },
+    "launcher": {
+      "filename": "cluster/csis_controlled_h_confirmatory.sbatch",
+      "sha256": "038558d963274c26421cc4edcae762d3f6240e1469573faf720387174571c489"
+    }
+  },
+  "post_smoke_execution_amendment": true,
+  "hash_convention": "SHA-256 of UTF-8 universal-newline source; confirmatory_batch.py additionally replaces its AMENDMENT_DIGEST literal with <amendment-digest>"
+}

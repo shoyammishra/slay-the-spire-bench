@@ -1,5 +1,80 @@
 # Experiment Log
 
+## 2026-09-08 - Batch amendment frozen and validated without new model calls
+
+Frozen amendment digest:
+`ba73b91d23336923b8ea96f693df5cc836c0f13e51b4f2bd1b44bf311863caad`.
+The original protocol, its implementation receipt, and the retrieved parent
+manifest/row/receipt are unchanged. Real preflight succeeds at global index
+1 with zero execution failures, no active session, and no real amendment
+journal created. The next real query is index 1, not a replacement for index 0.
+
+Development preflight failed closed while intermediate source hashes were
+being assembled, before inference. A first full mock under development
+freeze `9108b426...5a10e` completed and replayed; independent review then
+required persisted-session analysis to enforce the same one-query smoke gate
+as execution. That correction and regression cases precede the final freeze.
+No real continuation responses were produced under any development version.
+
+Final offline exercise retained the original one-response parent and added
+2,015 mock responses across 64 separately finalized sessions (first one,
+then batches of at most 32). It reused a verified parent/context in memory
+for speed; the standalone final CLI analysis independently reloaded sources
+and replayed every session and row. Coverage is exactly 2,016/2,016. All
+2,015 mock scores and effective qualities match their corresponding rows
+from the original frozen full mock. Mixed real-parent/mock-continuation data
+correctly reports `valid_for_primary_inference=false`; it is not a model
+result. The original parent still hashes to `438fb5a1...f9130`.
+
+Validation passed: 79 benchmark + 62 combat + 36 run + 32 statistics + 9
+batch test groups = 218. Four standard character/format mock pipelines also
+passed. The new tests cover exact coverage, zero-row deadline stops, pending
+and orphan recovery, tampering, server receipts, deadline headroom, initial
+smoke validity, diagnostic output protection, journal metadata, and persisted
+smoke-cap/failure rejection. Launcher and all documented Bash blocks passed
+Git Bash `bash -n`. Independent source/freeze/security review passed; no
+credential or private-infrastructure additions. Actual amended Slurm/server
+execution remains untested and requires the one-new-query batch smoke.
+
+Ignored final validation artifacts:
+- `results/batch_amendment_full_mock_final/` contains journal, session reports,
+  rows, and standalone analysis.
+- Journal SHA-256: `5acd3c952f1783717da49b18bd701f0cf668272a66e538e52152533fc762ea11`.
+- Analysis SHA-256: `3fa9854fda17a98ef93c9acacf11d5ae6942cc50531eb175a4f47a49c0ecf2db`.
+- `results/controlled_h_v2_confirmatory_batch_verified_preflight.json`.
+- `results/batch_amendment_test_*.log` and standard mock logs.
+
+
+## 2026-09-08 - Retrieved real smoke after interrupted CSIS allocation
+
+Job 10611 supplied one Qwen3-32B response before the interactive allocation
+ended. User-provided accounting reports FAILED, elapsed 00:37:24, exit 0:9;
+step .0 was cancelled and reconnect step .1 completed. This establishes
+allocation loss, not its cause. Network interruptions were reported by the
+operator. No replacement query or server launch was performed locally.
+
+Original frozen analysis replay passed on the retrieved manifest and row:
+1/2,016 complete, no pending slot, fixture ironclad-0395 at H=4, parsed,
+schema-valid, legal, finish_reason=stop, nontruncated, no execution failure.
+Chosen value 28, optimum 35, worst 11, raw regret 7, effective quality
+0.7083333333333334. This is a single smoke response, not a model finding.
+The report records commit c684a27; its server receipt exactly matches the
+separately retrieved receipt. The original analysis correctly suppresses
+inference because the matrix is incomplete.
+
+Operator-measured smoke command elapsed 4m12.331s. Multiplying this single
+observation by 2,016 gives about 141 hours, not a reliable full-run forecast.
+It does show the previous eight-hour same-server execution plan was not
+justified by measured throughput. Do not change token budget or sampling to
+fit the allocation. Preserve the response and amend scheduling separately.
+
+Retrieved SHA-256 evidence (raw files remain ignored):
+- Parent manifest: `438fb5a18a2ee8f6dfc7f1631ca1bde287082dae91fd939b469af816836f9130`.
+- Row 000000: `710792f6743627e003ded1a8114e8cec83e3d3cfd3ad75e72b7b6e0669300a68`.
+- Server receipt: `571d4533ce948a6202f0a4630158bcdd348d0f6d91f7fa10a51c3b140fc66e2c`.
+- Server log: `afea8f726b8b44c8da7e4287d9b94b4a8a89b95dc752db45396ea9fac7eda06d`.
+
+
 ## 2026-09-07 - CSIS execution instructions prepared for authorized commit/push
 
 Added `cluster/CSIS_CONTROLLED_H_CONFIRMATORY.md` with source transfer,

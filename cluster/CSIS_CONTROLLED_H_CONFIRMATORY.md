@@ -1,5 +1,11 @@
 # Expanded controlled-H confirmation on CSIS
 
+> **2026-09-08 supersession:** allocation 10611 ended after one saved smoke
+> response. Do not execute the historical interactive/same-server continuation
+> below. See `docs/controlled_h_batch_amendment.md` for the separately versioned
+> batch amendment and its validation status. Preserve the original evidence.
+
+
 This runs the separately frozen 2,016-query confirmation, not the old pilot.
 Use the existing `slaybench08` environment and pinned Qwen3 cache. The commands
 below are for the operator to execute; preparing them does not submit a job.

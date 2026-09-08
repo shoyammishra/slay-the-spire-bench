@@ -1,5 +1,44 @@
 # Decision Log
 
+## 2026-09-08 - Amend execution after one retained smoke response
+
+**Problem/options.** Interactive CSIS allocation 10611 ended after one legal,
+nontruncated response and no pending slot. The old same-server restriction
+prevents continuation, and one four-minute response does not support fitting
+2,016 queries in the inherited eight-hour request. Replacing the smoke would
+violate one-response sampling; rewriting its server receipt would falsify
+provenance; shrinking token budget would change the inference treatment.
+
+**Decision.** Preserve all original code/config and parent evidence bytes.
+Implement a separately versioned execution amendment, documented in
+`controlled_h_batch_amendment.md`, with a canonical journal, sequential
+immutable session reports, and pinned per-session server receipts. Original
+query 0 remains in its original artifact; each new query retains its global
+schedule index. Validate every row and exact contiguous coverage before
+calling the original analysis functions. Model, prompts, scoring, query order,
+strata, and all statistical/invalid-response gates are unchanged.
+
+Use detached `sbatch` jobs, one new query for the amended-stack smoke, then
+operator-declared batches of at most 32. Require 900-second timeout plus
+180-second headroom before starting a query, based on the real Slurm EndTime.
+Do not automatically resubmit jobs. Lost in-flight responses remain ambiguous
+failures, never replacement draws; those failures still block primary claims.
+The default launcher refuses further compute after an execution failure.
+
+**Trade-offs/limits/invalidation.** This amendment is made after observing
+one response and its latency, and must be disclosed with every report of the
+amended run. It does not retroactively make a restart valid under the old
+freeze. Weight/runtime/argument checks reduce but do not eliminate numerical
+nondeterminism across servers. Existing pilot/oracle results and the original
+smoke are not invalidated or rewritten; future combined results belong to
+the amended execution contract. No new capability or power claim follows.
+The final amendment digest is
+`ba73b91d23336923b8ea96f693df5cc836c0f13e51b4f2bd1b44bf311863caad`.
+Real amended-stack startup remains a separate smoke gate. Any change to
+sampling, scoring, prompts, fixtures, session coverage, or failure accounting
+requires another explicit versioned decision; preserve previous attempts.
+
+
 ## 2026-09-07 - Freeze expanded Qwen3 confirmation and all-slot analysis
 
 **Problem/options.** The 504-fixture expansion passed independently. Retaining

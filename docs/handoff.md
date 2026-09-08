@@ -13,6 +13,17 @@ Single source of truth stays where it already lives (see §2).
 
 ## 1. Project status snapshot (2026-07-12)
 
+- **Real smoke recovered; batch amendment validated (2026-09-08):**
+  original query 0 passed independent replay (1/2,016, no pending, legal and
+  nontruncated). Allocation 10611 subsequently failed. Preserve its parent
+  manifest/row/receipt; do not restart the original single-server runner.
+  `docs/controlled_h_batch_amendment.md` specifies detached bounded batches
+  and audited per-session continuation without requerying the smoke. The
+  old eight-hour same-server execution advice below is superseded. No new
+  model work has run. Final freeze `ba73b91d...63caad` passed 218 tests and
+  full 2,015-slot mock continuation/replay. Next use the one-new-query detached
+  batch smoke after pulling the amendment; inspect it before any 32-query job.
+
 - **Confirmation prepared (2026-09-07):** the separate Qwen3-32B/structured
   protocol now freezes all 2,016 response slots, all-pair zero-on-invalid
   analysis, two Bonferroni-adjusted stratified bootstrap tests, implementation
