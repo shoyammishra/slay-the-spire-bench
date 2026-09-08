@@ -13,6 +13,14 @@ Single source of truth stays where it already lives (see §2).
 
 ## 1. Project status snapshot (2026-07-12)
 
+- **Automatic scheduling requested (2026-09-08):** operator-reported batch
+  smoke 10612 passed at 2/2,016; job 10613 is the 32-query successor. New
+  `scripts/confirmatory_autoqueue.py` waits for that exact job, validates one
+  session/1..32 rows of progress, and can submit bounded successors. See
+  `docs/controlled_h_autoqueue.md`. It preserves all frozen execution files.
+  Seven fake-Slurm tests and nine batch regression groups passed. No queue
+  was started locally; the first real automatic handoff remains to be checked.
+
 - **Real smoke recovered; batch amendment validated (2026-09-08):**
   original query 0 passed independent replay (1/2,016, no pending, legal and
   nontruncated). Allocation 10611 subsequently failed. Preserve its parent

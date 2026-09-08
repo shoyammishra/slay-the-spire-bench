@@ -1,5 +1,11 @@
 # Controlled-H batch execution amendment
 
+> **Scheduling supersession, 2026-09-08:** the operator requested automatic
+> successive batches. `controlled_h_autoqueue.md` documents the separate
+> bounded supervisor. Historical manual-only instructions below remain as
+> provenance; the frozen inference and batch execution contract is unchanged.
+
+
 Date: 2026-09-08, after one completed response and before any continuation.
 This is a disclosed post-smoke operational amendment, not the original
 single-server freeze. The implementation and amendment must pass offline

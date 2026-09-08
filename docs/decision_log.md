@@ -1,5 +1,31 @@
 # Decision Log
 
+## 2026-09-08 - Authorize bounded automatic scheduling of remaining batches
+
+**Problem/options.** The operator explicitly requested that the next 32-query
+batch follow each completed batch automatically. Manual submission introduces
+idle time and requires repeated SSH attention; pre-submitting a long dependency
+chain cannot inspect each completed checkpoint before spending the next allocation.
+
+**Decision.** Add a separate login-node supervisor with one recorded Slurm job
+at a time. Start after job 10613 with baseline index 2 and one finalized session.
+Require exact-job COMPLETED/0:0 plus frozen checkpoint validation, passing smoke,
+zero execution failures, and exactly one session/1..32 rows of progress. Submit
+at most 64 new 32-query jobs, ending sooner at 2,016 total rows. Never auto-retry
+queries, failed jobs, ambiguous submissions, or zero-progress batches. Save a
+submission marker before sbatch; bind source, protocol, baseline, and budget
+in a durable ignored receipt. Stop-file handling affects future submission only.
+
+**Supersession, limits, and reversal.** This explicit operator request replaces
+the prior manual-only scheduling rule, not the immutable batch experiment or
+its failure accounting. No original source-lock file changes; existing running
+batches and responses remain valid. No effect-size/quality-based stopping is
+added. Slurm accounting and login-node process availability remain operational
+dependencies. A missing submission receipt needs manual reconciliation. A
+budget shortfall cannot authorize itself. See `controlled_h_autoqueue.md` for
+commands, stop behavior, evidence retention, and review requirements.
+
+
 ## 2026-09-08 - Amend execution after one retained smoke response
 
 **Problem/options.** Interactive CSIS allocation 10611 ended after one legal,

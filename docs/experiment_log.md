@@ -1,5 +1,23 @@
 # Experiment Log
 
+## 2026-09-08 - Automatic queue prepared without cluster submission
+
+Operator reports job 10612 completed its amended-stack smoke at 2/2,016,
+continuation_smoke_passed=true, zero execution failures, and one finalized
+session. Job 10613 is the subsequently submitted 32-query batch; its completion
+is not yet verified locally. The operator requested automatic successors.
+
+A new standalone supervisor targets that exact job and baseline. Local mocked
+Slurm tests cover handoff, failed/foreign/duplicate accounting, zero or excessive
+progress, unexpected session advances, no-requery submission ambiguity, budget
+and completion stops, stop files, and contract drift. No sacct/sbatch command,
+GPU allocation, or model inference was executed locally for this change. The
+first real automatic handoff must still be checked on CSIS. All seven new
+scheduler tests and nine batch regression groups passed; documented Bash
+blocks passed syntax validation. Existing frozen
+runner/launcher/configuration files and real evidence remain unchanged.
+
+
 ## 2026-09-08 - Batch amendment frozen and validated without new model calls
 
 Frozen amendment digest:
