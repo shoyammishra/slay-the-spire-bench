@@ -1,0 +1,26 @@
+{
+  "study_id": "small-model-development-2026-09-08",
+  "status": "development only; not a confirmatory preregistration",
+  "models": {
+    "qwen3-8b": {"repository": "Qwen/Qwen3-8B", "revision": "b968826d9c46dd6066d109eabc6255188de91218"},
+    "qwen3-14b": {"repository": "Qwen/Qwen3-14B", "revision": "40c069824f4251a91eefaf281ebe4c544efd3e18"}
+  },
+  "exposed_prefix_queries": 432,
+  "exposure_basis": "operator-reported 435 saved original responses; first 432 form complete fixture blocks",
+  "fixtures_per_character_stratum": 3,
+  "horizons": [2, 4, 1, 8],
+  "max_tokens": 16000,
+  "max_model_len": 32768,
+  "timeout_seconds": 1800,
+  "deadline_headroom_seconds": 180,
+  "temperature": 0,
+  "top_p": 1,
+  "top_k": -1,
+  "seed": 42,
+  "enable_thinking": true,
+  "vllm_version": "0.8.5.post1",
+  "transformers_version": "4.51.3",
+  "gpu_memory_utilization": 0.90,
+  "max_new_queries_per_job": 16,
+  "final_statistical_gates": null
+}

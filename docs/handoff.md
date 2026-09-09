@@ -13,6 +13,17 @@ Single source of truth stays where it already lives (see §2).
 
 ## 1. Project status snapshot (2026-07-12)
 
+- **Small-model pivot (2026-09-08):** user reports autoqueue stopped after
+  outcome/validity peeks; last reported snapshot has 435 saved rows and 19
+  truncations. Active batch completion remains unverified. Preserve the old
+  frozen run as incomplete exploratory evidence. User requests smaller models
+  first and 16,000 output tokens in a separate follow-up. Proceeding with the
+  stated Qwen3-8B/14B assumption, 8B first; the separate development runner is
+  prepared. See small_model_development.md. Pilot on exposed fixtures,
+  validate context/runtime and power the paired size contrast before freezing
+  fresh evaluation. See newest decision/experiment entries. Do not resume the
+  old queue or edit its frozen configuration for the new study.
+
 - **Automatic scheduling requested (2026-09-08):** operator-reported batch
   smoke 10612 passed at 2/2,016; job 10613 is the 32-query successor. New
   `scripts/confirmatory_autoqueue.py` waits for that exact job, validates one

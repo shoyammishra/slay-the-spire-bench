@@ -1,5 +1,52 @@
 # Experiment Log
 
+## 2026-09-08 - Small-model development implementation verified locally
+
+Prepared separate pinned Qwen3-8B/14B development configuration, runner and
+manual bounded Slurm launcher. Each model uses 12 exposed fixtures/48 queries,
+16,000 output tokens, 32,768 context and an initial single H2 smoke. Full raw
+API responses, request settings, usage and timing are preserved in separate
+per-model reports. No model weights were downloaded and no GPU job or real
+inference was launched locally. Official model API revision checks were read-only.
+
+Twelve focused tests pass, including full 48-query mock continuation for both
+models, score/evidence replay, receipt and request tampering, truncation guards,
+context overflow, zero-time stop, consumed transport failure and crash/pending
+no-retry behavior. All 209 standard tests pass with UTF-8 Python output, plus
+nine original batch tests and seven queue tests. The first standard benchmark
+invocation reported 77/79; the UTF-8 rerun reported 79/79. Four standard
+character/format mock pipelines and new launcher Bash syntax validation pass.
+An initial one-row development mock predates final source edits and is retained
+under ignored results; its contract drift is expected and must not be bypassed.
+Full current-code mocks use isolated temporary reports in the focused tests.
+
+Linux serving, GPU fit, live tokenizer compatibility, throughput and real
+truncation rates remain untested until the operator runs the one-query smoke.
+The development sample does not establish final power or a scaling result.
+See small_model_development.md for the next cluster commands.
+
+## 2026-09-08 - Operator-reported interim peeks and queue stop
+
+Automatic handoffs reached 418 finalized responses; a subsequent read-only
+snapshot contained 433 saved responses. The exploratory normal forecast used
+53 Ironclad and 55 Silent H1/H8 pairs, giving weighted differences -0.202247
+and +0.033470. Its conditional forecasts omit variance uncertainty and do not
+predict registered bootstrap validity or publication success.
+
+At 435 saved rows, operator output reports saved-row replay passed, no execution
+failures, and 19 truncations (10 Ironclad, 9 Silent). H2 parse/legal counts were
+47/53 and 50/56 respectively. All 53 Ironclad H1/H8 pairs were clean; Silent's
+clean-pair weighted difference was +0.018393. H8 oracle spans were substantially
+larger, so normalization and simulator validity remain unresolved. The 1% final
+gate permits at most 20/2,016 truncations: failure was not yet irreversible at
+this snapshot. These reports have not been independently retrieved locally.
+
+User reports stopping the queue, then requests smaller models and a separate
+16,000-token output condition. Current batch final state is unknown. Preserve
+all artifacts and disclose the outcome-informed stopping and pilot reuse.
+See decision_log.md, 2026-09-08 small-model pivot. No new model run or protocol
+freeze is claimed.
+
 ## 2026-09-08 - Automatic queue prepared without cluster submission
 
 Operator reports job 10612 completed its amended-stack smoke at 2/2,016,

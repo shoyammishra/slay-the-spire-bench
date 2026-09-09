@@ -1,5 +1,62 @@
 # Decision Log
 
+## 2026-09-08 - Prepare bounded exposed-fixture small-model pilot
+
+Implement a separate 48-query development runner for each pinned Qwen3-8B/14B
+revision. Select three exposed fixtures per character/sensitivity stratum from
+the first 432 original slots by identity hash, without response-based selection.
+Keep all four horizons with cyclic orders to diagnose H2/H4 failures before
+choosing final endpoints. This 12-fixture sample is a reliability screen, not
+adequate power or certification of a 1% truncation rate.
+
+Use 16,000 output tokens, 32,768 context, explicit common generation settings,
+BF16/TP1, and recorded usage/latency. Tokenize all prompts on the pinned live
+server before inference. Start with exactly one H2 smoke, then at most 16 new
+queries per manually inspected job. Canonical per-model reports atomically save
+pending queries and full response/score evidence together. Resume replays the
+saved evidence and refuses pending or failed requests; no automatic requery or
+submission. Existing frozen files are unchanged. See small_model_development.md.
+
+This supersedes the planning-only state, not the pending final evaluation design.
+No new confirmatory statistical gate or sample-size freeze is established. Fresh
+held-out fixtures and direct paired size-contrast power remain required work.
+
+## 2026-09-08 - Pivot to small-model development after interim validity inspection
+
+The user reports stopping the automatic queue and prioritizes a small-model
+size comparison, deferring 32B and additional models. The user requests doubling
+the output allowance from 8,000 to 16,000 tokens in a separate follow-up.
+This supersedes automatic continuation as the active plan; the current batch's
+terminal state and final checkpoint remain unverified locally.
+
+Preserve the original frozen protocol and all responses. Two outcome peeks
+were requested: an exploratory plug-in normal predictive forecast at 433 rows
+and an interface/scoring replay diagnostic at 435 rows. Stopping is informed
+by these observations and must be disclosed. The original confirmation is
+incomplete, not a completed negative result or a successful confirmation.
+
+Develop on exposed fixtures, then freeze the new settings, endpoint selection,
+validity policy, model-size contrast and power before fresh evaluation. Do not
+relax gates to rescue observed outcomes or pool the old 8,000-token condition
+with the new condition. A two-size comparison supports a bounded within-family
+contrast, not a general scaling law; compare paired H effects directly rather
+than comparing which model is individually significant. The original power
+calculation does not power that contrast.
+
+Proceed with the stated Qwen3-8B/14B assumption, 8B first, after the user
+said to continue. This is an 8B/14B comparison, not exactly 7B/14B. Qwen2.5-7B/14B is an exact-size alternative, but official cards
+advertise 8,192 generation tokens. For Qwen3, provisionally test 32,768 total
+context with 16,000 output tokens; verify tokenized prompts plus generation fit,
+GPU memory, timeout and actual throughput before release. More output does not
+guarantee no truncation or faster completion. The subsequent development-pilot
+entry above pins revisions/settings; the final evaluation remains unfrozen.
+No new inference has been executed locally.
+
+References: https://huggingface.co/Qwen/Qwen3-8B and
+https://huggingface.co/Qwen/Qwen3-14B ; exact-size alternatives:
+https://huggingface.co/Qwen/Qwen2.5-7B-Instruct and
+https://huggingface.co/Qwen/Qwen2.5-14B-Instruct .
+
 ## 2026-09-08 - Authorize bounded automatic scheduling of remaining batches
 
 **Problem/options.** The operator explicitly requested that the next 32-query
