@@ -13,6 +13,14 @@ Single source of truth stays where it already lives (see §2).
 
 ## 1. Project status snapshot (2026-07-12)
 
+- **8B automatic completion prepared (2026-09-08):** operator reports smoke
+  10749 passed at 1/48 (31.156 s, 2,406 output tokens, no truncation), then
+  authorized automation and confirmed no successor submitted. New separate
+  small_model_autoqueue.py caps at 48 or five new jobs, verifies each completed
+  job/checkpoint and refuses duplicates/ambiguous submission. Pilot frozen
+  execution files remain unchanged. See small_model_development.md. Supervisor
+  not started locally; first real handoff remains to be checked.
+
 - **Small-model pivot (2026-09-08):** user reports autoqueue stopped after
   outcome/validity peeks; last reported snapshot has 435 saved rows and 19
   truncations. Active batch completion remains unverified. Preserve the old

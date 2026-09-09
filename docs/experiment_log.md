@@ -1,5 +1,21 @@
 # Experiment Log
 
+## 2026-09-08 - Operator reports 8B smoke success; autoqueue prepared
+
+The initial weight download aborted with a Rust/backend error; the operator
+subsequently confirmed the pinned cache ready after disabling accelerated
+transfer and retrying with one download worker. No generation ran in that attempt.
+Operator-reported job 10749 then completed one clean H2 response in 31.156 seconds,
+with 1,404 prompt and 2,406 completion tokens. Its final status was 1/48, clean=1,
+truncated=0. The artifacts have not yet been independently retrieved locally;
+one query does not establish average throughput or rare-failure reliability.
+
+The user requested automatic completion to 48 and confirmed no successor job.
+Seven fake-Slurm tests pass for the new bounded supervisor, including the exact
+1 -> 17 -> 33 -> 48 chain, job/coverage rejection, queue-duplicate protection,
+stop/failure behavior and ambiguous-submission no-retry. Twelve pilot regression
+tests also pass. No Slurm submission or model inference was executed locally.
+
 ## 2026-09-08 - Small-model development implementation verified locally
 
 Prepared separate pinned Qwen3-8B/14B development configuration, runner and

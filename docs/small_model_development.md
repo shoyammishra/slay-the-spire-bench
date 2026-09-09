@@ -45,7 +45,8 @@ scaling law. Held-out fixtures and their oracle audit remain outstanding.
 
 Keep the old autoqueue stopped. Check that its active batch has ended using its
 exact job ID before starting a new GPU job. Preserve that batch and checkpoint;
-do not delete pending markers. No automatic successor submission is provided.
+do not delete pending markers. The separately authorized supervisor below now
+supports bounded successors.
 
 On the login node, after these changes are available on the remote branch:
 
@@ -87,7 +88,7 @@ execution failure before a subsequent batch is permitted. Inspect elapsed time,
 usage and server logs too. After a satisfactory smoke, use the same sbatch command
 with `PILOT_MAX_NEW=16`, inspect its result, then continue until 48 rows. The runner
 caps the last batch at the remaining queries and stops on insufficient deadline.
-Do not start with 16 or use an autoqueue. For 14B, change both the prefetch model
+Do not start a model with 16. For 14B, change both the prefetch model
 key and `PILOT_MODEL` to `qwen3-14b`, starting again at `PILOT_MAX_NEW=1`.
 
 ## Evidence and interruption handling
@@ -117,3 +118,51 @@ GPU fit and real generation quality are established only by the cluster smoke.
 Official model sources:
 [Qwen3-8B](https://huggingface.co/Qwen/Qwen3-8B) and
 [Qwen3-14B](https://huggingface.co/Qwen/Qwen3-14B).
+
+## Automatic 8B completion (2026-09-08 supersession)
+
+The user authorized automatic continuation through 48 after smoke 10749 passed,
+and confirmed no manual successor has been submitted. The separate
+`scripts/small_model_autoqueue.py` preserves the source-bound pilot runner,
+config and launcher. It waits for exact-root Slurm COMPLETED/0:0, replays the
+canonical real checkpoint, checks the clean first smoke and 1..16 rows of
+progress, then submits one successor. It stops at 48 or five new jobs, whichever
+comes first. Typical progress is 1 -> 17 -> 33 -> 48. Other queued/running
+`slay_small_pilot` jobs block submission to avoid duplicates. Later parse or
+truncation failures remain measured development outcomes; execution failures,
+pending responses, source drift and ambiguous submission receipts stop it.
+No effect or significance stopping rule is introduced.
+
+Run on the login node:
+
+```bash
+cd ~/slay-the-spire-bench
+git pull --ff-only origin main
+eval "$(conda shell.bash hook)"
+conda activate slaybench08
+export CONDA_SH="$(conda info --base)/etc/profile.d/conda.sh"
+export HF_HOME="${HF_HOME:-${HOME}/scratch/hf_cache}"
+mkdir -p results/small_model_development
+nohup python -u scripts/small_model_autoqueue.py \
+  --model qwen3-8b --after-job 10749 --after-index 0 \
+  --max-jobs 5 --authorize-submit \
+  >> results/small_model_development/qwen3-8b_autoqueue.log 2>&1 < /dev/null &
+tail -F results/small_model_development/qwen3-8b_autoqueue.log
+```
+
+The index is the completed count BEFORE the watched job. If a manual successor
+is submitted before starting this command, use its exact ID and correct baseline
+instead. Do not guess or submit manual jobs once the supervisor is active.
+Re-running the identical command resumes only a waiting supervisor state; its
+exclusive lock prevents a second supervisor. An ambiguous submission marker is
+never resubmitted blindly. Preserve it for manual reconciliation.
+
+To stop future submissions without cancelling an existing batch:
+
+```bash
+touch results/small_model_development/qwen3-8b_autoqueue.stop
+```
+
+The supervisor uses `nohup`, so it can survive SSH loss subject to login-node
+process policy. Logs/state remain private under ignored results. This does not
+restart the original 32B queue or automatically start 14B inference.

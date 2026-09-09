@@ -1,5 +1,22 @@
 # Decision Log
 
+## 2026-09-08 - Authorize automatic 8B development completion
+
+After operator-reported successful H2 smoke 10749, the user explicitly requests
+automatic continuation through 48 and confirms no successor was submitted.
+Add a separate login-node supervisor, leaving pilot source/config/launcher bytes
+unchanged so the saved smoke remains compatible. Exact completed Slurm root,
+full checkpoint replay, clean initial smoke and 1..16 newly saved rows precede
+each submission. Cap at 48 total responses or five new jobs; final cap is the
+remaining count. Reject other queued/running development jobs. Preserve a durable
+submission marker before sbatch and never retry an ambiguous receipt. Stop files
+prevent future submission without cancelling a current job. No outcome-quality
+stop or new statistical gate is added; truncations remain development evidence.
+
+This supersedes manual-only continuation for 8B. It does not authorize automatic
+14B startup, change either model condition, or resume the stopped 32B queue.
+See small_model_development.md for the canonical state, commands and limits.
+
 ## 2026-09-08 - Prepare bounded exposed-fixture small-model pilot
 
 Implement a separate 48-query development runner for each pinned Qwen3-8B/14B
