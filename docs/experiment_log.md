@@ -1,5 +1,37 @@
 # Experiment Log
 
+## 2026-09-30 - v3 confirmatory: Qwen3-8B complete — validity gate FAILED (truncation 4.0%); descriptive null on lookahead
+
+**Run.** Job 373153, Sharanga H100, 8 h 08 min, 7,040/7,040 queries, 0 execution failures,
+automatic smoke gate passed. Frozen protocol digest `69701178…`. All rows replayed locally
+(receipts, requests, scores verified).
+
+**Pre-registered gate: FAILED.** Truncation 281/7,040 = **4.0%** > 1% maximum ⇒ per the frozen
+protocol, primary inference is **withheld** for Qwen3-8B. (Dev pilot showed 1/48 ≈ 2%; the gate
+was set too tight for the observed rate — this is disclosed, not relaxed.) Truncation is flat
+over H (IC 4.4/4.3/4.7/3.5%, Silent 3.5/4.0/3.9/3.6% at H1/2/4/8), so it cannot create or hide
+an H contrast by itself.
+
+**Descriptive results (not confirmatory because of the gate):**
+
+| | IC | Silent |
+|---|---|---|
+| Primary DiD (same-oracle gain, H8) | −.031 [−.098, +.034], p=.29 | +.018 [−.036, +.071], p=.46 |
+| Excl. 248 fixtures with any truncation (exploratory) | −.033 [−.096, +.030] | +.035 [−.014, +.084] |
+| H2 use / H-blind baseline (McNemar p) | .192 / .184 (.80) | .128 / .123 (1.0) |
+| H4 use / baseline | .226 / .255 (.31) | .240 / .266 (.51) |
+| H8 use / baseline | .286 / .293 (.85) | .275 / .282 (.84) |
+| H8 answers: H8-opt / H1-opt-only / other (n=440) | 126 / 113 / 201 | 121 / 124 / 195 |
+| H8 vs H1 discordant (toward / away from H8-opt) | 56 / 59 | 50 / 53 |
+
+**Reading.** Qwen3-8B shows no detectable lookahead use: stating H=2/4/8 changes its first
+action in ~25% of sensitive fixtures, but symmetrically — its H-answers are no more
+H-optimal than its own H1 answers at any H; both DiD CIs lie inside ±.10. It also does not
+deliberate longer at higher H (median completion tokens ≈2.5–2.8k at every H, both
+characters). The earlier "myopia" signal (8/12 H1-optimal at H8) does NOT replicate at
+scale: H8 choices split roughly evenly between H1-optimal and H8-optimal, with 45% neither.
+Caveat that travels with every citation: validity gate failed (truncation 4.0% vs 1%).
+
 ## 2026-09-30 - Qwen3-14B development pilot complete (Sharanga); myopia signature; v3 oracle smoke passed
 
 **14B pilot.** 48/48 on Sharanga H100 (jobs 372674 smoke → 372880 → 372930 → 372950 via the
