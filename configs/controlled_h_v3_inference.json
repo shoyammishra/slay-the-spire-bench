@@ -1,0 +1,109 @@
+{
+  "protocol_id": "controlled-h-v3-lookahead-curve-2026-09-30",
+  "status": "frozen-before-any-model-sees-v3-fixtures",
+  "instrument_version": "controlled-decision-horizon-v2",
+  "fixture_protocol_digest": "dbcbc03bb38b7a27a0a80011db2365b0fa544da1878c9b13422dadb82262aff7",
+  "decisions": "user 2026-09-30: DiD primary; H in {1,2,4,8} for a per-model lookahead curve; staged models (Qwen3-8B/14B first, 6 more pre-specified, added by versioned amendment before they run); 8-way concurrency; link to existing combat/run matrix (docs/controlled_h_v3_inference_proposal.md)",
+  "sources": {
+    "manifest": {
+      "filename": "controlled_h_v3_manifest.json",
+      "sha256": "TBD"
+    },
+    "full": {
+      "filename": "controlled_h_v3_full.json",
+      "sha256": "TBD"
+    },
+    "release_fixtures": {
+      "filename": "controlled_h_v3_release_fixtures.json",
+      "sha256": "TBD"
+    },
+    "release_audit": {
+      "filename": "controlled_h_v3_release_fixtures_audit.json",
+      "sha256": "TBD"
+    }
+  },
+  "release": {
+    "characters": [
+      "ironclad",
+      "silent"
+    ],
+    "sensitive_per_character": 440,
+    "control_per_character": 440
+  },
+  "inference": {
+    "models": {
+      "qwen3-8b": {
+        "repository": "Qwen/Qwen3-8B",
+        "revision": "b968826d9c46dd6066d109eabc6255188de91218"
+      },
+      "qwen3-14b": {
+        "repository": "Qwen/Qwen3-14B",
+        "revision": "40c069824f4251a91eefaf281ebe4c544efd3e18"
+      }
+    },
+    "prompt_format": "structured",
+    "horizons": [
+      1,
+      2,
+      4,
+      8
+    ],
+    "order": "cyclic 4x4 Latin square over H, cycled within character x sensitivity by sha256(protocol_id:order:fixture_id) rank",
+    "max_tokens": 16000,
+    "max_model_len": 32768,
+    "temperature": 0,
+    "top_p": 1,
+    "top_k": -1,
+    "seed": 42,
+    "enable_thinking": true,
+    "vllm_version": "0.8.5.post1",
+    "transformers_version": "4.51.3",
+    "gpu_memory_utilization": 0.9,
+    "max_num_seqs": 8,
+    "concurrency": 8,
+    "timeout_seconds": 1800,
+    "deadline_headroom_seconds": 180,
+    "smoke_queries": 8,
+    "retries": "none; an in-flight query lost to a crash is recorded as ambiguous_query",
+    "hardware": "Sharanga gpu_h100_4, 1x H100 80GB, BF16, TP=1",
+    "queries_per_model": 7040,
+    "authorized_models": [
+      "qwen3-8b",
+      "qwen3-14b"
+    ],
+    "prespecified_additional_models": {
+      "qwen2.5-7b": "Qwen/Qwen2.5-7B-Instruct",
+      "llama-3.1-8b": "meta-llama/Llama-3.1-8B-Instruct",
+      "mistral-7b": "mistralai/Mistral-7B-Instruct-v0.3",
+      "deepseek-r1-distill-7b": "deepseek-ai/DeepSeek-R1-Distill-Qwen-7B",
+      "deepseek-r1-distill-14b": "deepseek-ai/DeepSeek-R1-Distill-Qwen-14B",
+      "qwen3-32b": "Qwen/Qwen3-32B"
+    },
+    "model_addition_rule": "each additional model is added by a versioned amendment pinning its revision BEFORE it runs; same fixtures, prompts, scoring, gates and analysis; non-thinking models run with the same settings minus enable_thinking (disclosed)"
+  },
+  "analysis": {
+    "primary": "per character at H=8: mean_sensitive(q8-q1) - mean_control(q8-q1), sensitivity = H1/H8 optimal sets disjoint (release label); q = effective quality (truncated/unparseable/illegal = 0)",
+    "alpha_per_character": 0.025,
+    "bootstrap_replicates": 10000,
+    "bootstrap_seed_by_character": {
+      "ironclad": 20260930,
+      "silent": 20260931
+    },
+    "smallest_effect_of_interest": 0.1,
+    "secondary": [
+      "lookahead curve per model: for each H in {2,4,8}, on fixtures whose H-optimal set is disjoint from the H1-optimal set, lookahead_use_rate (response at H is H-optimal), myopic_rate (response at H is H1-optimal), ignore_baseline_rate (the H1 response is H-optimal), exact McNemar of use vs baseline, and per-H DiD with per-H labels",
+      "action switch at H8 (as lookahead curve at H=8, release labels)",
+      "legacy v2 mixture .25 sensitive + .75 control dH at H8",
+      "model contrasts: DiD and lookahead-use differences paired by fixture (exploratory until >=2 families are run)",
+      "link to the existing benchmark matrix: Spearman rank correlation across models between H8 lookahead_use_rate and (a) combat win*min(1,hp_ratio), (b) run avg_progress; exact permutation p; correlational only, n = number of models; run-level between-model variance share is ~.02 (stats_report), so (a) is the expected informative link"
+    ],
+    "legacy_mixture_weights": [
+      0.25,
+      0.75
+    ],
+    "max_truncation_rate": 0.01,
+    "max_excluded_pair_rate": 0.02,
+    "exclusions": "fixtures with any execution failure at any H are excluded and reported; model errors stay in as quality 0",
+    "claim_scope": "isolates one mechanism of long-horizon planning (lookahead use within a single decision, H<=8 transitions); not a claim about long-horizon planning in general"
+  }
+}

@@ -1,6 +1,8 @@
 # Controlled-H v3 confirmatory inference — PROPOSAL (not frozen)
 
-**Status:** draft for user approval, 2026-09-30. Nothing here is frozen or authorized.
+**Status:** user decisions recorded 2026-09-30 (see §7); config `configs/controlled_h_v3_inference.json` freezes after the fixture release.
+
+Original draft status: draft for user approval, 2026-09-30. Nothing here is frozen or authorized.
 It becomes binding only as a separately versioned config + digest, written **before** any
 model sees a v3 fixture. Fixture protocol: `configs/controlled_h_v3_heldout.json`
 (decision_log 2026-09-29). Rationale for the estimand: decision_log 2026-09-29 (DiD proposal)
@@ -77,3 +79,21 @@ horizon, measured on fixtures where the optimal action does not change (controls
 | Qwen3-32B | ~2–4 min (8k tokens, CSIS A100) | ~120–235 GPU-h | ~25–50 h |
 
 The H100 QOS allows 2 running jobs per user on the shared account.
+
+## 7. User decisions (2026-09-30) — supersede §2/§5 where they differ
+
+- **Primary:** sensitive-minus-control at H8 (approved).
+- **Horizons: H ∈ {1, 2, 4, 8}** (changed from H1/H8) so each model yields a **lookahead curve**:
+  per H, on fixtures whose H-optimal move differs from the H1-optimal move, the rate of picking
+  the H-optimal move vs the H1-optimal move, against an H-blind baseline. 7,040 queries/model.
+  Order: 4×4 Latin square within character × sensitivity.
+- **Models, staged:** Qwen3-8B and Qwen3-14B authorized first. Pre-specified for later, each by
+  versioned amendment before it runs: Qwen2.5-7B, Llama-3.1-8B, Mistral-7B, R1-Distill-7B/14B,
+  Qwen3-32B (all servable on the pinned vLLM 0.8.5 stack; all but Qwen3-8B/14B already have
+  combat/run matrix data).
+- **Link to long-horizon failure:** Spearman across models between H8 lookahead use and the
+  existing combat and run metrics — correlational, n = number of models; run-level barely
+  separates models (between-model variance share ≈ .02), so combat is the expected link.
+- **Framing:** "we isolate one mechanism of long-horizon planning — lookahead use in a single
+  decision — and test whether models use it." Not a claim about long-horizon planning in general.
+- **Concurrency:** 8-way (approved).
