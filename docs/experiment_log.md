@@ -1,5 +1,48 @@
 # Experiment Log
 
+## 2026-09-29 - Qwen3-8B development pilot found COMPLETE locally (48/48); 14B moved to Sharanga
+
+**Provenance.** `results/small_model_development/real/qwen3-8b.json` (retrieved to the laptop
+2026-09-09, never logged until now) holds 48/48 rows; server receipts map to CSIS jobs
+10749 (smoke, 1 row) → 10750 (16) → 10751 (16) → 10753 (15), i.e. the bounded autoqueue ran
+to completion. `small_model_pilot.py status`: completed 48, clean 47, **truncated 1**
+(silent-0298 at H1). Development evidence on EXPOSED fixtures — not confirmatory.
+
+**Mean effective quality by H (n=6 per cell):**
+
+| | H1 | H2 | H4 | H8 |
+|---|---|---|---|---|
+| Ironclad | .508 | .330 | .662 | .723 |
+| Silent | .665 | .584 | .760 | .855 |
+
+**Paired H8−H1 (n=3 fixtures per cell):** Ironclad sensitive +.270 / control +.159; Silent
+sensitive +.106 / control +.275. Per-fixture spreads are huge (−.40 … +.91).
+
+**Read-off (instrument before subject; checked against raw regret/oracle spans).**
+(1) **Controls improve H1→H8 as much as sensitive fixtures.** NOT a normalization artifact:
+control oracle spans are flat (mean 16.0 / 16.7 / 20.5 / 16.8 at H1/2/4/8; only sensitive H4/H8
+spans jump to ~180 via a lethal-bonus value). The model changes its first action between H1
+and H8 in **9/12** fixtures, incl. controls 0227/0158/0327 where it moves from a suboptimal to
+a better action although the optimal action is unchanged ⇒ there is a **generic H-prompt
+effect** (stating a longer horizon improves answers even when lookahead is irrelevant), or
+noise at n=3. The frozen primary estimand (sensitive H8−H1 alone) conflates this with
+lookahead; the lookahead-specific quantity is **sensitive-minus-control** (difference-in-
+differences), which the 25/75 design already supports. Revise the endpoint BEFORE the fresh
+freeze. (2) **H2 dip is a fixture-definition issue, not a scoring bug:** "control" is defined
+on H1 vs H8 only, so the optimal action can differ at H2/H4 (e.g. silent-0317: identical action
+at all four H, quality 1.0/0.0/0.0/1.0). Define sensitivity per H, or restrict endpoints to H1/H8.
+(3) 3/12 fixtures show an H-blind action (identical H1 and H8 choice). (4) n=3 per cell: no
+inferential weight. These inform the fresh-evaluation freeze only.
+
+**Execution change.** User authorized Claude to run on Sharanga (2026-09-29). Built env
+`slaybench08` there with the exact pinned stack (vLLM 0.8.5.post1 / Transformers 4.51.3 /
+torch 2.6.0+cu124, Python 3.11). Frozen launcher/config bytes unchanged; resources overridden
+via `SBATCH_PARTITION=gpu_h100_4 SBATCH_GRES=gpu:1`. Qwen3-14B runs from a separate clone
+with its own lock/results and `SBATCH_JOB_NAME=slay_small_pilot_14b`. **Hardware differs
+between models (8B: CSIS A100-80GB; 14B: Sharanga H100-80GB)** — disclose; fine for
+development, not for a confirmatory size contrast. A redundant Sharanga 8B smoke (372675)
+was cancelled before start; a mis-chained submission (372671) was cancelled before start.
+
 ## 2026-09-08 - Operator reports 8B smoke success; autoqueue prepared
 
 The initial weight download aborted with a Rust/backend error; the operator
