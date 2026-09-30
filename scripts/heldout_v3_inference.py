@@ -30,12 +30,12 @@ ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 from scripts import controlled_horizon_confirmatory as c
-from scripts.controlled_horizon_model_pilot import _package_version
+from scripts.controlled_horizon_model_pilot import _package_version, score_precomputed_oracle
 from scripts.controlled_horizon_pilot import _atomic_write_json
 from slay_bench.controlled_horizon import ControlledFixture, load_fixture, legal_actions
 
 CONFIG = ROOT / 'configs/controlled_h_v3_inference.json'
-FROZEN_DIGEST = None  # set when the inference protocol is frozen
+FROZEN_DIGEST = '697011782709a76095ea705dab1ee1e862891b9bd7f717a4f0221075c28b8ef2'
 OUT = ROOT / 'results/controlled_h_v3_inference'
 
 
@@ -363,6 +363,16 @@ def _key(score):
     return None if not a else f"{a['action']}:{a['card_index']}:{a['target_index']}"
 
 
+def cf_gain(oracle_row, h, row_h, row_1):
+    """EQ_H(a_H) - EQ_H(a_1): both answers scored under the SAME H oracle.
+
+    An H-blind model gives the same answer at H and H1, so its gain is exactly 0. The raw
+    q_H - q_1 is NOT H-blind invariant: the same action's normalized quality changes with H
+    (caught by the constant-action mock, 2026-09-30)."""
+    s1 = score_precomputed_oracle(oracle_row, h, row_1['response_parsed'])
+    return row_h['effective_quality'] - c.effective_quality(s1, row_1['diagnostics']['truncated'])
+
+
 def did_bootstrap(sens, ctrl, reps, seed, alpha):
     obs = statistics.fmean(sens) - statistics.fmean(ctrl)
     rng = random.Random(seed)
@@ -402,14 +412,15 @@ def analyze(cfg, digest, model, mock=False, rows=None, ctx=None):
                gates=gates, valid_for_primary_inference=valid, by_character={})
     alpha = a['alpha_per_character']
     for char in cfg['release']['characters']:
-        dh = {True: [], False: []}
+        dh, raw = {True: [], False: []}, {True: [], False: []}
         switch = {'h8_picks_h8_opt': 0, 'h8_picks_h1_opt_only': 0, 'h8_other': 0,
                   'h1_picks_h8_opt': 0, 'discordant_h8_only': 0, 'discordant_h1_only': 0, 'n': 0}
         for fid, hs in complete_pairs.items():
             if ctx[0][fid].character != char:
                 continue
             tag = ctx[2][fid]
-            dh[tag].append(hs[8]['effective_quality'] - hs[1]['effective_quality'])
+            dh[tag].append(cf_gain(ctx[1][fid], 8, hs[8], hs[1]))
+            raw[tag].append(hs[8]['effective_quality'] - hs[1]['effective_quality'])
             if tag:
                 o = ctx[1][fid]
                 o1, o8 = _optimal(o, 1), _optimal(o, 8)
@@ -429,9 +440,12 @@ def analyze(cfg, digest, model, mock=False, rows=None, ctx=None):
                                          a['bootstrap_seed_by_character'][char], alpha)
                    if min(len(dh[True]), len(dh[False])) >= 2 else None,
                    action_switch=switch,
-                   legacy_mixture=(a['legacy_mixture_weights'][0] * statistics.fmean(dh[True]) +
-                                   a['legacy_mixture_weights'][1] * statistics.fmean(dh[False]))
-                   if dh[True] and dh[False] else None)
+                   legacy_mixture=(a['legacy_mixture_weights'][0] * statistics.fmean(raw[True]) +
+                                   a['legacy_mixture_weights'][1] * statistics.fmean(raw[False]))
+                   if raw[True] and raw[False] else None,
+                   raw_dH_descriptive={'sensitive': statistics.fmean(raw[True]) if raw[True] else None,
+                                       'control': statistics.fmean(raw[False]) if raw[False] else None,
+                                       'note': 'q8-q1 on own oracles; not H-blind invariant'})
         b, m = switch['discordant_h8_only'], switch['discordant_h1_only']
         res['action_switch']['mcnemar_exact_p'] = _binom_two_sided(b, b + m) if b + m else None
         res['lookahead_curve'] = lookahead_curve(
@@ -459,7 +473,7 @@ def lookahead_curve(sets, oracles, horizons):
         sens_dq, ctrl_dq = [], []
         for fid, hs in sets.items():
             o1, oh = _optimal(oracles[fid], 1), _optimal(oracles[fid], h)
-            dq = hs[h]['effective_quality'] - hs[1]['effective_quality']
+            dq = cf_gain(oracles[fid], h, hs[h], hs[1])
             if not o1.isdisjoint(oh):
                 ctrl_dq.append(dq)
                 continue

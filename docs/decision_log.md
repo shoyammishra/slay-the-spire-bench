@@ -1,5 +1,31 @@
 # Decision Log
 
+## 2026-09-30 - Freeze v3 inference (H1/2/4/8 lookahead curve); pre-inference estimand amendment
+
+**Frozen:** `configs/controlled_h_v3_inference.json`, digest
+`697011782709a76095ea705dab1ee1e862891b9bd7f717a4f0221075c28b8ef2` (in
+`scripts/heldout_v3_inference.py`), bound to the v3 fixture release (1,760 fixtures, 440
+sensitive + 440 control per character; release reproduced byte-for-byte in selection on the
+laptop). User decisions: DiD primary; H∈{1,2,4,8} for a per-model lookahead curve; Qwen3-8B/14B
+authorized, six more models pre-specified (each needs a versioned amendment before it runs);
+8-way concurrency; link to the existing combat/run matrix; framing = one mechanism (lookahead
+use in a single decision), not long-horizon planning in general.
+
+**Amendment before any model saw a v3 fixture.** The full constant-action mock (always
+`end_turn`, i.e. an H-blind policy) produced Silent DiD +.077, p<.001 under the first estimand
+(q8−q1, each answer scored on its own H oracle): the same action's normalized quality moves
+with H, differently in sensitive vs control strata. Principle 2 (ask what a degenerate
+strategy scores) caught it. **New primary:** g = EQ8(a8) − EQ8(a1), both answers scored under
+the H8 oracle; DiD = mean_sens(g) − mean_ctrl(g). An H-blind model scores exactly 0 (verified
+on all 7,040 mock queries: DiD 0.000, p = 1.000; curve use − baseline = 0 at every H; plus a
+regression test on the real release). q8−q1 is kept as a descriptive only. Power at 440/440
+from the pilot data re-scored under g: 1.00 (IC) / .96 (Silent) at .10 (SDs .23–.42).
+
+**Correction to 2026-09-29 reading.** Re-scored under g, pilot controls barely move
+(IC −.005, Silent −.061), so the "generic longer-horizon prompt effect on controls" was mostly
+this artifact. Exploratory pilot DiDs under g: Ironclad −.04 (32B) / −.26 (8B) / −.28 (14B);
+Silent +.09 / +.30 / −.37 — tiny n, exposed fixtures, no inferential weight.
+
 ## 2026-09-29 - Freeze v3 held-out fixture protocol; run the oracle audit on Sharanga CPU
 
 **Authorization.** User directed that the fresh-fixture oracle audit run on Sharanga

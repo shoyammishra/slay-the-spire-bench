@@ -1,25 +1,25 @@
 {
   "protocol_id": "controlled-h-v3-lookahead-curve-2026-09-30",
-  "status": "frozen-before-any-model-sees-v3-fixtures",
+  "status": "frozen 2026-09-30 (re-frozen after the pre-inference estimand amendment) before any model saw a v3 fixture",
   "instrument_version": "controlled-decision-horizon-v2",
   "fixture_protocol_digest": "dbcbc03bb38b7a27a0a80011db2365b0fa544da1878c9b13422dadb82262aff7",
   "decisions": "user 2026-09-30: DiD primary; H in {1,2,4,8} for a per-model lookahead curve; staged models (Qwen3-8B/14B first, 6 more pre-specified, added by versioned amendment before they run); 8-way concurrency; link to existing combat/run matrix (docs/controlled_h_v3_inference_proposal.md)",
   "sources": {
     "manifest": {
       "filename": "controlled_h_v3_manifest.json",
-      "sha256": "TBD"
+      "sha256": "682c5e5ed45d2d06d30993153745e2d886147af722850aa6da9c0a0bdbb17566"
     },
     "full": {
       "filename": "controlled_h_v3_full.json",
-      "sha256": "TBD"
+      "sha256": "fff4b9756639a887c3f40b9cae5dd62c00471e6b5e26371be5278bca0963072b"
     },
     "release_fixtures": {
       "filename": "controlled_h_v3_release_fixtures.json",
-      "sha256": "TBD"
+      "sha256": "3dcc82db616a2e65c91408adbea5fc7582d44d09635c522db14fd1fe4b7cc323"
     },
     "release_audit": {
       "filename": "controlled_h_v3_release_fixtures_audit.json",
-      "sha256": "TBD"
+      "sha256": "5e9bdf7bb39f86abe51dcc61b9c9e4f767b1aa3d2afe0656336a53e73f953291"
     }
   },
   "release": {
@@ -82,7 +82,7 @@
     "model_addition_rule": "each additional model is added by a versioned amendment pinning its revision BEFORE it runs; same fixtures, prompts, scoring, gates and analysis; non-thinking models run with the same settings minus enable_thinking (disclosed)"
   },
   "analysis": {
-    "primary": "per character at H=8: mean_sensitive(q8-q1) - mean_control(q8-q1), sensitivity = H1/H8 optimal sets disjoint (release label); q = effective quality (truncated/unparseable/illegal = 0)",
+    "primary": "per character at H=8: mean_sensitive(g) - mean_control(g), g = EQ8(a8) - EQ8(a1): effective quality of the model's H8 answer minus that of its H1 answer, BOTH scored under the H8 oracle (truncated/unparseable/illegal = 0); sensitivity = H1/H8 optimal sets disjoint (release label). An H-blind model scores exactly 0.",
     "alpha_per_character": 0.025,
     "bootstrap_replicates": 10000,
     "bootstrap_seed_by_character": {
@@ -91,7 +91,7 @@
     },
     "smallest_effect_of_interest": 0.1,
     "secondary": [
-      "lookahead curve per model: for each H in {2,4,8}, on fixtures whose H-optimal set is disjoint from the H1-optimal set, lookahead_use_rate (response at H is H-optimal), myopic_rate (response at H is H1-optimal), ignore_baseline_rate (the H1 response is H-optimal), exact McNemar of use vs baseline, and per-H DiD with per-H labels",
+      "lookahead curve per model: for each H in {2,4,8}, on fixtures whose H-optimal set is disjoint from the H1-optimal set, lookahead_use_rate (response at H is H-optimal), myopic_rate (response at H is H1-optimal), ignore_baseline_rate (the H1 response is H-optimal), exact McNemar of use vs baseline, and per-H DiD of the same-oracle gain EQ_H(a_H)-EQ_H(a_1) with per-H labels",
       "action switch at H8 (as lookahead curve at H=8, release labels)",
       "legacy v2 mixture .25 sensitive + .75 control dH at H8",
       "model contrasts: DiD and lookahead-use differences paired by fixture (exploratory until >=2 families are run)",
@@ -104,6 +104,7 @@
     "max_truncation_rate": 0.01,
     "max_excluded_pair_rate": 0.02,
     "exclusions": "fixtures with any execution failure at any H are excluded and reported; model errors stay in as quality 0",
-    "claim_scope": "isolates one mechanism of long-horizon planning (lookahead use within a single decision, H<=8 transitions); not a claim about long-horizon planning in general"
+    "claim_scope": "isolates one mechanism of long-horizon planning (lookahead use within a single decision, H<=8 transitions); not a claim about long-horizon planning in general",
+    "amendment_2026-09-30": "Before any model ran: the constant-action mock showed the earlier q8-q1 estimand (each answer on its own oracle) is not H-blind invariant (Silent DiD +.077, p<.001 for a policy that ignores H). Primary and per-H curve DiD switched to the same-oracle gain; q8-q1 kept as a descriptive only."
   }
 }

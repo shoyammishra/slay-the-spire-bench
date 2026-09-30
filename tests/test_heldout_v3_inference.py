@@ -49,31 +49,66 @@ def test_schedule_latin_square_balances_positions_within_strata():
     assert all(sorted(v) == [1, 2, 4, 8] for v in per.values())
 
 
-def _oracle(opt):
-    return {'oracles': {str(h): {'optimal_actions': [dict(action='play', card_index=i, target_index=0)
-                                                      for i in ids]} for h, ids in opt.items()}}
+def _oracle(values_by_h):
+    """values_by_h: {H: {card: value}} -> oracle row in the frozen format."""
+    out = {}
+    for h, vals in values_by_h.items():
+        best, worst = max(vals.values()), min(vals.values())
+        out[str(h)] = dict(action_values={f'play:{k}:0': v for k, v in vals.items()},
+                           best_value=best, worst_value=worst, exact=True,
+                           optimal_actions=[dict(action='play', card_index=k, target_index=0)
+                                            for k, v in vals.items() if v == best])
+    return {'oracles': out}
 
 
-def _row(card, q):
-    return {'score': {'scored_action': dict(action='play', card_index=card, target_index=0)},
-            'effective_quality': q}
+def _row(oracle, h, card):
+    from scripts.controlled_horizon_confirmatory import effective_quality
+    from scripts.controlled_horizon_model_pilot import score_precomputed_oracle
+    parsed = dict(action='play', card_index=card, target_index=0)
+    score = score_precomputed_oracle(oracle, h, parsed)
+    return dict(score=score, response_parsed=parsed, diagnostics={'truncated': False},
+                effective_quality=effective_quality(score))
 
 
-def test_lookahead_curve_counts_use_myopia_and_baseline():
-    # f1: H1-opt {0}, H8-opt {1}; model plays 0 at H1 and 1 at H8 -> uses lookahead.
-    # f2: same optima; model plays 0 at both -> myopic.  f3: control at every H.
-    oracles = {'f1': _oracle({1: [0], 2: [0], 4: [1], 8: [1]}),
-               'f2': _oracle({1: [0], 2: [0], 4: [1], 8: [1]}),
-               'f3': _oracle({1: [2], 2: [2], 4: [2], 8: [2]})}
-    sets = {'f1': {1: _row(0, .2), 2: _row(0, .2), 4: _row(1, 1.), 8: _row(1, 1.)},
-            'f2': {1: _row(0, .2), 2: _row(0, .2), 4: _row(0, .1), 8: _row(0, .1)},
-            'f3': {1: _row(2, 1.), 2: _row(2, 1.), 4: _row(2, 1.), 8: _row(2, 1.)}}
+def test_lookahead_curve_counts_use_myopia_baseline_and_same_oracle_did():
+    short, long_ = {0: 10, 1: 0, 2: 5}, {0: 0, 1: 10, 2: 5}
+    sens_oracle = _oracle({1: short, 2: short, 4: long_, 8: long_})
+    ctrl_oracle = _oracle({h: {0: 0, 1: 5, 2: 10} for h in (1, 2, 4, 8)})
+    oracles = {'f1': sens_oracle, 'f2': sens_oracle, 'f3': ctrl_oracle}
+    plays = {'f1': {1: 0, 2: 0, 4: 1, 8: 1},   # switches to the long-horizon move
+             'f2': {1: 0, 2: 0, 4: 0, 8: 0},   # myopic
+             'f3': {1: 2, 2: 2, 4: 2, 8: 2}}   # control, optimal throughout
+    sets = {f: {h: _row(oracles[f], h, card) for h, card in p.items()} for f, p in plays.items()}
     curve = inf.lookahead_curve(sets, oracles, [1, 2, 4, 8])
     assert curve['2']['sensitive_n'] == 0 and curve['2']['lookahead_use_rate'] is None
     c8 = curve['8']
     assert c8['sensitive_n'] == 2 and c8['control_n'] == 1
     assert c8['lookahead_use_rate'] == .5 and c8['myopic_rate'] == .5 and c8['ignore_baseline_rate'] == 0
-    assert abs(c8['did'] - ((0.8 + -0.1) / 2 - 0.0)) < 1e-12
+    assert inf.cf_gain(oracles['f1'], 8, sets['f1'][8], sets['f1'][1]) == 1.0
+    assert inf.cf_gain(oracles['f2'], 8, sets['f2'][8], sets['f2'][1]) == 0.0
+    assert c8['did'] == 0.5
+
+
+def test_h_blind_constant_policy_scores_exactly_zero_on_the_real_release():
+    # Instrument check (the degenerate strategy): an answer that ignores H must have zero gain
+    # at every H and zero DiD, on the frozen release itself. Regression for 2026-09-30.
+    from scripts.controlled_horizon_confirmatory import make_row
+    cfg, _ = inf.load_config()
+    fixtures, oracles, sens, prompts = inf.load_context(cfg)
+    queries = inf.schedule(cfg, fixtures, sens)
+    sets = {}
+    for q in queries[:400]:
+        row = make_row(q, prompts[q['fixture_id']], oracles[q['fixture_id']],
+                       {'action': 'end_turn'}, '{"action":"end_turn"}', 'stop')
+        sets.setdefault(q['fixture_id'], {})[q['horizon']] = row
+    sets = {f: hs for f, hs in sets.items() if len(hs) == 4}
+    assert len(sets) >= 50
+    for f, hs in sets.items():
+        for h in (2, 4, 8):
+            assert inf.cf_gain(oracles[f], h, hs[h], hs[1]) == 0.0
+    curve = inf.lookahead_curve(sets, oracles, [1, 2, 4, 8])
+    for h, v in curve.items():
+        assert v['did'] in (None, 0.0) and v['lookahead_use_rate'] == v['ignore_baseline_rate'], (h, v)
 
 
 def test_v3_inference_runner_is_outside_the_frozen_code_receipt():
