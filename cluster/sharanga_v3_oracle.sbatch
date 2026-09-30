@@ -38,14 +38,17 @@ readonly LOGDIR="results/controlled_h_v3_logs/job_${SLURM_JOB_ID}"
 mkdir -p "$LOGDIR"
 echo "node=$(hostname -s) shards=[${START},${END})/${SHARDS} workers=${WORKERS} start=$(date -Is)"
 
+# Compute nodes lack /usr/bin/time (login node has it); peak memory then comes from sacct MaxRSS.
+TIMER=""
+[[ -x /usr/bin/time ]] && TIMER="/usr/bin/time -v"
 run_shard() {
   local s="$1"
-  # stderr = per-fixture progress + /usr/bin/time peak RSS; one log per shard.
-  /usr/bin/time -v python scripts/controlled_horizon_v3.py shard --shard "$s" --shards "$SHARDS" \
+  # stderr = per-fixture progress (+ peak RSS when available); one log per shard.
+  $TIMER python scripts/controlled_horizon_v3.py shard --shard "$s" --shards "$SHARDS" \
     > "${LOGDIR}/shard_${s}.log" 2>&1 || echo "shard ${s} FAILED (see ${LOGDIR}/shard_${s}.log)"
 }
 export -f run_shard
-export SHARDS LOGDIR
+export SHARDS LOGDIR TIMER
 seq "$START" $((END - 1)) | xargs -P "$WORKERS" -I{} bash -c 'run_shard {}'
 echo "end=$(date -Is)"
-grep -h "Maximum resident" "${LOGDIR}"/shard_*.log | sort -k6 -n | tail -1
+grep -h "Maximum resident" "${LOGDIR}"/shard_*.log 2>/dev/null | sort -k6 -n | tail -1 || true
