@@ -28,7 +28,11 @@ effect** (stating a longer horizon improves answers even when lookahead is irrel
 noise at n=3. The frozen primary estimand (sensitive H8−H1 alone) conflates this with
 lookahead; the lookahead-specific quantity is **sensitive-minus-control** (difference-in-
 differences), which the 25/75 design already supports. Revise the endpoint BEFORE the fresh
-freeze. (2) **H2 dip is a fixture-definition issue, not a scoring bug:** "control" is defined
+freeze. *(Correction, same day: the frozen primary estimand is NOT sensitive-only — it is the
+population mixture `.25·mean(sens ΔH) + .75·mean(ctrl ΔH)`
+(`controlled_horizon_confirmatory_analysis.py:37`), i.e. control-dominated, so the confound is
+larger than first stated. The 32B pilot shows the same confound with the OPPOSITE sign:
+controls H8−H1 = −.136 Ironclad / −.212 Silent (n=11 each). See decision_log 2026-09-29.)* (2) **H2 dip is a fixture-definition issue, not a scoring bug:** "control" is defined
 on H1 vs H8 only, so the optimal action can differ at H2/H4 (e.g. silent-0317: identical action
 at all four H, quality 1.0/0.0/0.0/1.0). Define sensitivity per H, or restrict endpoints to H1/H8.
 (3) 3/12 fixtures show an H-blind action (identical H1 and H8 choice). (4) n=3 per cell: no

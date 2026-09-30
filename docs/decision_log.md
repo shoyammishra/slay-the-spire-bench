@@ -1,5 +1,44 @@
 # Decision Log
 
+## 2026-09-29 - PROPOSED (not frozen): make sensitive-minus-control the primary controlled-H estimand
+
+**Status: proposal awaiting user approval. Nothing frozen, no protocol file changed.**
+
+**Problem.** The frozen primary estimand is the population mixture
+`.25·mean(sensitive H8−H1) + .75·mean(control H8−H1)`. Controls are fixtures whose optimal
+first action is identical at H1 and H8, so their ΔH measures a *generic* effect of stating a
+longer horizon (prompt/deliberation), not lookahead. Both development datasets show that
+effect is real-looking and model-dependent: Qwen3-8B controls +.16 IC / +.28 Silent (n=3,
+exposed); Qwen3-32B pilot controls −.136 IC / −.212 Silent (n=11). A mixture dominated by
+controls therefore mostly measures the generic effect, and cannot answer "does the model use
+extra lookahead". Also: "control" is defined on H1/H8 only, so H2/H4 qualities mix
+sensitive and insensitive regimes (8B H2 dip).
+
+**Options.** (a) Keep the mixture — rejected: not a lookahead estimand. (b) Sensitive-only
+H8−H1 — rejected: still contains the generic effect. (c) **Difference-in-differences per
+character: mean(sens ΔH) − mean(ctrl ΔH)**, controls as the within-design counterfactual.
+(d) Action-switch metric on sensitive fixtures (does the model move to the H8-optimal action)
+— useful secondary, but binary and harder to power.
+
+**Proposed choice: (c) primary, per character (α=.025 each), H1 vs H8 only.** Secondary: the
+legacy mixture (continuity), (d), and H2/H4 descriptively with per-H sensitivity labels
+recomputed offline from the oracle. Minimum effect of interest stays .10.
+
+**Cost (normal approximation, SDs from the 32B pilot: sens ~.50/.54, ctrl ~.32/.42).** The
+current 63/189 release gives DiD power ≈ .23 IC / .19 Silent — inadequate. 80% power needs
+≈ **665 IC / 876 Silent fixtures per character at 50% sensitive** (333/438 sensitive), or
+≈1,072/1,316 at 25%. Screen yield of sensitive candidates ≈ 28% (226/800), so ≈3,000
+candidates per character must be screened; the 1,020-candidate full oracle audit took ~30 h
+serial on the laptop → parallelize on Sharanga CPU. Model cost with H1/H8 only: ~1.3–1.8k
+queries per character per model. SDs come from n=4–11 per stratum — re-estimate from the
+14B + 8B dev data before freezing, and treat these N as planning values.
+
+**Limitations / reversal.** Chosen after observing development outcomes on exposed
+fixtures; must be disclosed as outcome-informed endpoint revision *before* any fresh held-out
+data exist (legitimate for the fresh freeze, never retroactive to the stopped 32B run).
+The 504-fixture release stays valid as a development/secondary set. Reversal = revert to the
+mixture in a separately versioned protocol.
+
 ## 2026-09-08 - Authorize automatic 8B development completion
 
 After operator-reported successful H2 smoke 10749, the user explicitly requests
