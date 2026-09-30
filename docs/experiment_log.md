@@ -1,5 +1,47 @@
 # Experiment Log
 
+## 2026-09-30 - Qwen3-14B development pilot complete (Sharanga); myopia signature; v3 oracle smoke passed
+
+**14B pilot.** 48/48 on Sharanga H100 (jobs 372674 smoke → 372880 → 372930 → 372950 via the
+bounded supervisor), pinned stack identical to 8B (vLLM 0.8.5.post1 / Transformers 4.51.3);
+hardware differs from 8B (CSIS A100) — development only. Truncated 1, parse-fail 1, illegal 1
+(8B: same 1/1/1). Median completion tokens 2,403 (8B 1,771); max = 16,000 cap in both.
+Report verified locally with `small_model_pilot.py status` (after the receipt fix below).
+
+| Mean effective quality | H1 | H2 | H4 | H8 |
+|---|---|---|---|---|
+| 14B Ironclad | .75 | .57 | .40 | .47 |
+| 14B Silent | .72 | .56 | .67 | .93 |
+
+Paired H8−H1, n=3 fixtures per cell (exposed fixtures, no inferential weight):
+
+| | IC sens | IC ctrl | IC DiD | Silent sens | Silent ctrl | Silent DiD |
+|---|---|---|---|---|---|---|
+| 8B | +.27 | +.16 | **+.11** | +.11 | +.28 | **−.17** |
+| 14B | −.44 (all 3 negative) | −.12 | **−.32** | +.01 | +.43 | **−.42** |
+
+**Myopia signature (new, from oracle optimal-action sets).** On sensitive fixtures at H8, the
+chosen action is H1-optimal in 5/6 (8B) and 3/6 (14B) cases, H8-optimal in 0/6 and 1/6 —
+combined **8/12 myopic vs 1/12 forward-looking**. At H1, models pick the H1-optimal action only
+3/12. Reading: when longer lookahead changes the best move, these models mostly keep the
+short-horizon move. Consistent in direction with the stopped 32B interim IC −.20. Caveats that
+travel with it: 12 sensitive fixture-H8 cells, exposed fixtures, two sizes of one family,
+different hardware per model. This motivates the action-switch secondary endpoint (decision_log
+2026-09-29 option d) — to be pre-specified in the inference freeze, not claimed from this.
+
+**v3 oracle smoke (job 372725, compute, 8 workers).** 8 shards / 40 fixtures in 9 min 22 s:
+**40/40 exact** (no node-budget or wall-cap failures), 20 sensitive / 20 control (IC 13/11,
+Silent 7/9), per-fixture wall median 57 s / p90 149 s / max 291 s (all four H), ~75 MB RSS per
+worker. Projected full audit ≈ 85 CPU-h. Production = shards 8–799 in one 192-CPU big_compute
+job (373057).
+
+**Regression caught + fixed (2026-09-30).** `scripts/controlled_horizon_v3.py` matched the
+`scripts/controlled_horizon*.py` glob hashed by the frozen v2 code receipt, so both pilot
+reports (and the frozen confirmatory runner) refused with "implementation differs from frozen
+code receipt" wherever the file existed. Renamed to `scripts/heldout_v3_fixtures.py`; regression
+test added; first production submission (373055) cancelled before start. The 14B run was
+unaffected (its clone predates the file). v3 protocol, manifest and smoke shards unchanged.
+
 ## 2026-09-29 - Qwen3-8B development pilot found COMPLETE locally (48/48); 14B moved to Sharanga
 
 **Provenance.** `results/small_model_development/real/qwen3-8b.json` (retrieved to the laptop
