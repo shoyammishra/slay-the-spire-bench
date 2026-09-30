@@ -9,7 +9,7 @@ frozen separately before any model sees these fixtures.
 
 **Protocol** `configs/controlled_h_v3_heldout.json`, digest
 `dbcbc03bb38b7a27a0a80011db2365b0fa544da1878c9b13422dadb82262aff7` (hard-coded in
-`scripts/controlled_horizon_v3.py`). Same generation recipe and oracle as v2, except:
+`scripts/heldout_v3_fixtures.py`). Same generation recipe and oracle as v2, except:
 (1) fresh seeds (base 30,000,000, character offset 10,000,000, stride 1009), 2,000
 candidates per character; seeds/IDs/state digests verified disjoint from every prior
 controlled-H source (manifest aborts on overlap; locally 4,000/4,000 generated, 0 failures).

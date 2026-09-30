@@ -1,6 +1,6 @@
 #!/bin/bash
 # v3 held-out controlled-H fixtures: exact-oracle audit. Model-free, CPU only.
-# Protocol: configs/controlled_h_v3_heldout.json (frozen digest in scripts/controlled_horizon_v3.py).
+# Protocol: configs/controlled_h_v3_heldout.json (frozen digest in scripts/heldout_v3_fixtures.py).
 #
 # Sharanga CPU QOS forbids 1-CPU array tasks (compute: >=4 CPUs, <=7 jobs; big_compute:
 # >=128 CPUs, <=8 jobs), so one job runs shards [SHARD_START, SHARD_END) with one worker
@@ -8,14 +8,14 @@
 # resumes; finished dispositions (incl. budget failures) are never recomputed.
 #
 # Build the manifest ONCE on the login node first:
-#   python scripts/controlled_horizon_v3.py manifest
+#   python scripts/heldout_v3_fixtures.py manifest
 # Smoke (8 shards on compute), then production ranges on big_compute, e.g.:
 #   sbatch --partition=compute --cpus-per-task=8 --mem=32G \
 #          --export=ALL,SHARD_START=0,SHARD_END=8 cluster/sharanga_v3_oracle.sbatch
 #   sbatch --export=ALL,SHARD_START=8,SHARD_END=200 cluster/sharanga_v3_oracle.sbatch
 # Merge + release after every shard is complete:
-#   python scripts/controlled_horizon_v3.py merge --shards 800
-#   python scripts/controlled_horizon_v3.py release
+#   python scripts/heldout_v3_fixtures.py merge --shards 800
+#   python scripts/heldout_v3_fixtures.py release
 #SBATCH --job-name=slay_v3_oracle
 #SBATCH --partition=big_compute
 #SBATCH --ntasks=1
@@ -44,7 +44,7 @@ TIMER=""
 run_shard() {
   local s="$1"
   # stderr = per-fixture progress (+ peak RSS when available); one log per shard.
-  $TIMER python scripts/controlled_horizon_v3.py shard --shard "$s" --shards "$SHARDS" \
+  $TIMER python scripts/heldout_v3_fixtures.py shard --shard "$s" --shards "$SHARDS" \
     > "${LOGDIR}/shard_${s}.log" 2>&1 || echo "shard ${s} FAILED (see ${LOGDIR}/shard_${s}.log)"
 }
 export -f run_shard

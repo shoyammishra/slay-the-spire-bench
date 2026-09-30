@@ -8,7 +8,7 @@ import tempfile
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
-from scripts import controlled_horizon_v3 as v3
+from scripts import heldout_v3_fixtures as v3
 from scripts.controlled_horizon_expansion import run_stage
 from scripts.controlled_horizon_pilot import _atomic_write_json
 
@@ -67,6 +67,14 @@ def test_manifest_rejects_overlap_with_prior_fixtures():
     except ValueError:
         return
     raise AssertionError('overlapping seeds were accepted')
+
+
+def test_v3_runner_is_outside_the_frozen_code_receipt():
+    # The v2 confirmatory/pilot contracts hash every scripts/controlled_horizon*.py; a new file
+    # matching that glob silently invalidates them (happened once on 2026-09-30).
+    from scripts.controlled_horizon_confirmatory import code_receipt
+    assert not any('heldout_v3' in path for path in code_receipt())
+    assert not list((ROOT / 'scripts').glob('controlled_horizon_v3*.py'))
 
 
 if __name__ == '__main__':
