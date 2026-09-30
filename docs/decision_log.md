@@ -1,5 +1,35 @@
 # Decision Log
 
+## 2026-09-29 - Freeze v3 held-out fixture protocol; run the oracle audit on Sharanga CPU
+
+**Authorization.** User directed that the fresh-fixture oracle audit run on Sharanga
+("do it on sharanga"), following the DiD proposal below. This freezes only the model-free
+**fixture** protocol; the inference/analysis protocol (incl. the DiD primary) is still to be
+frozen separately before any model sees these fixtures.
+
+**Protocol** `configs/controlled_h_v3_heldout.json`, digest
+`dbcbc03bb38b7a27a0a80011db2365b0fa544da1878c9b13422dadb82262aff7` (hard-coded in
+`scripts/controlled_horizon_v3.py`). Same generation recipe and oracle as v2, except:
+(1) fresh seeds (base 30,000,000, character offset 10,000,000, stride 1009), 2,000
+candidates per character; seeds/IDs/state digests verified disjoint from every prior
+controlled-H source (manifest aborts on overlap; locally 4,000/4,000 generated, 0 failures).
+(2) **Exactness = 2M-node budget only.** All 326 v2 exclusions were 120 s wall timeouts at
+H=8 (none hit the node budget; exact H8 needed ≤140k nodes), so v2 exclusion depended on
+laptop speed. The oracle runs ~935 s per 1M nodes (median; p95 1,248), so the wall cap is
+raised to 7,200 s per H as a safety stop only, with wall-cap exclusions reported separately.
+(3) No screen stage — every candidate gets the full H∈{1,2,4,8} oracle. (4) Release quota
+440 sensitive + 440 control per character (DiD 80%-power planning, ≥438 sensitive for Silent),
+ranked by sha256(protocol_id:fixture_id); shortfall fails closed.
+
+**Execution.** Slurm array on `big_compute`, 800 shards (fixtures sorted by ID, shard i
+takes i::800), 1 CPU / 6 GB each, throttled (%300) on the shared account; one-shard smoke
+first to measure time and peak RSS. Expected ≈500–600 CPU-h. Merge validates exact coverage.
+
+**Limits.** Hardware still affects only the rare wall-cap stop, not exactness. The node
+budget itself excludes the hardest states (disclose as a difficulty restriction, as in v2).
+Fixture yields are planning estimates from v2 (IC ~39% exact-sensitive per candidate; Silent
+~19% under the old wall cap, expected higher now).
+
 ## 2026-09-29 - PROPOSED (not frozen): make sensitive-minus-control the primary controlled-H estimand
 
 **Status: proposal awaiting user approval. Nothing frozen, no protocol file changed.**

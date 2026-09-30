@@ -1,0 +1,105 @@
+{
+  "protocol_id": "controlled-h-v3-heldout-2026-09-29",
+  "instrument_version": "controlled-decision-horizon-v2",
+  "status": "frozen-before-generation; model-free fixture protocol; no inference authorized",
+  "purpose": "Fresh, never-model-exposed fixtures sized for a per-character sensitive-minus-control (difference-in-differences) H8-vs-H1 test (decision_log 2026-09-29).",
+  "candidate_generation": {
+    "candidates_per_character": 2000,
+    "characters": [
+      "ironclad",
+      "silent"
+    ],
+    "seed_base": 30000000,
+    "character_seed_offset": 10000000,
+    "seed_stride": 1009,
+    "encounters": [
+      [
+        "GremlinNob"
+      ],
+      [
+        "Lagavulin"
+      ],
+      [
+        "SlimeBoss"
+      ],
+      [
+        "Hexaghost"
+      ],
+      [
+        "Sentry",
+        "Sentry"
+      ]
+    ],
+    "hp_fractions": [
+      1.0,
+      0.75,
+      0.5
+    ],
+    "combat_turns": [
+      1,
+      2,
+      3
+    ],
+    "fixture_turn_plays": [
+      0,
+      1
+    ],
+    "deck_size": 10,
+    "replacement_after_generation_failure": false
+  },
+  "full_oracle": {
+    "horizons": [
+      1,
+      2,
+      4,
+      8
+    ],
+    "node_budget_per_fixture_h": 2000000,
+    "wall_seconds_per_fixture_h": 7200.0,
+    "exactness_rule": "node budget only; the wall cap is a safety stop and every wall-cap exclusion is reported separately"
+  },
+  "release": {
+    "fixtures_per_character": 880,
+    "h1_h8_sensitive_per_character": 440,
+    "h1_h8_insensitive_per_character": 440,
+    "rank_within_character_and_sensitivity": "sha256(protocol_id:fixture_id)",
+    "minimum_sensitive_fraction": 0.2,
+    "require_nonzero_h8_oracle_span": true,
+    "require_prompt_invariance": true,
+    "require_exact_oracles_at_all_horizons": true,
+    "require_h1_mismatch_loss_on_sensitive_fixtures": true
+  },
+  "failure_policy": {
+    "generation_failure": "account-and-exclude-without-replacement",
+    "full_oracle_budget_failure": "account-and-exclude",
+    "wall_cap_failure": "account-and-exclude-and-report",
+    "zero_h8_span": "account-and-exclude-from-release",
+    "quota_shortfall": "fail-closed-without-changing-the-protocol",
+    "model_behavior_used_for_selection": false
+  },
+  "execution": {
+    "cluster": "Sharanga CPU partition, one node type per run",
+    "sharding": "fixtures sorted by fixture_id, shard i takes positions i::n",
+    "python_env": "slaybench08 (Python 3.11)",
+    "screen_stage": "none; every generated candidate receives the full oracle"
+  },
+  "prior_fixture_sources": {
+    "v2_base_screen": {
+      "filename": "controlled_h_v2_frozen_screen.json",
+      "sha256": "036b8dcac8badf178d02f0216fb4ad8f5e5196816e0f25aeec68bc3bb075bc89"
+    },
+    "v2_expansion_screen": {
+      "filename": "controlled_h_v2_expansion_screen.json",
+      "sha256": "14eb6b0d7b12eabb198219980fa5a0132a7755a04737574e278328435938a043"
+    },
+    "v2_expansion_full": {
+      "filename": "controlled_h_v2_expansion_full.json",
+      "sha256": "81e85d8dfa403c5d0d1dc6e394a0fa808996709766a7bb0c2a14010a7183839c"
+    },
+    "v2_silent_extension_full": {
+      "filename": "controlled_h_v2_silent_control_extension_full.json",
+      "sha256": "2a73203b860489aa86064bb8e4c6691eea989e4536c5bfe86e8c19d1c4c40961"
+    }
+  },
+  "disjointness": "seeds, fixture IDs and state digests must not overlap any prior source; any overlap aborts manifest"
+}
