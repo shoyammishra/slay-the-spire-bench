@@ -1,5 +1,41 @@
 # Experiment Log
 
+## 2026-10-01 - v3 confirmatory: Qwen3-14B complete — gate PASSED; Ironclad primary rejects, driven by control degradation
+
+**Run.** Job 373154, Sharanga H100 (4 CPUs after a QOS fix), 11 h 23 min, 7,040/7,040, 0
+execution failures, truncation **46/7,040 = 0.7% (gate passed)**, excluded pairs 0. All rows
+replayed locally. **First valid confirmatory controlled-H result.**
+
+| Pre-registered primary (H8, same-oracle gain) | Estimate [97.5% CI] | p | Reject at α=.025 |
+|---|---|---|---|
+| **Ironclad** | **+.100 [+.043, +.158]** | .0001 | **yes** (CI does not exclude the .10 SEI) |
+| Silent | +.005 [−.043, +.053] | .82 | no (CI inside ±.10) |
+
+**Decomposition (audit before belief).** Ironclad sensitive mean gain +.015 (118 up / 119 down)
+vs control −.085 (70 up / 134 down). The rejection is produced by **H=8 instructions degrading
+answers on control fixtures** (where the optimal action is H-invariant), with sensitive
+fixtures flat. Under the pre-registered additivity assumption (equal generic effect in both
+strata) this reads as a +.10 lookahead benefit offsetting a generic harm; that assumption is
+not testable within this design. The direct measure does not confirm lookahead use:
+
+| 14B lookahead curve | IC use / H-blind baseline (McNemar p) | Silent use / baseline (p) |
+|---|---|---|
+| H2 | .179 / .197 (.54) | .154 / .138 (.68) |
+| H4 | .276 / .273 (1.0) | .258 / .219 (.30) |
+| H8 | .289 / .250 (.16) | .298 / .289 (.77) |
+
+Sensitive gain by encounter (IC): −.025 to +.045 across all five — no outlier. 14B deliberates
+~40% longer at **H2** (median completion tokens IC 2,680/3,790/2,759/2,526, Silent
+2,660/3,853/2,958/2,679 at H1/2/4/8); 8B shows no such bump. The H2 anomaly (also high H2
+myopic rates .39–.41) needs a prompt-level look before any H2 interpretation.
+
+**Two-model summary (Qwen3, one family).** Primary: 1 of 4 model×character cells rejects (14B
+IC), and that rejection is control-driven; 8B is gate-invalid but descriptively null in both
+characters. Direct lookahead use (H-answer hits the H-optimal move more than the model's own H1
+answer): **no cell significant at any H (all p ≥ .16)**. Honest reading: no robust evidence that
+Qwen3-8B/14B use the additional lookahead they are asked for; stating a longer horizon
+perturbs choices and, for 14B Ironclad, degrades them where lookahead is irrelevant.
+
 ## 2026-09-30 - v3 confirmatory: Qwen3-8B complete — validity gate FAILED (truncation 4.0%); descriptive null on lookahead
 
 **Run.** Job 373153, Sharanga H100, 8 h 08 min, 7,040/7,040 queries, 0 execution failures,
