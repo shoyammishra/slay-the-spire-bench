@@ -39,7 +39,39 @@ FROZEN_DIGEST = '697011782709a76095ea705dab1ee1e862891b9bd7f717a4f0221075c28b8ef
 # Versioned amendments that add models (path -> frozen digest). Each must amend the base
 # digest above and may only ADD models; prompts, scoring, gates and analysis are unchanged.
 AMENDMENTS = {'configs/controlled_h_v3_inference_amendment1.json': 'bac116c3e1d7f4a4c2227df2e5b73466ae2935df1cd7a5ec3407e810b3b36993'}
+# Prompt conditions beyond the base protocol (name -> (amendment path, frozen digest)).
+CONDITIONS = {'defined': ('configs/controlled_h_v3_inference_amendment2.json',
+                          'eadf64f3cea0c40497855b24b9547deca57adeb89de4aa9a79fa55ad89378e67')}
 OUT = ROOT / 'results/controlled_h_v3_inference'
+
+
+def condition_config(cfg, digest, condition):
+    """Derived config for a prompt condition; 'base' returns cfg unchanged."""
+    if condition == 'base':
+        return cfg
+    rel, frozen = CONDITIONS[condition]
+    am = json.loads((ROOT / rel).read_text(encoding='utf-8'))
+    if c.digest_json(am) != frozen or am['amends_protocol_digest'] != digest:
+        raise ValueError('condition amendment differs from its freeze or amends another protocol')
+    out = json.loads(json.dumps(cfg))
+    out['protocol_id'] = am['amendment_id']
+    out['inference']['horizons'] = am['horizons']
+    out['inference']['authorized_models'] = [m for m in am['models']
+                                             if m in cfg['inference']['authorized_models']]
+    out['_condition'] = dict(name=condition, amendment_id=am['amendment_id'], digest=frozen,
+                             anchor=am['prompt_change']['anchor'],
+                             insert=am['prompt_change']['inserted_after_anchor'])
+    return out
+
+
+def apply_condition(cfg, horizon, user):
+    cond = cfg.get('_condition')
+    if not cond:
+        return user
+    anchor = cond['anchor'].replace('{H}', str(horizon))
+    if user.count(anchor) != 1:
+        raise ValueError('condition anchor not found exactly once in the user prompt')
+    return user.replace(anchor, anchor + cond['insert'])
 
 
 def load_config(path=CONFIG, require_frozen=True):
@@ -104,7 +136,8 @@ def load_context(cfg, source_dir=ROOT / 'results'):
             if max(values) != o['best_value'] or min(values) != o['worst_value']:
                 raise ValueError('oracle extrema mismatch')
         fixtures[fid], oracles[fid] = fixture, row
-        prompts[fid] = c.prompt_contract(fixture, prompt_protocol)
+        prompts[fid] = {h: (sy, apply_condition(cfg, h, us))
+                        for h, (sy, us) in c.prompt_contract(fixture, prompt_protocol).items()}
     for char in cfg['release']['characters']:
         for tag, quota in ((True, cfg['release']['sensitive_per_character']),
                            (False, cfg['release']['control_per_character'])):
@@ -163,6 +196,8 @@ def contract(cfg, digest, model, mock):
                frozen_v2_code_receipt=c.code_receipt())
     if model in cfg.get('_amendments', {}):
         out['amendment'] = cfg['_amendments'][model]
+    if cfg.get('_condition'):
+        out['condition'] = {k: cfg['_condition'][k] for k in ('name', 'amendment_id', 'digest')}
     return out
 
 
@@ -203,8 +238,9 @@ def receipt_ok(r, cfg, digest, model, port, strict=True):
 
 
 # ---------------------------------------------------------------- evidence store
-def model_dir(model, mock):
-    return OUT / ('mock' if mock else 'real') / model
+def model_dir(model, mock, cfg=None):
+    cond = (cfg or {}).get('_condition')
+    return OUT / ('mock' if mock else 'real') / (model + (f"__{cond['name']}" if cond else ''))
 
 
 def row_file(d, index):
@@ -217,7 +253,7 @@ def pending_file(d, index):
 
 def load_rows(cfg, digest, model, mock, queries, ctx, strict=True):
     """Replay every saved row; convert orphaned in-flight markers to ambiguous failures."""
-    d = model_dir(model, mock)
+    d = model_dir(model, mock, cfg)
     _, oracles, _, prompts = ctx
     meta_path = d / 'contract.json'
     if meta_path.exists():
@@ -301,7 +337,7 @@ def smoke_gate(cfg, rows):
 def run(args, cfg, digest):
     ctx = load_context(cfg)
     queries = schedule(cfg, ctx[0], ctx[2])
-    d = model_dir(args.model, args.mock)
+    d = model_dir(args.model, args.mock, cfg)
     (d / 'rows').mkdir(parents=True, exist_ok=True)
     with c.exclusive_writer(d / 'run'):
         meta = d / 'contract.json'
@@ -524,6 +560,66 @@ def lookahead_curve(sets, oracles, horizons):
     return out
 
 
+def _paired_sets(cfg, digest, model, ctx):
+    queries = schedule(cfg, ctx[0], ctx[2])
+    rows = load_rows(cfg, digest, model, False, queries, ctx, strict=False)
+    if len(rows) != len(queries):
+        return None
+    sets = {}
+    for q in queries:
+        sets.setdefault(q['fixture_id'], {})[q['horizon']] = rows[q['index']]['row']
+    return sets
+
+
+def ablation(base_cfg, cond_cfg, digest):
+    """Pre-registered Amendment 2 contrast: DiD_defined - DiD_original at H8, paired by fixture."""
+    a = base_cfg['analysis']
+    ctx_b, ctx_d = load_context(base_cfg), load_context(cond_cfg)
+    oracles, sens, fixtures = ctx_b[1], ctx_b[2], ctx_b[0]
+    tests, out = [], {}
+    for model in cond_cfg['inference']['authorized_models']:
+        sb, sd = _paired_sets(base_cfg, digest, model, ctx_b), _paired_sets(cond_cfg, digest, model, ctx_d)
+        if sb is None or sd is None:
+            out[model] = dict(status='incomplete: needs both conditions complete')
+            continue
+        base_valid = analyze(base_cfg, digest, model, ctx=ctx_b)['valid_for_primary_inference']
+        cond_valid = analyze(cond_cfg, digest, model, ctx=ctx_d)['valid_for_primary_inference']
+        out[model] = dict(original_condition_valid=base_valid, defined_condition_valid=cond_valid,
+                          by_character={})
+        for char in base_cfg['release']['characters']:
+            diff = {True: [], False: []}
+            b = m = hit_b = hit_d = 0
+            for fid in fixtures:
+                if fixtures[fid].character != char:
+                    continue
+                o = oracles[fid]
+                gb = cf_gain(o, 8, sb[fid][8], sb[fid][1])
+                gd = cf_gain(o, 8, sd[fid][8], sd[fid][1])
+                diff[sens[fid]].append(gd - gb)
+                if sens[fid]:
+                    o8 = _optimal(o, 8)
+                    xb, xd = _key(sb[fid][8]['score']) in o8, _key(sd[fid][8]['score']) in o8
+                    hit_b += xb; hit_d += xd; b += xd and not xb; m += xb and not xd
+            r = did_bootstrap(diff[True], diff[False], a['bootstrap_replicates'],
+                              a['bootstrap_seed_by_character'][char] + 100, 0.05)
+            n = len(diff[True])
+            res = dict(contrast=r, h8_use_original=hit_b / n, h8_use_defined=hit_d / n,
+                       mcnemar_exact_p=_binom_two_sided(b, b + m) if b + m else None)
+            out[model]['by_character'][char] = res
+            tests.append((r['p_two_sided'], model, char))
+    # Holm across all completed model x character contrasts (familywise .05).
+    ordered = sorted(tests)
+    k = len(ordered)
+    running = 0.0
+    for i, (p, model, char) in enumerate(ordered):
+        running = max(running, min(1.0, (k - i) * p))
+        valid = out[model]['original_condition_valid'] and out[model]['defined_condition_valid']
+        out[model]['by_character'][char]['contrast']['holm_p'] = running
+        out[model]['by_character'][char]['contrast']['reject_holm_05'] = bool(valid and running < .05)
+    return dict(holm_family_size=k, family_complete=k == 2 * len(cond_cfg['inference']['authorized_models']),
+                models=out)
+
+
 def _binom_two_sided(k, n):
     """Exact two-sided binomial test at p=.5 (McNemar exact)."""
     probs = [math.comb(n, i) / 2 ** n for i in range(n + 1)]
@@ -533,7 +629,7 @@ def _binom_two_sided(k, n):
 # ---------------------------------------------------------------- CLI
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument('action', choices=('preflight', 'server', 'run', 'status', 'analyze'))
+    parser.add_argument('action', choices=('preflight', 'server', 'run', 'status', 'analyze', 'ablation'))
     parser.add_argument('--model', required=True)
     parser.add_argument('--mock', action='store_true')
     parser.add_argument('--port', type=int, default=18900)
@@ -541,8 +637,10 @@ def main():
     parser.add_argument('--stop-at-unix', type=float)
     parser.add_argument('--max-new', type=int)
     parser.add_argument('--authorize-model-inference', action='store_true')
+    parser.add_argument('--condition', choices=('base',) + tuple(CONDITIONS), default='base')
     args = parser.parse_args()
     cfg, digest = load_config()
+    cfg = condition_config(cfg, digest, args.condition)
     if args.model not in cfg['inference']['models']:
         parser.error('unknown model')
     if args.action in ('server', 'run') and not args.mock and \
@@ -566,9 +664,18 @@ def main():
         while run(args, cfg, digest) == 'continue':
             pass  # smoke passed: continue to the full schedule in the same allocation
         return
+    if args.action == 'ablation':
+        if args.condition == 'base':
+            parser.error('ablation compares a condition against base; pass --condition')
+        base_cfg, _ = load_config()
+        result = ablation(base_cfg, cfg, digest)
+        path = OUT / 'real' / f'ablation_{args.condition}.json'
+        _atomic_write_json(path, result)
+        print(json.dumps(result, indent=1))
+        return
     if args.action == 'analyze':
         result = analyze(cfg, digest, args.model, args.mock)
-        path = model_dir(args.model, args.mock) / 'analysis.json'
+        path = model_dir(args.model, args.mock, cfg) / 'analysis.json'
         _atomic_write_json(path, result)
         print(json.dumps(result, indent=1))
         return

@@ -1,0 +1,30 @@
+{
+  "amendment_id": "controlled-h-v3-amendment-2-defined-transition-2026-10-01",
+  "amends_protocol_digest": "697011782709a76095ea705dab1ee1e862891b9bd7f717a4f0221075c28b8ef2",
+  "status": "frozen 2026-10-01 before any model saw the defined-transition prompt",
+  "decision": "user 2026-10-01: prompt-definition ablation for Qwen3-14B, Llama-3.1-8B and R1-Distill-Qwen-14B (exp. log 2026-10-01 H2 analysis: 'decision transition' undefined; 4-6% read H as turns; 14B debated the term in 32% of H2 answers)",
+  "condition": "defined",
+  "models": [
+    "qwen3-14b",
+    "llama-3.1-8b",
+    "deepseek-r1-distill-14b"
+  ],
+  "horizons": [
+    1,
+    8
+  ],
+  "prompt_change": {
+    "anchor": "after exactly {H} decision transitions.",
+    "inserted_after_anchor": " A decision transition is one action: playing one card or ending the turn.",
+    "rule": "the anchor must occur exactly once in each user prompt; system prompt unchanged; nothing else changes"
+  },
+  "unchanged": "fixtures (v3 release), oracle, scoring, request settings, serving stack, concurrency, truncation and pair gates",
+  "analysis": {
+    "within_condition": "same primary (same-oracle DiD at H8) and H8 lookahead curve as the base protocol, reported per model and character",
+    "primary_ablation_contrast": "per model and character: DiD_defined - DiD_original at H8, paired by fixture (stratified bootstrap over fixtures within sensitive and control strata, 10,000 replicates, seed = base seed + 100); Holm correction across the 3 models x 2 characters at familywise alpha .05",
+    "secondary": "H8 lookahead use (H8 answer is H8-optimal) defined vs original on sensitive fixtures, exact McNemar paired by fixture; H8 truncation and median completion tokens defined vs original",
+    "requires": "the model's original-condition run must be complete and gate-valid for the ablation contrast; otherwise report descriptively",
+    "interpretation": "a null contrast with a valid null within-condition DiD = robustness of the no-lookahead finding to the undefined term; a positive contrast = models fail partly by misreading the horizon instruction"
+  },
+  "exposure_note": "these fixtures were already seen by each model under the original prompt (same model, different prompt); the ablation is a within-model paired comparison, not a fresh held-out test"
+}

@@ -1,5 +1,24 @@
 # Decision Log
 
+## 2026-10-01 - v3 Amendment 2: prompt-definition ablation ("decision transition" defined)
+
+**Why.** The v3 prompt never defines "decision transition" (oracle: one card play or end_turn);
+4–6% of 14B answers read H as turns and 14B debated the term in 32% of H2 answers. A reviewer
+can attribute the lookahead null to an ambiguous instruction.
+
+**What.** `configs/controlled_h_v3_inference_amendment2.json`, digest
+`eadf64f3cea0c40497855b24b9547deca57adeb89de4aa9a79fa55ad89378e67`: condition `defined` inserts
+exactly one sentence after "after exactly {H} decision transitions." — " A decision transition
+is one action: playing one card or ending the turn." — H∈{1,8}, same fixtures/oracle/scoring/
+settings/gates; results in `<model>__defined/`. Pre-registered contrast per model × character:
+DiD_defined − DiD_original at H8, paired by fixture, Holm across 3 models × 2 characters at
+familywise .05; secondary McNemar on H8 lookahead use. Within-model paired comparison on
+already-seen fixtures (disclosed), not a fresh held-out test.
+
+**Scheduling (user 2026-10-01).** Run the ablation now for Llama-3.1-8B and R1-Distill-14B
+alongside their original-condition runs; Qwen3-14B's ablation is added later. Two chains, at
+most two H100 slots: base Llama → base R1; defined Llama → defined R1.
+
 ## 2026-10-01 - v3 Amendment 1: add Llama-3.1-8B (second family) and R1-Distill-Qwen-14B
 
 **Why.** The ICML main-track gate requires ≥2 model families; Qwen3-8B/14B are one family.
