@@ -1,5 +1,26 @@
 # Experiment Log
 
+## 2026-10-01 - v3 Amendment 3: Mistral-7B valid null, but half its answers are illegal (missing target)
+
+**Mistral-7B-Instruct-v0.3 (job 374727, 28 min, non-thinking).** 7,040/7,040; truncation 1/7,040
+(.01%), excluded pairs 0 → **gate PASSED**. **Primary (H8 DiD, same-oracle): Ironclad +.013
+[−.032,+.059] p=.52; Silent +.033 [−.009,+.075] p=.080 — null both characters.** Curve: H8 use
+vs H-blind baseline IC .166 vs .143 (McNemar p=.064), Silent .109 vs .098 (p=.38); H2/H4 at
+baseline. **Caveat that travels with every Mistral number:** only 3,407/7,040 answers are clean;
+3,633 parse and pass schema but are **illegal**, 3,621 of them a targeted `play` with no
+`target_index`. Illegal answers score as the worst action (not excluded), so the gate passes, but
+lookahead use is floor-limited (IC H8 "other action" 338/440). Illegal rate by cell .47–.59, flat in
+H except a parallel Ironclad drift (control .59→.52, sensitive .56→.47 from H1→H8) that the DiD
+cancels. Reading: a third family, null, with a format-compliance floor; not evidence about
+lookahead at the strength of Llama-3.1-8B's tight null.
+
+**Operations (same day).** Qwen2.5-7B job 374726 failed before any query: the home filesystem
+(conda envs) degraded — `import vllm` 991 s, then 346 s, recovered to 10 s by 21:36 IST — so the
+server missed the 20-min readiness budget; no rows written; resubmitted as 375030. Pending H100
+jobs were held during the outage and released after. Qwen3-14B `defined` job 374622 was cancelled
+by root 2 min after start with no output (cause unknown, nothing written); resubmitted as 374979.
+Another account user's job holds one of the two per-user H100s, so Llama-3.3-70B (TP=2) waits.
+
 ## 2026-10-01 - v3 Amendment 1 results: Llama-3.1-8B valid null; R1-Distill-14B excluded by smoke gate
 
 **Llama-3.1-8B-Instruct (job 374098, 17 min, second family, non-thinking).** 7,040/7,040,
