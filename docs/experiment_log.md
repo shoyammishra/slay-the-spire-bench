@@ -1,5 +1,28 @@
 # Experiment Log
 
+## 2026-10-02 - gpt-oss-120b serving: two environment fixes (disclosed), smoke gate passed
+
+Two failed starts, **0 rows each**, before the run that is now going (job 375712):
+1. **375644** — torch inductor shells out to `nvcc --version`; the cluster's system `nvcc` is not
+   executable for our account (same root cause as 2026-07-23). Fix: conda `cuda-nvcc=12.8`
+   (12.8.93, matching torch 2.8.0+cu128) installed into the gpt-oss env. vLLM/Transformers
+   unchanged.
+2. **375701** — `vllm/_moe_C.abi3.so` (vLLM 0.10.2 wheel, tag `cp38-abi3-linux_x86_64`) requires
+   `log2@GLIBC_2.29`; the cluster is Rocky 8.10 / glibc 2.28, so `_moe_C` fails to load
+   (`topk_softmax` missing). Every other `.so` in the env needs ≤ 2.28 (scanned). Fix, in place, on
+   that one file only: `patchelf --clear-symbol-version log2` (binds to the system `log2`, the
+   pre-2.29 implementation; results differ by at most 1 ulp) and the `libm.so.6 GLIBC_2.29`
+   version requirement marked WEAK (`VER_FLG_WEAK`). sha256 original `03933be4…6a9`, patched
+   `05a5ccde…aa02`; original kept as `_moe_C.abi3.so.orig`. **Disclosure:** a one-symbol binary
+   patch of the serving stack for gpt-oss only; the pinned versions (vLLM 0.10.2 / Transformers
+   4.56.2) are unchanged.
+
+**Run 375712:** weights load ~18 min (MXFP4 → Marlin weight-only kernels; Hopper has no native FP4,
+and FlashInfer is absent). Smoke gate passed; at 751 rows: truncation 1 (.13%), parse failure 1,
+illegal 2, execution failures 0; ~3.5k completion tokens per query (similar to Qwen3); ~15
+queries/min → ~8 h total. Evidence stores the harmony `reasoning_content` and final `content`
+separately.
+
 ## 2026-10-02 - v3 Amendment 3: Qwen2.5-7B tight null; Qwen3-32B relaunched after readiness fix
 
 **Qwen2.5-7B-Instruct (job 375030, 30 min, non-thinking).** 7,040/7,040, 6,987 clean, truncation
