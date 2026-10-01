@@ -1,5 +1,29 @@
 # Decision Log
 
+## 2026-10-01 - v3 Amendment 1: add Llama-3.1-8B (second family) and R1-Distill-Qwen-14B
+
+**Why.** The ICML main-track gate requires ≥2 model families; Qwen3-8B/14B are one family.
+User directed adding pre-specified models ("do these").
+
+**What.** `configs/controlled_h_v3_inference_amendment1.json`, digest
+`bac116c3e1d7f4a4c2227df2e5b73466ae2935df1cd7a5ec3407e810b3b36993`, amends base digest
+`69701178…` and may only ADD models (runner enforces): Llama-3.1-8B-Instruct @ `0e9e39f2…`
+(Meta; non-thinking — the independent second family) and DeepSeek-R1-Distill-Qwen-14B @
+`1df85071…` (thinking; DeepSeek post-training on a Qwen2.5 base — a different pipeline, not an
+independent pretraining family). Everything else is unchanged: fixtures, prompts, request
+settings, stack, gates, analyses. Disclosures recorded in the file (template ignores
+`enable_thinking`; R1-Distill at temperature 0 vs DeepSeek's recommended 0.6).
+
+**Evidence integrity across code versions.** Adding amendment support changed the runner's
+code hash, which is part of each run's contract. New rows are still written under a strict
+contract; finished evidence (8B/14B) is verified non-strictly: every contract field must match
+except the runner's own code hash, the frozen v2 scoring-code receipt is still compared, and
+every score is re-derived by replay. Both 8B and 14B re-verify and the 14B analysis reproduces
+exactly (IC +.100). Regression test added.
+
+**Scheduling.** Llama first (weights cached), R1-Distill after its download; one H100 slot at a
+time where possible, since the shared account's two H100 slots also serve other students.
+
 ## 2026-09-30 - Freeze v3 inference (H1/2/4/8 lookahead curve); pre-inference estimand amendment
 
 **Frozen:** `configs/controlled_h_v3_inference.json`, digest

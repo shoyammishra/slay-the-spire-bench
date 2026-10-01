@@ -111,6 +111,18 @@ def test_h_blind_constant_policy_scores_exactly_zero_on_the_real_release():
         assert v['did'] in (None, 0.0) and v['lookahead_use_rate'] == v['ignore_baseline_rate'], (h, v)
 
 
+def test_amendment_only_adds_models_and_leaves_base_contracts_untouched():
+    cfg, digest = inf.load_config()
+    assert {'llama-3.1-8b', 'deepseek-r1-distill-14b'} <= set(cfg['inference']['authorized_models'])
+    assert 'amendment' not in inf.contract(cfg, digest, 'qwen3-14b', False)
+    assert inf.contract(cfg, digest, 'llama-3.1-8b', False)['amendment']['amendment_id'].endswith('amendment-1-2026-10-01')
+    a = inf.contract(cfg, digest, 'qwen3-8b', False)
+    b = dict(a, code={'scripts/heldout_v3_inference.py': 'old'})
+    assert inf.contract_matches(b, a, strict=False) and not inf.contract_matches(b, a, strict=True)
+    c2 = dict(a, protocol_digest='0' * 64)
+    assert not inf.contract_matches(c2, a, strict=False)
+
+
 def test_v3_inference_runner_is_outside_the_frozen_code_receipt():
     from scripts.controlled_horizon_confirmatory import code_receipt
     assert not any('heldout_v3' in p for p in code_receipt())

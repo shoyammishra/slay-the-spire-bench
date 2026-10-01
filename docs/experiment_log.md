@@ -1,5 +1,31 @@
 # Experiment Log
 
+## 2026-10-01 - H2 anomaly explained from reasoning traces (exploratory, regex-based)
+
+**Prompt check.** Across H the prompts differ only by the digit in "after exactly {H} decision
+transitions" (system prompt identical) — no wording bug. The term "decision transition" is
+never defined in the prompt (oracle: one transition = one card play or end_turn).
+
+**Trace patterns (share of answers; regex over the `<think>` text, coarse):**
+
+| | H1 | H2 | H4 | H8 |
+|---|---|---|---|---|
+| 14B median thinking chars | 9.9k | **14.5k** | 10.8k | 9.8k |
+| 14B mentions "transition" | .59 | **.87** | .78 | .65 |
+| 14B says too hard/complex to compute | .03 | **.21** | .10 | .08 |
+| 14B reads H as N *actions* (actions-only / both) | – | .46 / .32 | .45 / .07 | .19 / .02 |
+| 14B reads H as N *turns* only | – | .05 | .04 | .06 |
+| 8B mentions "transition" | .11 | .28 | .26 | .16 |
+
+**Reading.** 14B engages with the horizon explicitly mostly when it is small: at H2 it tries
+to reason about two concrete actions (78% of answers), argues about what a transition means
+(32% "both" readings) and reports difficulty (21%); by H8 explicit step-counting drops to 21%
+and deliberation returns to the H1 length. The extra H2 effort does not help (H2 lookahead use
+.179 vs H-blind baseline .197). Misreading H as turns is uncommon (4–6%) but nonzero — disclose
+as a construct limitation; a future instrument version should define "decision transition"
+in the prompt (would be a new version; not applied to v3). 8B rarely engages with H at all,
+consistent with its null.
+
 ## 2026-10-01 - v3 confirmatory: Qwen3-14B complete — gate PASSED; Ironclad primary rejects, driven by control degradation
 
 **Run.** Job 373154, Sharanga H100 (4 CPUs after a QOS fix), 11 h 23 min, 7,040/7,040, 0

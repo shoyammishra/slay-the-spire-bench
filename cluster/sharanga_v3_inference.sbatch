@@ -21,7 +21,7 @@ source "${HOME}/miniconda3/etc/profile.d/conda.sh"
 conda activate "${CONDA_ENV:-slaybench08}"
 set -u
 readonly MODEL="${V3_MODEL:?set V3_MODEL}"
-case "$MODEL" in qwen3-8b|qwen3-14b) ;; *) echo "unknown model"; exit 2 ;; esac
+case "$MODEL" in qwen3-8b|qwen3-14b|llama-3.1-8b|deepseek-r1-distill-14b) ;; *) echo "unknown model"; exit 2 ;; esac
 export HF_HOME="${HF_HOME:-/scratch/${USER}/hf}" HF_HUB_OFFLINE=1 TRANSFORMERS_OFFLINE=1
 export PYTHONUNBUFFERED=1 PYTHONIOENCODING=utf-8
 

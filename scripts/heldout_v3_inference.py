@@ -36,6 +36,9 @@ from slay_bench.controlled_horizon import ControlledFixture, load_fixture, legal
 
 CONFIG = ROOT / 'configs/controlled_h_v3_inference.json'
 FROZEN_DIGEST = '697011782709a76095ea705dab1ee1e862891b9bd7f717a4f0221075c28b8ef2'
+# Versioned amendments that add models (path -> frozen digest). Each must amend the base
+# digest above and may only ADD models; prompts, scoring, gates and analysis are unchanged.
+AMENDMENTS = {'configs/controlled_h_v3_inference_amendment1.json': 'bac116c3e1d7f4a4c2227df2e5b73466ae2935df1cd7a5ec3407e810b3b36993'}
 OUT = ROOT / 'results/controlled_h_v3_inference'
 
 
@@ -44,6 +47,17 @@ def load_config(path=CONFIG, require_frozen=True):
     digest = c.digest_json(cfg)
     if require_frozen and digest != FROZEN_DIGEST:
         raise ValueError('inference config differs from the registered freeze')
+    cfg['_amendments'] = {}
+    for rel, frozen in AMENDMENTS.items():
+        am = json.loads((ROOT / rel).read_text(encoding='utf-8'))
+        if c.digest_json(am) != frozen or am['amends_protocol_digest'] != digest:
+            raise ValueError(f'amendment {rel} differs from its freeze or amends another protocol')
+        for name, spec in am['add_models'].items():
+            if name in cfg['inference']['models']:
+                raise ValueError(f'amendment may only add models: {name}')
+            cfg['inference']['models'][name] = spec
+            cfg['inference']['authorized_models'].append(name)
+            cfg['_amendments'][name] = dict(amendment_id=am['amendment_id'], digest=frozen)
     return cfg, digest
 
 
@@ -145,8 +159,21 @@ def server_command(cfg, model, port):
 def contract(cfg, digest, model, mock):
     code = {p: hashlib.sha256((ROOT / p).read_text(encoding='utf-8').encode()).hexdigest()
             for p in ('scripts/heldout_v3_inference.py', 'cluster/sharanga_v3_inference.sbatch')}
-    return dict(protocol_digest=digest, model=model, mock=mock, code=code,
-                frozen_v2_code_receipt=c.code_receipt())
+    out = dict(protocol_digest=digest, model=model, mock=mock, code=code,
+               frozen_v2_code_receipt=c.code_receipt())
+    if model in cfg.get('_amendments', {}):
+        out['amendment'] = cfg['_amendments'][model]
+    return out
+
+
+def contract_matches(saved, current, strict):
+    """strict (writing rows): identical. Otherwise (status/analysis of finished evidence):
+    everything but the runner's own code hash must match; scores are re-derived by replay
+    with the frozen v2 scoring code, whose receipt is still compared."""
+    if strict:
+        return saved == current
+    strip = lambda x: {k: v for k, v in x.items() if k != 'code'}
+    return strip(saved) == strip(current)
 
 
 def request_payload(cfg, model, messages):
@@ -168,8 +195,8 @@ def http_json(url, payload=None, timeout=30):
         return json.load(r)
 
 
-def receipt_ok(r, cfg, digest, model, port):
-    return (r['contract'] == contract(cfg, digest, model, False)
+def receipt_ok(r, cfg, digest, model, port, strict=True):
+    return (contract_matches(r['contract'], contract(cfg, digest, model, False), strict)
             and r['command'] == server_command(cfg, model, port) and r['port'] == port
             and r['runtime_versions'] == {k: cfg['inference'][k + '_version']
                                           for k in ('vllm', 'transformers')})
@@ -188,13 +215,14 @@ def pending_file(d, index):
     return d / 'rows' / f'{index:05d}.pending'
 
 
-def load_rows(cfg, digest, model, mock, queries, ctx):
+def load_rows(cfg, digest, model, mock, queries, ctx, strict=True):
     """Replay every saved row; convert orphaned in-flight markers to ambiguous failures."""
     d = model_dir(model, mock)
     _, oracles, _, prompts = ctx
     meta_path = d / 'contract.json'
     if meta_path.exists():
-        if json.loads(meta_path.read_text(encoding='utf-8')) != contract(cfg, digest, model, mock):
+        if not contract_matches(json.loads(meta_path.read_text(encoding='utf-8')),
+                                contract(cfg, digest, model, mock), strict):
             raise ValueError('contract drift; preserve evidence and review')
     rows = {}
     for q in queries:
@@ -219,7 +247,7 @@ def load_rows(cfg, digest, model, mock, queries, ctx):
         rec = entry['evidence'].get('server_receipt')
         if mock and rec is not None:
             raise ValueError('mock evidence carries real provenance')
-        if not mock and rec is not None and not receipt_ok(rec, cfg, digest, model, rec['port']):
+        if not mock and rec is not None and not receipt_ok(rec, cfg, digest, model, rec['port'], strict):
             raise ValueError(f'row {q["index"]} was produced by a non-protocol server')
         if not mock and rec is None and entry['evidence'].get('error_type') != 'lost_in_flight':
             raise ValueError(f'row {q["index"]} lacks server provenance')
@@ -388,7 +416,7 @@ def did_bootstrap(sens, ctrl, reps, seed, alpha):
 def analyze(cfg, digest, model, mock=False, rows=None, ctx=None):
     ctx = ctx or load_context(cfg)
     queries = schedule(cfg, ctx[0], ctx[2])
-    rows = rows if rows is not None else load_rows(cfg, digest, model, mock, queries, ctx)
+    rows = rows if rows is not None else load_rows(cfg, digest, model, mock, queries, ctx, strict=False)
     a, inf = cfg['analysis'], cfg['inference']
     by_fixture = {}
     for q in queries:
@@ -546,7 +574,7 @@ def main():
         return
     ctx = load_context(cfg)
     queries = schedule(cfg, ctx[0], ctx[2])
-    rows = load_rows(cfg, digest, args.model, args.mock, queries, ctx)
+    rows = load_rows(cfg, digest, args.model, args.mock, queries, ctx, strict=False)
     print(json.dumps(dict(completed=len(rows), total=len(queries), smoke_gate=smoke_gate(cfg, rows),
                           clean=sum(clean(r['row']) for r in rows.values()),
                           truncated=sum(r['row']['diagnostics']['truncated'] for r in rows.values()),

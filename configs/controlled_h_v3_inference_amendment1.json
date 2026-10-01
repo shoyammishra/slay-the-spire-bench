@@ -1,0 +1,28 @@
+{
+  "amendment_id": "controlled-h-v3-amendment-1-2026-10-01",
+  "amends_protocol_digest": "697011782709a76095ea705dab1ee1e862891b9bd7f717a4f0221075c28b8ef2",
+  "status": "frozen 2026-10-01 before either added model saw a v3 fixture",
+  "decision": "user 2026-10-01 ('do these'): add a second model family for the ICML >=2-family gate",
+  "add_models": {
+    "llama-3.1-8b": {
+      "repository": "meta-llama/Llama-3.1-8B-Instruct",
+      "revision": "0e9e39f249a16976918f6564b8830bc894c89659",
+      "family": "Meta Llama 3.1",
+      "thinking": false
+    },
+    "deepseek-r1-distill-14b": {
+      "repository": "deepseek-ai/DeepSeek-R1-Distill-Qwen-14B",
+      "revision": "1df8507178afcc1bef68cd8c393f61a886323761",
+      "family": "DeepSeek R1 distillation (Qwen2.5-14B base)",
+      "thinking": true
+    }
+  },
+  "unchanged": "fixtures, prompts (incl. system prompt), request settings (temperature 0, top_p 1, seed 42, 16,000 output tokens, 32,768 context), vLLM 0.8.5.post1 / Transformers 4.51.3, BF16 TP=1, 8-way concurrency, gates, primary and secondary analyses",
+  "disclosures": [
+    "Llama-3.1-8B-Instruct is a non-thinking model: it answers without a reasoning phase, so it tests whether lookahead appears without explicit deliberation. It is the independent second family.",
+    "DeepSeek-R1-Distill-Qwen-14B shares the Qwen2.5 base architecture/pretraining with the Qwen line, so it is a different post-training pipeline, not an independent pretraining family.",
+    "chat_template_kwargs.enable_thinking is sent unchanged; both added models' chat templates ignore it (Llama has no thinking mode; R1-Distill always reasons).",
+    "R1-Distill is run at temperature 0 (protocol-wide) although DeepSeek recommends 0.6; greedy decoding can lengthen/loop reasoning and raise truncation, which the 1% gate will catch.",
+    "Model contrasts across families remain exploratory: two independent pretraining families (Qwen, Llama) is the minimum, not a scaling claim."
+  ]
+}
