@@ -1,0 +1,22 @@
+{
+  "amendment_id": "controlled-h-v3-amendment-4-llama-70b-2026-10-01",
+  "amends_protocol_digest": "697011782709a76095ea705dab1ee1e862891b9bd7f717a4f0221075c28b8ef2",
+  "status": "frozen 2026-10-01 before the added model saw a v3 fixture",
+  "decision": "user 2026-10-01: add Llama-3.3-70B (Llama size axis 8B -> 70B)",
+  "add_models": {
+    "llama-3.3-70b": {
+      "repository": "meta-llama/Llama-3.3-70B-Instruct",
+      "revision": "6f6073b423013f6a7d4d9f39144961bfbfbc386b",
+      "family": "Meta Llama 3.x",
+      "thinking": false,
+      "tensor_parallel_size": 2,
+      "quantization": "fp8",
+      "hardware_note": "2x H100 80GB, TP=2, vLLM dynamic FP8 weight quantization. BF16 (141 GB) does not fit 2x H100 with KV room; 2x H200 BF16 is blocked by the H200 QOS submit limit while Qwen3-32B is queued."
+    }
+  },
+  "unchanged": "fixtures, prompts, request settings, pinned stack (vLLM 0.8.5.post1 / Transformers 4.51.3), 8-way concurrency, gates, analyses",
+  "disclosures": [
+    "FP8 dynamic quantization is a precision deviation from the BF16 used for every other model; it is reported next to every Llama-3.3-70B number and not used for any claim that depends on precision.",
+    "The Llama-3.1-8B vs Llama-3.3-70B contrast confounds size with the 3.1->3.3 post-training update; it is a family-scale point, not a clean size ablation."
+  ]
+}

@@ -39,7 +39,8 @@ FROZEN_DIGEST = '697011782709a76095ea705dab1ee1e862891b9bd7f717a4f0221075c28b8ef
 # Versioned amendments that add models (path -> frozen digest). Each must amend the base
 # digest above and may only ADD models; prompts, scoring, gates and analysis are unchanged.
 AMENDMENTS = {'configs/controlled_h_v3_inference_amendment1.json': 'bac116c3e1d7f4a4c2227df2e5b73466ae2935df1cd7a5ec3407e810b3b36993',
-              'configs/controlled_h_v3_inference_amendment3.json': '6eb87256470c742db1174706480ddc6f65b17e21ac5f6f9960e5819b7a8c19d4'}
+              'configs/controlled_h_v3_inference_amendment3.json': '6eb87256470c742db1174706480ddc6f65b17e21ac5f6f9960e5819b7a8c19d4',
+              'configs/controlled_h_v3_inference_amendment4.json': '899adb8313cbba0228fe79f10d9b256f80d0a0b0a09456e65e4a0e9cd18abf86'}
 # Prompt conditions beyond the base protocol (name -> (amendment path, frozen digest)).
 CONDITIONS = {'defined': ('configs/controlled_h_v3_inference_amendment2.json',
                           'eadf64f3cea0c40497855b24b9547deca57adeb89de4aa9a79fa55ad89378e67')}
@@ -179,6 +180,12 @@ def model_spec(cfg, model):
     return cfg['inference']['models'][model]
 
 
+def stack_versions(cfg, model):
+    """Pinned serving versions; an amendment may pin a different stack for one model."""
+    m = model_spec(cfg, model)
+    return {k: m.get(k + '_version', cfg['inference'][k + '_version']) for k in ('vllm', 'transformers')}
+
+
 def server_command(cfg, model, port):
     inf, m = cfg['inference'], model_spec(cfg, model)
     return ['-m', 'vllm.entrypoints.openai.api_server', '--model', m['repository'],
@@ -187,6 +194,7 @@ def server_command(cfg, model, port):
             '--max-model-len', str(inf['max_model_len']),
             '--gpu-memory-utilization', str(inf['gpu_memory_utilization']),
             '--dtype', 'bfloat16', '--max-num-seqs', str(inf['max_num_seqs']),
+            *(['--quantization', m['quantization']] if m.get('quantization') else []),
             '--generation-config', 'vllm', '--host', '127.0.0.1', '--port', str(port)]
 
 
@@ -234,8 +242,7 @@ def http_json(url, payload=None, timeout=30):
 def receipt_ok(r, cfg, digest, model, port, strict=True):
     return (contract_matches(r['contract'], contract(cfg, digest, model, False), strict)
             and r['command'] == server_command(cfg, model, port) and r['port'] == port
-            and r['runtime_versions'] == {k: cfg['inference'][k + '_version']
-                                          for k in ('vllm', 'transformers')})
+            and r['runtime_versions'] == stack_versions(cfg, model))
 
 
 # ---------------------------------------------------------------- evidence store
@@ -309,6 +316,8 @@ def ask(cfg, model, q, ctx, base, receipt, mock, tokens):
                     http_json(base + '/v1/chat/completions', payload, cfg['inference']['timeout_seconds']))
         raw = response['choices'][0]['message']['content']
         finish = response['choices'][0]['finish_reason']
+        if raw is None and finish == 'length':
+            raw = ''  # budget exhausted inside a separate reasoning channel: a truncation, not a failure
         if not isinstance(raw, str):
             raise ValueError('missing response text')
         replay = c.Replay(); replay.raw = raw; replay.last_finish_reason = finish
@@ -653,7 +662,7 @@ def main():
         if args.receipt is None or args.receipt.exists():
             parser.error('supply a new receipt path')
         for pkg in ('vllm', 'transformers'):
-            if _package_version(pkg) != cfg['inference'][pkg + '_version']:
+            if _package_version(pkg) != stack_versions(cfg, args.model)[pkg]:
                 raise ValueError(f'{pkg} differs from the protocol')
         cmd = server_command(cfg, args.model, args.port)
         _atomic_write_json(args.receipt, dict(contract=contract(cfg, digest, args.model, False),
