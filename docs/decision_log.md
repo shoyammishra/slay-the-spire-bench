@@ -1,5 +1,29 @@
 # Decision Log
 
+## 2026-10-01 - v3 Amendments 4-5: Llama-3.3-70B (FP8, 2× H100) and gpt-oss-120b (own stack)
+
+**Amendment 4** (`configs/controlled_h_v3_inference_amendment4.json`, digest `899adb83…`): adds
+Llama-3.3-70B-Instruct @ `6f6073b4…`, TP=2 on 2× H100 with vLLM dynamic FP8 weight quantization
+(BF16 141 GB does not fit 2× H100 with KV room; 2× H200 is blocked by the per-user H200 cap while
+Qwen3-32B is queued). Disclosed: FP8 precision deviation; 8B→70B confounds size with the 3.1→3.3
+post-training update. Runner gained per-model `tensor_parallel_size`/`quantization`.
+
+**Amendment 5** (`configs/controlled_h_v3_inference_amendment5.json`, digest `6b212296…`): adds
+gpt-oss-120b @ `b5c939de…` on 1× H100 in its released MXFP4 weights. **Options:** (a) skip it —
+loses the only open frontier-scale reasoning family; (b) upgrade every model's stack — invalidates
+comparability with all completed runs; (c) **pin a second stack for this one model** (chosen).
+vLLM 0.8.5.post1 cannot serve gpt-oss, so it runs from a separate env with **vLLM 0.10.2 /
+Transformers 4.56.2 / torch 2.8.0+cu128**; the runner's per-model `vllm_version` /
+`transformers_version` pins are checked before the server starts. Transformers was pinned down from
+the 5.18 pip resolved (vLLM 0.10.2 declares only `>=4.55.2`; 5.x postdates it). The harmony
+tokenizer fetches `o200k_base`/`cl100k_base` from the internet at load time → local copies (sha256
+recorded in the amendment) via `TIKTOKEN_ENCODINGS_BASE`. **Disclosed harmony-path differences:**
+the system prompt becomes a developer message; `enable_thinking` is not consulted (always reasons);
+`reasoning_effort` unset (= model default medium); vLLM 0.10.2 writes the server's wall-clock date
+into the system message (not request-settable). **Trade-off:** any gpt-oss vs other-model contrast
+also differs in serving stack and precision; reported alongside every gpt-oss number. **To change:**
+a later amendment may re-serve the others on 0.10.2 as a stack-replication condition.
+
 ## 2026-10-01 - v3 Amendment 3: matrix-link models (Qwen2.5-7B, Mistral-7B, Qwen3-32B)
 
 **Why.** The planned link between lookahead use and the combat/run matrix needs models in both

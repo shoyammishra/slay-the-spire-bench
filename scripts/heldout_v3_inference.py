@@ -40,7 +40,8 @@ FROZEN_DIGEST = '697011782709a76095ea705dab1ee1e862891b9bd7f717a4f0221075c28b8ef
 # digest above and may only ADD models; prompts, scoring, gates and analysis are unchanged.
 AMENDMENTS = {'configs/controlled_h_v3_inference_amendment1.json': 'bac116c3e1d7f4a4c2227df2e5b73466ae2935df1cd7a5ec3407e810b3b36993',
               'configs/controlled_h_v3_inference_amendment3.json': '6eb87256470c742db1174706480ddc6f65b17e21ac5f6f9960e5819b7a8c19d4',
-              'configs/controlled_h_v3_inference_amendment4.json': '899adb8313cbba0228fe79f10d9b256f80d0a0b0a09456e65e4a0e9cd18abf86'}
+              'configs/controlled_h_v3_inference_amendment4.json': '899adb8313cbba0228fe79f10d9b256f80d0a0b0a09456e65e4a0e9cd18abf86',
+              'configs/controlled_h_v3_inference_amendment5.json': '6b212296a3dde6c498bae73510e354d7255c941a0728b1d0a7af19a41149f49e'}
 # Prompt conditions beyond the base protocol (name -> (amendment path, frozen digest)).
 CONDITIONS = {'defined': ('configs/controlled_h_v3_inference_amendment2.json',
                           'eadf64f3cea0c40497855b24b9547deca57adeb89de4aa9a79fa55ad89378e67')}

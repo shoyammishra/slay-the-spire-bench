@@ -1,0 +1,24 @@
+{
+  "amendment_id": "controlled-h-v3-amendment-5-gpt-oss-120b-2026-10-01",
+  "amends_protocol_digest": "697011782709a76095ea705dab1ee1e862891b9bd7f717a4f0221075c28b8ef2",
+  "status": "frozen 2026-10-01 before the added model saw a v3 fixture",
+  "decision": "user 2026-10-01: add gpt-oss-120b (open-weight frontier-scale MoE, a third reasoning family)",
+  "add_models": {
+    "gpt-oss-120b": {
+      "repository": "openai/gpt-oss-120b",
+      "revision": "b5c939de8f754692c1647ca79fbf85e8c1e70f8a",
+      "family": "OpenAI gpt-oss",
+      "thinking": true,
+      "vllm_version": "0.10.2",
+      "transformers_version": "4.56.2",
+      "hardware_note": "1x H100 80GB (gpu_h100_4, TP=1, 4 CPUs), released MXFP4 MoE weights (~65 GB) with BF16 activations; served from a separate env (CONDA_ENV=/scratch/$USER/envs/vllm_oss: vLLM 0.10.2, Transformers 4.56.2, torch 2.8.0+cu128) because vLLM 0.8.5.post1 cannot serve gpt-oss; TIKTOKEN_ENCODINGS_BASE points at a local copy of o200k_base/cl100k_base (sha256 446a9538... / 223921b7...) so the harmony tokenizer loads offline"
+    }
+  },
+  "unchanged": "fixtures, prompts, request payload, scoring, 8-way concurrency, gates, analyses; only the serving stack differs for this one model",
+  "disclosures": [
+    "Serving stack differs from every other model (vLLM 0.10.2 / Transformers 4.56.2 vs 0.8.5.post1 / 4.51.3); pinned per model and checked by the runner before the server starts.",
+    "MXFP4 is the precision the model was released in, not a quantization we applied; it is reported next to every gpt-oss number.",
+    "gpt-oss is served through vLLM's harmony path: the protocol system prompt becomes a harmony developer message, chat_template_kwargs.enable_thinking is not consulted (the model always reasons in its analysis channel), reasoning_effort is unset (model default 'medium'), and vLLM 0.10.2 inserts the server's wall-clock date as the conversation start date (not request-settable). The answer is the final channel; analysis tokens count toward the same 16,000-token max_tokens budget.",
+    "Reasoning length is a model property here as for Qwen3; truncation is gated exactly as for every other model."
+  ]
+}
