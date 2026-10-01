@@ -50,8 +50,11 @@ set +m
 setsid python scripts/heldout_v3_inference.py server --model "$MODEL" --condition "$COND" --port "$PORT" \
   --receipt "$RECEIPT" --authorize-model-inference > "$SLOG" 2>&1 &
 PID=$!
+# Readiness budget (minutes). 20 min was too short for >60 GB checkpoints on Lustre: Qwen3-32B
+# spent 8 min loading weights alone (job 374631, 2026-10-02). Must stay below the walltime.
+readonly HEALTH_WAIT_MIN="${HEALTH_WAIT_MIN:-90}"
 READY=0
-for _ in $(seq 1 240); do
+for _ in $(seq 1 $((HEALTH_WAIT_MIN * 12))); do
   kill -0 "$PID" 2>/dev/null || break
   if curl --silent --fail --max-time 5 "http://localhost:${PORT}/v1/models" | grep -q "$MODEL"; then
     READY=1; break

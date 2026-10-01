@@ -128,6 +128,17 @@ def test_v3_inference_runner_is_outside_the_frozen_code_receipt():
     assert not any('heldout_v3' in p for p in code_receipt())
 
 
+def test_launcher_readiness_budget_fits_large_checkpoints_and_walltime():
+    """Regression (job 374631): a fixed 20-min readiness wait killed Qwen3-32B mid-load."""
+    import re
+    text = (ROOT / 'cluster/sharanga_v3_inference.sbatch').read_text(encoding='utf-8')
+    budget = int(re.search(r'HEALTH_WAIT_MIN:-(\d+)', text).group(1))
+    assert 'seq 1 $((HEALTH_WAIT_MIN * 12))' in text and 'sleep 5' in text
+    h, m, _ = map(int, re.search(r'--time=(\d+):(\d+):(\d+)', text).groups())
+    assert 60 <= budget < h * 60 + m
+    assert 24 * 60 - budget >= 18 * 60  # still leaves the H200 1-day cap room for ~18 h of queries
+
+
 if __name__ == '__main__':
     for name, fn in list(globals().items()):
         if name.startswith('test_'):

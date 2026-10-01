@@ -1,5 +1,16 @@
 # Decision Log
 
+## 2026-10-02 - v3 launcher: readiness budget 20 → 90 min (execution-only change)
+
+Qwen3-32B (job 374631, H200) failed with zero rows: loading 61 GiB from Lustre took 493 s and
+compile/graph capture pushed readiness past the hard-coded 20-min wait. Llama-3.3-70B (141 GB BF16
+read before FP8 quantization) and gpt-oss-120b (65 GB) would fail the same way. Now
+`HEALTH_WAIT_MIN` (default 90, env-overridable) with a regression test that it stays ≥60 min,
+below the 30 h walltime, and leaves ≥18 h of the H200 1-day cap. **Comparability:** no prompt,
+request, scoring or gate change; the launcher hash enters the contract's `code` field, so models
+started after this change carry the new hash (strict for writing, ignored for analysis — as
+designed). Already-queued jobs keep Slurm's stored copy of the old script → resubmitted.
+
 ## 2026-10-01 - v3 Amendments 4-5: Llama-3.3-70B (FP8, 2× H100) and gpt-oss-120b (own stack)
 
 **Amendment 4** (`configs/controlled_h_v3_inference_amendment4.json`, digest `899adb83…`): adds
