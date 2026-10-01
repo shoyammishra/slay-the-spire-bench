@@ -1,5 +1,44 @@
 # Experiment Log
 
+## 2026-10-01 - v3 Amendment 1 results: Llama-3.1-8B valid null; R1-Distill-14B excluded by smoke gate
+
+**Llama-3.1-8B-Instruct (job 374098, 17 min, second family, non-thinking).** 7,040/7,040,
+truncation 0, gate passed.
+
+| | Primary DiD H8 [97.5% CI] | p | H2 / H4 / H8 use vs H-blind baseline | myopic (H1-opt) at H2/H4/H8 |
+|---|---|---|---|---|
+| Ironclad | +.003 [−.006, +.012] | .50 | .142/.147, .217/.214, .232/.227 | .46/.43/.41 |
+| Silent | −.000 [−.012, +.011] | .98 | .128/.128, .189/.197, .270/.266 | .46/.45/.39 |
+
+Tight null in both characters: Llama barely changes its first action with H, and when the
+H-optimal move differs from the H1-optimal one it picks the H1-optimal move ~40–46% of the
+time — the clearest myopia profile in the study.
+
+**DeepSeek-R1-Distill-Qwen-14B (job 374099).** Automatic smoke gate FAILED: 2/8 truncated
+(limit ≤1), both at exactly 16,000 completion tokens (H4, H8; 220 s each), others 1.2k–4.8k.
+Runner stopped by design after 8 queries. Consistent with the earlier budget-bound deliberation
+finding for R1 distills; aggravated by temperature-0 decoding (DeepSeek recommends 0.6). At 25%
+truncation it would fail the 1% validity gate regardless. **Excluded under the pre-registered
+gate; reported as such.** Its defined-prompt ablation job (374109) was cancelled for the same
+reason. Not retried with a larger budget (would be a new amendment; not planned).
+
+**Llama-3.1-8B defined-prompt ablation (job 374108, Amendment 2).** 3,520/3,520, truncation 0,
+both conditions gate-valid. Pre-registered contrast DiD_defined − DiD_original at H8 (paired by
+fixture; Holm over the completed family, currently 2 tests — Qwen3-14B pending, R1 excluded):
+
+| | Contrast [95% CI] | p | Holm p | H8 lookahead use original → defined (McNemar p) |
+|---|---|---|---|---|
+| Ironclad | −.013 [−.029, +.002] | .098 | .157 | .232 → .225 (.51) |
+| Silent | −.013 [−.027, +.001] | .079 | .157 | .270 → .266 (.73) |
+
+Defining "decision transition" does not create lookahead use: Llama's null is robust to the
+undefined term. The Holm family is incomplete (Qwen3-14B's defined run to be added later; the
+correction will be recomputed over the final family).
+
+**R1-Distill defined run (job 374109)** was cancelled by the operator after its original-condition
+run failed the smoke gate: 104 rows, 3 truncated, 8 in-flight queries recorded as execution
+failures (never retried). Excluded together with its original condition.
+
 ## 2026-10-01 - H2 anomaly explained from reasoning traces (exploratory, regex-based)
 
 **Prompt check.** Across H the prompts differ only by the digit in "after exactly {H} decision
