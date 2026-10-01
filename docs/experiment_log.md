@@ -1,5 +1,22 @@
 # Experiment Log
 
+## 2026-10-02 - v3 Amendment 3: Qwen2.5-7B tight null; Qwen3-32B relaunched after readiness fix
+
+**Qwen2.5-7B-Instruct (job 375030, 30 min, non-thinking).** 7,040/7,040, 6,987 clean, truncation
+0, excluded pairs 0 → gate PASSED. **Primary H8 DiD: Ironclad −.001 [−.012,+.011] p=.88; Silent
+−.014 [−.032,+.001] p=.053 — tight null.** Lookahead use never exceeds the H-blind baseline (IC
+H2/4/8 .147/.184/.200 vs .149/.187/.209; Silent .133/.223/.264 vs .138/.232/.268; McNemar p ≥ .125);
+myopic (H1-optimal) choice .43–.46 IC, .40–.53 Silent. Same pattern as Llama-3.1-8B.
+
+**Tally of gate-valid base-condition models:** Qwen3-14B (IC rejection, control-driven; Silent null),
+Llama-3.1-8B (tight null), Mistral-7B (null, illegal-target floor), Qwen2.5-7B (tight null);
+Qwen3-8B gate-failed (descriptive null). **0 of 4 valid models show lookahead use above the H-blind
+baseline in any cell.**
+
+**Ops.** Qwen3-32B job 374631 (H200) died at the 20-min readiness wait after a 493 s weight load
+(0 rows) → launcher fix (decision_log 2026-10-02); 32B, Llama-3.3-70B and gpt-oss-120b resubmitted
+as 375643 / 375642 / 375644 with the new script.
+
 ## 2026-10-02 - v3 Amendment 2 complete: defining "decision transition" changes nothing (Qwen3-14B + Llama-3.1-8B)
 
 **Qwen3-14B `defined` (job 374979, 5h04m, H1/H8 only).** 3,520/3,520, truncation 5 (.14%),
