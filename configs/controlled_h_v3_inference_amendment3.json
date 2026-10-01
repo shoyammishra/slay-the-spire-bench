@@ -1,0 +1,41 @@
+{
+  "amendment_id": "controlled-h-v3-amendment-3-matrix-link-2026-10-01",
+  "amends_protocol_digest": "697011782709a76095ea705dab1ee1e862891b9bd7f717a4f0221075c28b8ef2",
+  "status": "frozen 2026-10-01 before any added model saw a v3 fixture",
+  "decision": "user 2026-10-01: link lookahead use to the existing combat/run matrix; requires controlled-H runs for matrix models",
+  "add_models": {
+    "qwen2.5-7b": {
+      "repository": "Qwen/Qwen2.5-7B-Instruct",
+      "revision": "a09a35458c702b33eeacc393d103063234e8bc28",
+      "family": "Qwen2.5",
+      "thinking": false
+    },
+    "mistral-7b": {
+      "repository": "mistralai/Mistral-7B-Instruct-v0.3",
+      "revision": "c170c708c41dac9275d15a8fff4eca08d52bab71",
+      "family": "Mistral",
+      "thinking": false
+    },
+    "qwen3-32b": {
+      "repository": "Qwen/Qwen3-32B",
+      "revision": "9216db5781bf21249d130ec9da846c4624c16137",
+      "family": "Qwen3",
+      "thinking": true,
+      "hardware_note": "1x H200 141GB (gpu_h200_8, TP=1, 4 CPUs): BF16 weights (64 GB) leave no room for a 32k-token KV sequence on an 80 GB H100; user decision 2026-10-01"
+    }
+  },
+  "unchanged": "fixtures, prompts, request settings, stack (vLLM 0.8.5.post1 / Transformers 4.51.3, BF16, TP=1), 8-way concurrency, gates, analyses; qwen3-32b runs on H200 instead of H100 (hardware only)",
+  "revision_note": "matrix runs (2026-06) were not revision-pinned; these repos were last modified before the matrix runs (Qwen2.5-7B 2025-01-12, Mistral 2025-12-03, Qwen3-32B 2025-07-26), so the pinned revisions are the ones the matrix served",
+  "link_analysis": {
+    "models": "every model that is gate-valid in the base condition AND has structured-format matrix aggregates (n = number of such models)",
+    "x": "H8 lookahead_use_rate (per character); secondary x = lookahead_use_rate - ignore_baseline_rate",
+    "y": [
+      "combat score = mean win_rate x min(1, hp_ratio), structured, 5-seed aggregate (as pre-specified in the base protocol; NOTE: equals 1.0 for every eligible model in the matrix -> reported as tied/undefined)",
+      "combat avg_hp_ratio (unclipped), structured, 5-seed aggregate - added because of that ceiling, decided from the matrix y-distribution only, before any correlation was computed",
+      "run avg_progress, structured, 5-seed aggregate (run-level between-model variance share ~.02: expected uninformative)",
+      "turn avg_damage_ratio, structured, 5-seed aggregate (single-turn decision quality; descriptive)"
+    ],
+    "test": "Spearman rank correlation per character, exact permutation p over all n! orderings; descriptive/directional only",
+    "power_note": "with n=4 the smallest attainable two-sided exact p is 2/24 = .083 (cannot reach .05); n=5 gives 2/120 = .017"
+  }
+}

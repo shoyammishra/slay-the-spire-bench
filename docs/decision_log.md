@@ -1,5 +1,26 @@
 # Decision Log
 
+## 2026-10-01 - v3 Amendment 3: matrix-link models (Qwen2.5-7B, Mistral-7B, Qwen3-32B)
+
+**Why.** The planned link between lookahead use and the combat/run matrix needs models in both
+studies; only Llama-3.1-8B overlapped (n=1). `configs/controlled_h_v3_inference_amendment3.json`,
+digest `6eb87256470c742db1174706480ddc6f65b17e21ac5f6f9960e5819b7a8c19d4`, adds Qwen2.5-7B-
+Instruct @ `a09a3545…`, Mistral-7B-Instruct-v0.3 @ `c170c708…` (both non-thinking) and Qwen3-32B
+@ `9216db57…` (same revision as the v2 pin). Repos last modified before the June 2026 matrix runs,
+so these are the revisions the matrix served. Qwen3-32B runs on **1× H200, TP=1** (user decision:
+64 GB BF16 weights leave no 32k-token KV room on an 80 GB H100); hardware-only difference.
+
+**Link analysis** (`scripts/heldout_v3_link.py`): models gate-valid in controlled-H AND with
+structured 5-seed matrix aggregates; x = H8 lookahead use (and use − H-blind baseline); Spearman
+per character, exact permutation p. **Combat score `win×min(1,hp)` is 1.0 for every eligible
+model** (all win 100% with hp ≥ 1) → reported as tied/undefined; unclipped `avg_hp_ratio`, run
+`avg_progress` and turn `avg_damage_ratio` added as y, decided from the matrix y-distribution
+alone before any correlation was computed. With n=4 the minimum exact two-sided p is .083; n=5
+gives .017. Directional only.
+
+**Scheduling.** H200 queue estimate for 32B is 2026-10-08 regardless of walltime (2× H100 would be
+~10-04); submitted to H200 per user instruction.
+
 ## 2026-10-01 - v3 Amendment 2: prompt-definition ablation ("decision transition" defined)
 
 **Why.** The v3 prompt never defines "decision transition" (oracle: one card play or end_turn);

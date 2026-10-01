@@ -38,7 +38,8 @@ CONFIG = ROOT / 'configs/controlled_h_v3_inference.json'
 FROZEN_DIGEST = '697011782709a76095ea705dab1ee1e862891b9bd7f717a4f0221075c28b8ef2'
 # Versioned amendments that add models (path -> frozen digest). Each must amend the base
 # digest above and may only ADD models; prompts, scoring, gates and analysis are unchanged.
-AMENDMENTS = {'configs/controlled_h_v3_inference_amendment1.json': 'bac116c3e1d7f4a4c2227df2e5b73466ae2935df1cd7a5ec3407e810b3b36993'}
+AMENDMENTS = {'configs/controlled_h_v3_inference_amendment1.json': 'bac116c3e1d7f4a4c2227df2e5b73466ae2935df1cd7a5ec3407e810b3b36993',
+              'configs/controlled_h_v3_inference_amendment3.json': '6eb87256470c742db1174706480ddc6f65b17e21ac5f6f9960e5819b7a8c19d4'}
 # Prompt conditions beyond the base protocol (name -> (amendment path, frozen digest)).
 CONDITIONS = {'defined': ('configs/controlled_h_v3_inference_amendment2.json',
                           'eadf64f3cea0c40497855b24b9547deca57adeb89de4aa9a79fa55ad89378e67')}
@@ -182,7 +183,7 @@ def server_command(cfg, model, port):
     inf, m = cfg['inference'], model_spec(cfg, model)
     return ['-m', 'vllm.entrypoints.openai.api_server', '--model', m['repository'],
             '--revision', m['revision'], '--tokenizer-revision', m['revision'],
-            '--served-model-name', model, '--tensor-parallel-size', '1',
+            '--served-model-name', model, '--tensor-parallel-size', str(m.get('tensor_parallel_size', 1)),
             '--max-model-len', str(inf['max_model_len']),
             '--gpu-memory-utilization', str(inf['gpu_memory_utilization']),
             '--dtype', 'bfloat16', '--max-num-seqs', str(inf['max_num_seqs']),
