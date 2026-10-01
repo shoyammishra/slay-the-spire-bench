@@ -185,3 +185,23 @@ The single most important step is valid run-level data + n ≥ 20 + reasoning mo
 - Rule Synergy Analysis using LLMs — https://arxiv.org/pdf/2508.19484
 - PLANET (planning benchmark collection) — https://arxiv.org/pdf/2504.14773
 - Anthropic (2026), Claude Fable 5 / Mythos 5 launch post — uses Slay the Spire as a long-horizon planning testbed (domain validation); reports reaching the final act ~3× more often with memory (corroborates our run-level floor effect) — https://www.anthropic.com/news/claude-fable-5-mythos-5
+
+## 2026-10-01 — Controlled-H novelty check (must-cite prior art)
+
+- **Chen, Li, Cakir, Akcali, Lee & Mattar (arXiv:2605.06840, May 2026), "Extracting Search Trees
+  from LLM Reasoning Traces Reveals Myopic Planning"** — four-in-a-row; fits search trees to CoT
+  traces and prunes CoT paragraphs: decisions are explained by a myopic model; deep nodes written in
+  the trace do not drive the move. **Closest prior work; the "LLMs are myopic" claim is theirs.**
+- "Why Reasoning Fails to Plan" (arXiv:2601.22311, 2026) — planning-centric analysis of long-horizon
+  agent failure; argues local reasoning ≠ lookahead.
+- "Analysis of Optimality of LLMs on Planning Problems" (arXiv:2604.02910) — thinking tokens scale
+  roughly linearly with plan complexity (e.g. Gemini 3.0 Pro).
+
+**What controlled-H adds (frame as complementary causal evidence, not discovery of myopia):**
+(1) a causal intervention — only the required horizon H changes on an identical state, with an exact
+per-H oracle — versus trace fitting/pruning; (2) an H-blind-invariant estimand plus a degenerate-policy
+audit showing that the naive q(H)−q(1) design manufactures lookahead effects; (3) reasoning length
+does not scale with the *requested* horizon (Qwen3 tokens flat over H), contrasting with scaling in
+plan complexity — to verify against the literature before claiming; (4) thinking and non-thinking
+models across families with tight nulls, robust to defining the horizon term; (5) a longer horizon
+instruction can degrade H-invariant decisions (Qwen3-14B controls −.085).
