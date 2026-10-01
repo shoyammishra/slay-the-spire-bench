@@ -1,5 +1,28 @@
 # Experiment Log
 
+## 2026-10-02 - v3 Amendment 2 complete: defining "decision transition" changes nothing (Qwen3-14B + Llama-3.1-8B)
+
+**Qwen3-14B `defined` (job 374979, 5h04m, H1/H8 only).** 3,520/3,520, truncation 5 (.14%),
+excluded pairs 0 → gate PASSED. Within-condition H8 DiD: Ironclad +.047 [−.011,+.104] p=.065
+(sens −.009, ctrl −.056), Silent +.029 [−.021,+.079] p=.195 — **the base-condition Ironclad
+rejection (+.100, control-driven) does not recur at α=.025 under the defined prompt**; the
+control-degradation pattern is still visible (ctrl −.056). H8 lookahead use .295 / .302 vs H-blind
+baseline .275 / .248.
+
+**Ablation (DiD_defined − DiD_original), Holm over the completed tests:**
+
+| model | char | contrast [95% CI] | p | Holm p | H8 use orig→defined (McNemar p) |
+|---|---|---|---|---|---|
+| Qwen3-14B | IC | −.053 [−.120,+.012] | .120 | .315 | .289→.295 (.85) |
+| Qwen3-14B | Silent | +.024 [−.031,+.080] | .395 | .395 | .298→.302 (.93) |
+| Llama-3.1-8B | IC | −.013 [−.029,+.002] | .098 | .315 | .232→.225 (.51) |
+| Llama-3.1-8B | Silent | −.013 [−.027,+.001] | .079 | .315 | .270→.266 (.73) |
+
+**0/4 reject.** The frozen family was 3 models × 2 characters; R1-Distill-14B never completed (base
+excluded by smoke gate, defined run cancelled), so `family_complete=false` and Holm is over the 4
+completed tests — disclose. **Reading: the lookahead null is not an artifact of the undefined term
+in either a thinking (Qwen3-14B) or a non-thinking (Llama) model.**
+
 ## 2026-10-01 - v3 Amendment 3: Mistral-7B valid null, but half its answers are illegal (missing target)
 
 **Mistral-7B-Instruct-v0.3 (job 374727, 28 min, non-thinking).** 7,040/7,040; truncation 1/7,040
