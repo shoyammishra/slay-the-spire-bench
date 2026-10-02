@@ -1,5 +1,29 @@
 # Experiment Log
 
+## 2026-10-03 - Operations: Qwen3-32B died on the home quota; Llama-70B resubmitted; Amendment 6 submitted
+
+- **Qwen3-32B (375643)** died after 19h51m with `OSError: [Errno 122] Disk quota exceeded`.
+  - Cause: the shared account's home directory (40 GB soft / 42 GB hard, shared with other
+    students) hit the hard limit.
+  - State: 5,887 of 7,040 rows; 7 queries were in flight.
+  - The frozen runner's `status` turned the 7 into permanent `ambiguous_query` rows
+    (5879, 5881–5886), which are never re-asked: 7 of 1,760 fixtures, under the 2% gate.
+    Truncation so far is 13 rows (0.2%).
+  - The frozen runner stops on any execution failure and has no "inspected" switch, so the run
+    resumes through `scripts/heldout_v3_resume.py` / `cluster/sharanga_v3_resume.sbatch`. That
+    wrapper accepts only those named indices; runner and launcher are unchanged, so the contract
+    still matches.
+  - Freed 4.5 GB of our own download caches: the pip cache and conda tarballs. No evidence or
+    environments were touched; home is now at 37.1 GB.
+  - Resubmitted as 377450 on H200.
+- **Llama-3.3-70B (375642)** was cancelled by someone else 2 minutes after it started
+  (2026-10-02 19:46, no log, no rows). Resubmitted on user instruction as 377451 (2× H100,
+  4 CPUs); it started immediately.
+- **Amendment 6 (user-authorized):** jobs 377452–377455 on H200: Llama-3.1-8B and
+  gpt-oss-120b × described/renamed. A login-node pre-flight verified the amendment and
+  effect-text digests on the cluster checkout. New files were copied over by scp; there was no
+  `git pull` while evidence-writing runs were active.
+
 ## 2026-10-02 - POST HOC robustness of v3 (PTA review response): encounters and the untargeted-Skill oracle bug
 
 Not pre-registered. `scripts/heldout_v3_robustness.py` on the cluster rows, 2,000 bootstrap
