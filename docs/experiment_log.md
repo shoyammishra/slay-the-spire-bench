@@ -1,5 +1,50 @@
 # Experiment Log
 
+## 2026-10-02 - POST HOC robustness of v3 (PTA review response): encounters and the untargeted-Skill oracle bug
+
+Not pre-registered. `scripts/heldout_v3_robustness.py` on the cluster rows, 2,000 bootstrap
+reps, encounter-stratified (fixtures resampled within encounter × sensitivity). "LOEO" means
+leave-one-encounter-out; "+enc" counts encounters with a positive DiD. "Excl." drops the 591
+fixtures holding a targeted Skill that the controlled-H oracle plays untargeted, i.e. as an
+enemy no-op (decision_log 2026-10-02, finding 1).
+
+| Model | Char | Pooled H8 DiD [strat. 95% CI] | LOEO range | +enc | Excl. DiD [CI] |
+|---|---|---|---|---|---|
+| gpt-oss-120b | IC | +.155 [+.104,+.205] p<.0005 | +.134..+.172 | 5/5 | +.144 [+.083,+.205] |
+| gpt-oss-120b | Silent | +.074 [+.024,+.125] p=.005 | +.058..+.089 | 5/5 | +.078 [+.019,+.141] |
+| Qwen3-14B | IC | +.100 [+.053,+.151] p<.0005 | +.084..+.120 | 5/5 | +.093 [+.033,+.152] |
+| Qwen3-14B | Silent | +.005 [−.038,+.047] | −.007..+.018 | 2/5 | +.018 [−.031,+.070] |
+| Llama-3.1-8B | IC / Silent | +.003 / −.000 | within ±.006 | 2/5, 2/5 | −.001 / +.003 |
+| Mistral-7B | IC / Silent | +.013 / +.033 (p=.076) | | 3/5, 4/5 | +.019 / +.051 [+.002,+.102] p=.049 |
+| Qwen2.5-7B | IC / Silent | −.001 / −.014 [−.030,−.000] p=.05 | | 2/5, 0/5 | +.000 / −.007 (n.s.) |
+| Qwen3-8B (gate failed) | IC / Silent | −.031 / +.018 | | 2/5, 3/5 | −.044 / +.001 |
+
+**Reading.**
+- Every pre-registered conclusion survives both checks. The rejections (gpt-oss both
+  characters, Qwen3-14B IC) hold in every leave-one-out, are positive in every or almost every
+  encounter, and move by ≤.011 when the exposed fixtures are dropped. The nulls stay null.
+- Two post hoc cells sit at about p=.05 with small effects:
+  - Qwen2.5-7B Silent −.014: it vanishes when the exposed fixtures are dropped.
+  - Mistral-7B Silent +.051, excluded subset only: floor-limited model, 52% illegal answers.
+
+  Neither is a finding. There is no multiplicity correction across the 24 post hoc cells.
+- gpt-oss H8 lookahead use exceeds the H-blind baseline in all 5 encounters on both
+  characters (e.g. Hexaghost IC .417 vs .198).
+
+**How often models chose an affected (no-op) Skill.**
+
+| Model | H8 picks (IC / Silent) | Within "other" on sensitive fixtures (IC / Silent) |
+|---|---|---|
+| gpt-oss-120b | 26/880, 59/880 | 10/170, 28/221 |
+| Qwen3-14B | 16/880, 24/880 | 4/171, 13/199 |
+| Llama-3.1-8B | 11/880, 18/880 | 1/159, 5/148 |
+
+So the bug does not explain the exploratory "abandon greedy → other" shift: affected cards
+account for ≤13% of the "other" class. It does bite on exposed controls. There, gpt-oss's
+oracle-optimal picks fall from 48 at H1 to 25 at H8 (IC), with 13 of the H8 picks being affected
+cards. That is part of the control-degradation component, but excluding these fixtures leaves
+the DiD essentially unchanged. **Disclose the bug with every v3 number; fix it in any v4.**
+
 ## 2026-10-02 - EXPLORATORY (post hoc): reasoning models respond to H by abandoning the greedy move, not by finding the lookahead move
 
 Not pre-registered; decided after seeing gpt-oss's "use up, value flat" result. Every H1 and H8
