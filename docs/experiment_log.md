@@ -23,6 +23,17 @@
   gpt-oss-120b × described/renamed. A login-node pre-flight verified the amendment and
   effect-text digests on the cluster checkout. New files were copied over by scp; there was no
   `git pull` while evidence-writing runs were active.
+- **PAUSED (user, 2026-10-03 04:15 IST):** the user needs the server until about 2026-10-15. Llama-70B (377451)
+  keeps running; 377450 and 377452–377455 were cancelled while still queued, with no rows written.
+  **To resume:**
+  1. Check `lfs quota -h -u $USER /home`.
+  2. Re-verify scratch weights; scratch purges after 15 days idle.
+  3. Resubmit:
+     - Qwen3-32B: `cluster/sharanga_v3_resume.sbatch` with
+       `V3_ACCEPT_LOST=5879:5881:5882:5883:5884:5885:5886` (H200, 4 CPUs, 24 h).
+     - The 4 Amendment-6 jobs: `cluster/sharanga_v3_knowledge.sbatch` with `V3_CONDITION`
+       described/renamed; gpt-oss also needs `CONDA_ENV`/`TIKTOKEN_*` exports as for job 375712.
+  4. If Llama-70B times out, resubmit it with the standard launcher (it resumes).
 
 ## 2026-10-02 - POST HOC robustness of v3 (PTA review response): encounters and the untargeted-Skill oracle bug
 
