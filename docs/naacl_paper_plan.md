@@ -12,7 +12,7 @@ writing rules, and the reader-orientation material the PTA reviewers asked for.
 | Commit to NAACL | by 2026-12-23 |
 | Decision / conference | 2027-02-10 / 2027-06-01..05, San Francisco |
 | Required | `Limitations` section (does not count toward 8 pages), Responsible NLP checklist, every author registered as a reviewer by 2026-10-12, anonymized PDF (no public-repo link) |
-| Template | `naacl/acl_latex.tex` + `naacl/acl.sty` (current acl-org style files, `[review]` option). The `naacl2021.*` files in the folder are the outdated 2021 style; do not use them. |
+| Template | `naacl/` mirrors github.com/acl-org/acl-style-files (verified byte-identical 2026-10-03; test compile OK). Write in a copy of `acl_latex.tex` with the `[review]` option. The outdated `naacl2021.*` files were removed. |
 
 **ICML conflict.** ARR and ICML both forbid concurrent review. The paper is under ARR review
 until meta-reviews arrive on 2026-12-18. On that date, choose: commit to NAACL, or withdraw from ARR and submit
