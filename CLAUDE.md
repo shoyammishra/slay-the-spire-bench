@@ -96,6 +96,7 @@ Detail lives in `docs/` — not here.
 - `docs/notes.md` — scratch pad
 - `docs/design.md` — architecture, invariants, interfaces
 - `docs/draft.md` — paper draft
+- `docs/naacl_paper_plan.md` — ARR Oct-2026/NAACL 2027 paper: template (`naacl/acl_latex.tex`), paper-deslop writing rules, the PTA-requested 'why this game' + layman glossary, skeleton
 - `docs/novelty_and_related_work.md` — novelty vs prior STS/game/planning work, top-tier viability, generalizability + candidate games
 
 ## Project Structure

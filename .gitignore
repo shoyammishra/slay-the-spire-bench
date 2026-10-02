@@ -48,3 +48,7 @@ Thumbs.db
 
 # Local rendering and visual-QA intermediates
 tmp/
+
+# Third-party writing skill supplied by the user (local only)
+.claude/skills/paper-deslop/
+docs/paper-deslop.zip
