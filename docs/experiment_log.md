@@ -1,5 +1,44 @@
 # Experiment Log
 
+## 2026-10-02 - v3 Amendment 5: gpt-oss-120b — FIRST model whose choices track the stated horizon; primary rejects but control-driven
+
+**gpt-oss-120b (job 375712, 7h54m, 1× H100, MXFP4, own stack — see entry below).** 7,040/7,040,
+7,011 clean, truncation 11 (.16%), excluded pairs 0 → **gate PASSED**.
+
+**Direct lookahead use (curve; H-blind baseline = the model's own H1 answer scored at H):**
+
+| char | H | use | baseline | McNemar p | myopic (H1-optimal) | DiD |
+|---|---|---|---|---|---|---|
+| IC | 2 | .249 | .147 | 3.1e-5 | .480 | +.082 |
+| IC | 4 | .288 | .228 | .054 | .401 | +.123 |
+| IC | 8 | .361 | .250 | 6.5e-5 | .252 | +.155 |
+| Silent | 2 | .195 | .144 | .16 | .405 | +.077 |
+| Silent | 4 | .275 | .185 | .017 | .279 | +.076 |
+| Silent | 8 | .305 | .209 | .0005 | .193 | +.074 |
+
+Use rises with H and myopic choice falls monotonically in both characters — **the first model in
+the study whose choices move toward the H-optimal action as H grows** (H8 action switch IC 98 vs
+49 discordant, Silent 91 vs 49).
+
+**Primary (H8 DiD, α=.025): REJECTS both — Ironclad +.155 [+.093,+.218] p<.0001; Silent +.074
+[+.017,+.133] p=.004 — but, as for Qwen3-14B, it is CONTROL-DRIVEN:** sensitive gain ≈ 0 (IC
++.014, Silent −.032) while control fixtures lose value (IC −.142, Silent −.107). Reading: the
+model's *choices* respond to H (secondary, direct measure), yet on sensitive fixtures that does
+not convert into higher H8-oracle value, and the longer horizon instruction degrades H-invariant
+decisions. Report both; do not call the primary rejection "lookahead benefit". **Open (next):**
+why sensitive gain ≈ 0 despite more H8-optimal picks — decompose sensitive-fixture value by
+choice class (H8-optimal / H1-only / other / illegal) at H1 vs H8.
+
+**Caveats that travel with every gpt-oss number:** different serving stack (vLLM 0.10.2 /
+Transformers 4.56.2) and native MXFP4 precision; harmony path (developer-message system prompt,
+default 'medium' reasoning effort, server date in system message); one-symbol glibc patch of
+`_moe_C`. Size, family, training recipe and stack are all confounded — a single model, not a scaling
+claim.
+
+**Tally (gate-valid base condition):** lookahead use above the H-blind baseline in **1 of 5**
+models (gpt-oss-120b); primary rejects in 2 of 5 (Qwen3-14B IC, gpt-oss both), both
+control-driven.
+
 ## 2026-10-02 - gpt-oss-120b serving: two environment fixes (disclosed), smoke gate passed
 
 Two failed starts, **0 rows each**, before the run that is now going (job 375712):
