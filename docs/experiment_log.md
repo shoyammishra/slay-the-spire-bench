@@ -1,5 +1,38 @@
 # Experiment Log
 
+## 2026-10-02 - EXPLORATORY (post hoc): reasoning models respond to H by abandoning the greedy move, not by finding the lookahead move
+
+Not pre-registered; decided after seeing gpt-oss's "use up, value flat" result. Every H1 and H8
+answer classified under the frozen oracles: **H8-optimal** / **H1-optimal only** (myopic) /
+**other legal** / illegal-or-truncated; value = H8-oracle effective quality (`tmp/decomp.py` on the
+cluster; same scorer as the primary). n = 440 per cell.
+
+| model | fixtures | H1-opt-only H1→H8 | H8-opt H1→H8 | other legal H1→H8 | mean EQ8 H1→H8 |
+|---|---|---|---|---|---|
+| Llama-3.1-8B | IC sens | 183→179 | 100→102 | 151→153 | .673→.674 |
+| | Silent sens | 176→173 | 117→119 | 147→148 | .719→.720 |
+| | IC ctrl | 37→37 | 244→244 | 154→154 | .773→.771 |
+| Qwen3-14B | IC sens | 199→142 | 110→127 | 129→169 | .663→.678 |
+| | Silent sens | 179→110 | 127→131 | 134→196 | .739→.722 |
+| | IC ctrl | 31→25 | 259→192 | 150→221 | .791→.707 |
+| | Silent ctrl | 25→29 | 251→217 | 159→191 | .809→.788 |
+| gpt-oss-120b | IC sens | 265→111 | 110→159 | 64→166 | .698→.712 |
+| | Silent sens | 245→85 | 92→134 | 102→217 | .713→.680 |
+| | IC ctrl | 30→28 | 323→203 | 87→203 | .844→.702 |
+| | Silent ctrl | 37→35 | 280→193 | 123→211 | .826→.720 |
+
+**Three regimes.** (1) **Non-thinking Llama is H-blind**: choices at H1 and H8 are almost identical.
+(2) **Reasoning models respond to H by leaving the myopic move**, more strongly at larger scale
+(gpt-oss drops 58%/65% of its myopic choices, 14B 29%/39%) — (3) **but they mostly land on *other*
+moves, not the H8-optimal one**: of gpt-oss's ~155/160 abandoned myopic choices, +49/+42 become
+H8-optimal and +102/+115 become "other legal" worth ~.54 (below the myopic move's .58–.68), so
+sensitive-fixture value is flat; on control fixtures (where the correct move is the same at every
+H) the H8 instruction moves them *off* it (gpt-oss 323→203 IC). **Candidate paper framing:
+"horizon instructions make reasoning models abandon greedy play, but not plan correctly —
+responsiveness to H scales, lookahead accuracy does not."** Needs: the Qwen3-32B point (same family
+as 14B), a pre-registered test of the "abandon-myopic → other" shift, and a check that "other legal"
+moves are not systematically near-optimal under some third horizon.
+
 ## 2026-10-02 - v3 Amendment 5: gpt-oss-120b — FIRST model whose choices track the stated horizon; primary rejects but control-driven
 
 **gpt-oss-120b (job 375712, 7h54m, 1× H100, MXFP4, own stack — see entry below).** 7,040/7,040,
