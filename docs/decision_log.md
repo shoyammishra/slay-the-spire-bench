@@ -1,5 +1,86 @@
 # Decision Log
 
+## 2026-10-02 - PTA reviews: controlled-H prompts depend on game knowledge; knowledge conditions planned (DRAFT, not frozen)
+
+**Problem.** The PTA reviewers (submission_plan 2026-10-02) asked whether results reflect
+pretrained Slay the Spire knowledge, and asked for a card-renaming ablation and a separate
+knowledge probe. Checking the frozen v3 prompt (`controlled_horizon.build_prompt`) found it
+lists cards by **name, cost, type and flags only**. No effect text is shown, and enemy move
+patterns appear only as internal state (`move_index`, private flags, RNG seeds). So every v3
+result so far measures planning **conditional on the model already knowing what 107 cards and
+5 encounters do**. A null result can mean "doesn't plan" or "doesn't know the game", and the
+small-model nulls are the most exposed to this. A renaming ablation alone would make the task
+unanswerable.
+
+**Options.**
+- (a) Rename only: confounds unfamiliarity with having no information at all. Rejected.
+- (b) Report this as a limitation only: leaves the reviewers' concern open. Rejected.
+- (c) **Chosen: an engine-faithful effect table plus two new prompt conditions and a probe.**
+  - `described`: original names plus effect text for every visible card, relic and enemy move pattern.
+  - `renamed+described`: deterministic neutral proper names plus the same text. Generic
+    mechanic keywords stay unchanged.
+  - Knowledge probe: ask about each card and enemy without any text, and score the answers
+    against the same table.
+
+  The contrasts separate three things:
+  - base → described: the effect of supplying knowledge;
+  - described → renamed: the effect of name familiarity with mechanics held fixed;
+  - probe accuracy against per-fixture lookahead use: missing knowledge vs failure to plan.
+
+**Gate before any GPU spend.** The table must be executable-verified against the engine:
+- coverage of every name in all 1,760 fixtures;
+- numeric play-through of every card;
+- enemy AI step-through;
+- renaming must be a bijection that leaks no original names.
+
+It describes OUR engine, not the wiki. Work is in progress in `slay_bench/effect_text.py`. Then a
+frozen amendment (horizon subset, models, Holm family), a mock pass, a smoke run, and
+user-authorized runs follow, as for Amendment 2.
+
+**Trade-offs.**
+- Effect text lengthens prompts; the appendix length will be reported, and truncation is gated as before.
+- Described conditions are new conditions, never pooled with base rows.
+- The conditions measure H-use *given* knowledge; base rows stay the primary record of the frozen protocol.
+
+**Instrument findings while building the table (2026-10-02).** The table is in
+`slay_bench/ablation/effect_text.py`. It is a subpackage because the frozen v2 code receipt
+hashes every `slay_bench/*.py`, not just `controlled_horizon*`, and the glob is not recursive.
+It has 21 tests. Every card is played through the real `play_card`, enemy AI is stepped
+turn by turn, and no original name is left in any of the 1,760 renamed prompts. The appendix
+is about 640–1,270 tokens (median about 790). Suspected engine/interface bugs were pinned by
+tests, not fixed (frozen instrument):
+
+1. **The controlled-H interface never targets a Skill.**
+   - What happens: `legal_actions` gives every non-Attack card `target_index=-1`, and
+     targeted Skills then do nothing to enemies.
+   - Cards affected: Deadly Poison, Terror, Catalyst, Corpse Explosion, Malaise, Spot
+     Weakness, and the Weak part of Leg Sweep.
+   - Exposure: 591 of 1,760 fixtures hold one in hand, draw or discard pile (603 counting generated cards), and 317 have one playable in hand.
+   - **This is an oracle-validity issue for the frozen v3 results.** The oracle scores
+     multi-turn poison and debuff plays as wasted energy, and those are exactly the moves a
+     long-horizon planner should value.
+   - The 2026-09-04 statement that "the engine ignores the target for those cards" is false for these 7.
+2. Caltrops is a no-op: player Thorns is never read.
+3. Flame Barrier's retaliation never expires and stacks, and it gives 8 Block where the real card gives 12.
+4. Played Powers go to the discard pile and can be replayed.
+5. Burst plus a self-exhausting Skill exhausts the same card object twice.
+6. Poison and Choke HP loss never trigger the Slime Boss split.
+7. Both Sentries share the id `Sentry_0`.
+8. Lagavulin wakes when the player is below max HP, not when it is hit.
+
+Engine-vs-game deviations are recorded in the table's `real_game` notes and are never shown in prompts.
+
+**Next step for #1.** Run a sensitivity analysis on the frozen results that excludes exposed
+fixtures, and measure how often models chose an affected card (in progress). Fixing it needs
+new fixtures and a v4 protocol; it cannot be patched into v3. Any described or renamed
+condition must either fix the interface first or describe the no-op honestly. The table's
+default mode does the latter.
+
+**Also from the reviews (no protocol change).** Fixtures are independent at the seed level
+(1,760 unique seeds and states) but come from 5 encounters. `scripts/heldout_v3_robustness.py`
+(post hoc) reports per-encounter and leave-one-encounter-out DiD and an encounter-stratified
+bootstrap. A bootstrap p of 0 is reported as "< 1/reps".
+
 ## 2026-10-02 - v3 launcher: readiness budget 20 → 90 min (execution-only change)
 
 Qwen3-32B (job 374631, H200) failed with zero rows: loading 61 GiB from Lustre took 493 s and

@@ -5,6 +5,30 @@
 **Authoritative for:** venue strategy, submission deadlines, manuscript separation,
 and the paper critical path.
 
+## PTA outcome and review response (2026-10-02)
+
+**PTA rejected** (ratings 3 / 4 / 4 = borderline reject / accept / accept; confidence 4 / 5 / 3).
+Non-archival, so there is no cost to ICML. Reviews are paraphrased here (not quoted; public repo).
+The reviewers agreed that the self-audit was the paper's strength: the constant-`Strike` and
+dictionary counterexamples, the retracted claims, and the necessity test. The rejection rests on
+the gaps below. Every concern is a check the ICML paper must also pass.
+
+| # | Concern (reviewers) | Status 2026-10-02 | Action |
+|---|---|---|---|
+| 1 | Controlled-H proposed but no model results (2 of 3) | **Answered**: 6 models analyzed, 2 running | Main result of the ICML paper |
+| 2 | Degenerate-policy baselines missing for turn, combat and rollout; the "clears gate 1" claim is unsupported (2 of 3) | Partly done but **never reported**: turn random-legal .145/.231 and left-to-right .510/.614 (`turn_saturation_check.py`); greedy rollout anchor on matched seeds; controlled-H has the H-blind baseline and constant-action mock built in | Report them; add combat random-legal and fixed-priority controls |
+| 3 | Combat ceiling: the greedy bot wins Act-1 combats, so the operation cannot rank models (implied) | Real | Report as a ceiling or drop combat from claims |
+| 4 | Pretraining familiarity with the game; asks for a card-renaming ablation with mechanics fixed (1) | **Sharper than the reviewers knew:** the controlled-H prompt shows card *names only*, with no effect text, so the task needs remembered game knowledge by construction | Engine-verified effect table (in progress), then `described` and `renamed+described` conditions (decision_log 2026-10-02) |
+| 5 | No separate measure of game knowledge vs action choice (1) | Not done | Non-interactive knowledge probe scored against the same effect table |
+| 6 | Statistics: cells share seeds, so "19/20 pairs" are not independent; tied strata; p at the test floor (2) | Applies to the PTA analysis. Controlled-H resamples fixtures (one seed per fixture, verified) but has only 5 encounters | Encounter-robustness check (`scripts/heldout_v3_robustness.py`); report p as "< 1/reps" at the floor; retire the 19/20 framing |
+| 7 | The 235B-vs-32B card-pick headline sits on a task a dictionary solves 120/120 (1) | Valid | Drop it as a headline or report it against the dictionary ceiling |
+| 8 | Why this game, why a clone, jargon (1; clarity 1/5) | Writing | Motivation paragraph, glossary, why a deterministic clone (exact oracle) |
+| 9 | Reproducibility: configs, release (1) | Configs are frozen, fingerprinted and version-pinned | State them in the paper; commit to a release |
+
+Workshop fallback: an **ICLR 2027 non-archival workshop** (list due 2026-11-29; papers due
+around late Jan–Feb 2027, after the ICML freeze). ACCV workshops were ruled out: wrong field,
+and LNCS proceedings are archival.
+
 ## Main-track readiness update (2026-09-05)
 
 The real 120-query Qwen3 pilot is complete and independently audited; it
