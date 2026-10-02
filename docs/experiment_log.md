@@ -34,6 +34,10 @@
      - The 4 Amendment-6 jobs: `cluster/sharanga_v3_knowledge.sbatch` with `V3_CONDITION`
        described/renamed; gpt-oss also needs `CONDA_ENV`/`TIKTOKEN_*` exports as for job 375712.
   4. If Llama-70B times out, resubmit it with the standard launcher (it resumes).
+- **Llama-70B 377451 hit a GPU hardware fault** (04:18 IST): one of its two H100s reported
+  "NVML: GPU requires reset" and showed no utilisation or memory-error data. The vLLM TP=2
+  server deadlocked at NCCL init with 0 rows. Cancelled and resubmitted as **377473**,
+  excluding that node. Ask the admins to reset the GPU.
 
 ## 2026-10-02 - POST HOC robustness of v3 (PTA review response): encounters and the untargeted-Skill oracle bug
 
