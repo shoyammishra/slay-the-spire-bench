@@ -1,0 +1,92 @@
+{
+  "amendment_id": "controlled-h-v3-amendment-6-knowledge-conditions-2026-10-02",
+  "amends_protocol_digest": "697011782709a76095ea705dab1ee1e862891b9bd7f717a4f0221075c28b8ef2",
+  "status": "frozen 2026-10-02 before any described or renamed query was sent",
+  "decision": "user 2026-10-02: answer the PTA reviewers' knowledge/recognition concern with knowledge conditions on the v3 fixtures that hold no untargeted Skill",
+  "question": "Is the v3 H-use result limited by missing game knowledge (base prompts show card names only) or carried by name familiarity?",
+  "fixture_subset": {
+    "rule": "drop a fixture if its hand, draw or discard pile holds a targeted Skill; the controlled-H interface plays every Skill untargeted, so the frozen oracle scores these as enemy no-ops (decision_log 2026-10-02). The rule reads card names only, never model output.",
+    "excluded_if_any_pile_holds": [
+      "Catalyst",
+      "Corpse Explosion",
+      "Deadly Poison",
+      "Leg Sweep",
+      "Malaise",
+      "Spot Weakness",
+      "Terror"
+    ],
+    "kept_count": 1169,
+    "kept_ids_sha256": "949e8bce37afea8b6ec2e789f8ba020892996201660db6be4a0caa022019c5de",
+    "kept_by_stratum": {
+      "ironclad_sensitive": 334,
+      "ironclad_control": 321,
+      "silent_sensitive": 259,
+      "silent_control": 255
+    }
+  },
+  "horizons": [
+    1,
+    8
+  ],
+  "models": [
+    "llama-3.1-8b",
+    "gpt-oss-120b"
+  ],
+  "model_rationale": "llama-3.1-8b: non-thinking, tight base null; gpt-oss-120b: the only model whose choices track H. Both have complete, gate-valid base runs.",
+  "effect_text": {
+    "module": "slay_bench/ablation/effect_text.py",
+    "sha256": "b5ce0beab3624df14d20ce313506d80fd5d325c40cae385a2f91b2fa5f406a08",
+    "version": "effect-text-v1",
+    "mode": "controlled_h"
+  },
+  "launcher": "cluster/sharanga_v3_knowledge.sbatch",
+  "conditions": {
+    "described": {
+      "prompt_change": "the frozen prompt with effects_appendix(state) inserted immediately before the final 'Choose the next action' instruction; system prompt unchanged"
+    },
+    "renamed": {
+      "prompt_change": "described, then: the system prompt's game sentence rewritten; every proper name (cards incl. engine ids, enemies, relics, distinctive move names, Slay the Spire / Ironclad / Silent) replaced by its neutral token in system and user prompts; private engine-flag keys replaced per flag_key_map; generic mechanic keywords (Strength, Block, Poison, Vulnerable, ...) kept and defined in the reference",
+      "name_seed": 2026,
+      "system_prompt_rewrite": {
+        "from": "You are an expert Slay the Spire player controlling the {character}.",
+        "to": "You are an expert player of a deterministic deck-building card game."
+      },
+      "flag_key_map": {
+        "_activated": "_flag_01",
+        "_asleep": "_flag_02",
+        "_asleep_turns": "_flag_03",
+        "_awoken": "_flag_04",
+        "_combust_plays": "_flag_05",
+        "_first": "_flag_06",
+        "_first_move": "_flag_07",
+        "_inferno_count": "_flag_08",
+        "_phase": "_flag_09",
+        "_split": "_flag_10",
+        "_toggle": "_flag_11"
+      },
+      "leak_check": "the runner refuses a prompt in which any original proper name survives as a whole word"
+    }
+  },
+  "unchanged": "oracles, scorer, response contract, request payload (max_tokens 16000, temperature, seed), serving stacks and model revisions, 8-way concurrency, smoke gate, truncation and excluded-pair gates",
+  "analysis": {
+    "primary": "per model x character on the subset, paired by fixture at H8: knowledge = DiD of (g_described - g_base); familiarity = DiD of (g_renamed - g_described); g = EQ8(a8) - EQ8(a1) under the frozen oracle; sensitive-minus-control bootstrap as in v3",
+    "holm_family_size": 8,
+    "alpha": 0.05,
+    "bootstrap": "v3 replicates (10,000); seeds = v3 per-character seed + 300 (knowledge) / + 400 (familiarity)",
+    "validity": "a contrast can reject only if both conditions it compares pass the v3 gates; base validity is the model's frozen v3 analysis",
+    "secondary_descriptive": [
+      "H8 lookahead-use rate on sensitive fixtures per condition, McNemar exact between conditions",
+      "mean H8 effective quality per condition",
+      "truncation and illegal rates per condition"
+    ],
+    "base_comparator": "the model's frozen v3 base rows restricted to the same 1,169 fixtures (H1 and H8 only)"
+  },
+  "deferred": "knowledge probe (non-interactive questions scored against the same effect table) goes in a separate amendment",
+  "disclosures": [
+    "The subset over-represents Ironclad (655 vs 514 Silent fixtures) and excludes Silent poison/debuff decks; claims are scoped to fixtures without targeted Skills.",
+    "The effect reference describes OUR engine, which deviates from the real game in recorded places (effect_text real_game notes); for those cards described prompts contradict pretrained knowledge by design.",
+    "Base rows were collected under a 4-horizon schedule (H1/H2/H4/H8, Latin-square order); condition rows use H1/H8 only, so query order and context differ beyond the prompt change.",
+    "Condition prompts are longer by about 640-1,270 tokens; truncation is gated as in v3.",
+    "Post hoc in origin: the exclusion rule and these conditions were designed after seeing base results, but before any condition query."
+  ]
+}

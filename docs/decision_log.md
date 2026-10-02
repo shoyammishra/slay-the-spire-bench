@@ -1,5 +1,53 @@
 # Decision Log
 
+## 2026-10-02 - v3 Amendment 6 FROZEN: knowledge conditions on the 1,169-fixture subset
+
+**Decision (user, 2026-10-02):** run the knowledge conditions on the v3 fixtures that hold no
+targeted Skill. The alternative was a fixed v4: new fixtures, a multi-day oracle audit and full
+re-runs, which don't fit before the 2027-01-15 freeze.
+
+`configs/controlled_h_v3_inference_amendment6.json`, digest `b7f44796…`.
+
+**Fixtures.** 1,169 of 1,760, fingerprinted by the hash of the kept IDs:
+- IC 334 sensitive / 321 control; Silent 259 / 255.
+- The rule reads card names in the hand, draw and discard piles, never model output.
+- In the frozen base results this subset reproduces every conclusion (experiment_log 2026-10-02).
+
+**Design.**
+- Horizons: H1 and H8 only.
+- Models: Llama-3.1-8B and gpt-oss-120b.
+- Conditions: `described` (frozen prompt plus the effect reference) and `renamed` (described
+  plus neutral proper names, a neutral game sentence, and anonymized private-flag keys).
+- Primary contrasts, Holm over 8 tests:
+  - knowledge = DiD(g_described − g_base);
+  - familiarity = DiD(g_renamed − g_described).
+- Secondary: H8 use (McNemar) and mean H8 quality.
+- The knowledge probe is deferred to its own amendment.
+
+**Implementation.**
+- `scripts/heldout_v3_knowledge.py` wraps the frozen runner without editing it. The runner's
+  hash is in the contract of Qwen3-32B rows still being written. The wrapper swaps the module's
+  `load_context` and reuses its serving contract, evidence store, schedule, gates and analysis.
+- Launcher: `cluster/sharanga_v3_knowledge.sbatch`, which runs only the amendment's models and conditions.
+- The condition contract digest binds the amendment plus the effect-text hash. It deliberately
+  excludes wrapper and launcher code: a prompt change is caught when each saved row's prompt is
+  re-checked on load, and an analysis fix must not orphan finished rows.
+
+**Verified.**
+- 10 tests, including a whole-word leak scan of every renamed prompt and description splicing
+  that adds only the reference.
+- The mock gives exactly zero DiD and use equal to the H-blind baseline.
+- Mock runs of 2,338 queries per condition for both models are complete and clean.
+- Renamed prompts are about 1,750 tokens.
+
+**Disclosures.**
+- The subset over-represents Ironclad and omits Silent poison decks.
+- The reference describes our engine; where it differs from the real game, it contradicts pretrained knowledge.
+- Base rows came from a 4-horizon schedule, condition rows from H1 and H8 only.
+- The conditions were designed post hoc, but before any condition query.
+
+**Not yet authorized:** GPU runs.
+
 ## 2026-10-02 - PTA reviews: controlled-H prompts depend on game knowledge; knowledge conditions planned (DRAFT, not frozen)
 
 **Problem.** The PTA reviewers (submission_plan 2026-10-02) asked whether results reflect
