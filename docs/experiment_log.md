@@ -1,5 +1,59 @@
 # Experiment Log
 
+## 2026-10-03 - v3 Qwen3-32B COMPLETE: gate valid; second model whose choices track H; same "abandon greedy, rarely plan" pattern
+
+Run: jobs 375643 (19h51m, died on the home quota at 5,887 rows) + 377474 (resume, 4h24m).
+Inputs: H200, base condition, 7,040/7,040 queries.
+
+**Gates.**
+- Truncation 0.21%.
+- Excluded pairs 0.17%: the 7 lost-in-flight queries (decision_log/experiment_log 2026-10-03).
+- **Valid.**
+
+**Primary (pre-registered, H8 DiD).**
+
+| | Estimate [95% CI] | p | Result | Sensitive / control gain |
+|---|---|---|---|---|
+| IC | **+.125** [+.068, +.183] | <.0001 | rejects | +.030 / −.095 |
+| Silent | +.045 [−.007, +.099] | .059 | does not reject | −.012 / −.057 |
+
+As with Qwen3-14B and gpt-oss, the IC rejection is mostly driven by the controls.
+
+**Lookahead curve (use vs H-blind baseline, McNemar exact).**
+
+| | H2 | H4 | H8 |
+|---|---|---|---|
+| IC | .190 vs .130 (p=.011) | .246 vs .202 (p=.14) | **.280 vs .218 (p=.026)** |
+| Silent | .119 vs .155 (p=.31) | .296 vs .227 (p=.085) | **.298 vs .191 (p=7.3e-5)** |
+
+The myopic rate falls with H: IC .481 → .404 → .348; Silent .418 → .279 → .241.
+
+**Choice classes at H1 → H8, sensitive fixtures (post hoc, same method as 2026-10-02).**
+
+| | H1-optimal only (myopic) | H8-optimal | Other |
+|---|---|---|---|
+| IC | 236 → 153 | 96 → 123 | 108 → 161 |
+| Silent | 232 → 106 | 85 → 131 | 122 → 202 |
+
+H8-optimal choices on controls: IC 289 → 218, Silent 284 → 229.
+
+**Robustness (post hoc).**
+- IC: leave-one-encounter-out range +.105 to +.151; 5/5 encounters positive; +.127 with the
+  591 untargeted-Skill fixtures excluded.
+- Silent: +.054 [−.001, +.110] when excluded.
+
+**Reading.**
+- Qwen3 now gives a within-family size trend in *responsiveness to H*:
+  - 8B: no response (gate failed);
+  - 14B: control-driven rejection, use at the baseline;
+  - 32B: use above the baseline on both characters, myopia falling monotonically.
+- gpt-oss-120b shows the same profile, larger.
+- In all three responsive models, the abandoned greedy moves go mostly to "other" moves rather
+  than to the lookahead move, and controls degrade.
+- Candidate paper claim, still exploratory until the knowledge conditions land: *with scale,
+  reasoning models increasingly respond to a stated horizon by abandoning the greedy move, but
+  rarely find the lookahead move.*
+
 ## 2026-10-03 - Operations: Qwen3-32B died on the home quota; Llama-70B resubmitted; Amendment 6 submitted
 
 - **Qwen3-32B (375643)** died after 19h51m with `OSError: [Errno 122] Disk quota exceeded`.
