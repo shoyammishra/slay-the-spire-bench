@@ -1,5 +1,48 @@
 # Experiment Log
 
+## 2026-10-03 - Amendment 6 (knowledge conditions): Llama-3.1-8B COMPLETE: knowledge and familiarity both tight nulls
+
+**Runs.** Jobs 377488 (described, 54 min) and 377489 (renamed, 16 min), H200.
+Subset: 1,169 fixtures, H1 and H8, 2,338 queries each.
+
+**Gates.**
+
+| Condition | Truncation | Excluded | Valid |
+|---|---|---|---|
+| described | 0% | 0% | yes |
+| renamed | 0.77% | 0% | yes |
+
+**Pre-registered contrasts** (Holm family incomplete: 4 of 8 tests until gpt-oss finishes).
+
+| | Knowledge: DiD(g_described − g_base) | Familiarity: DiD(g_renamed − g_described) |
+|---|---|---|
+| IC | −.003 [−.022, +.017], p=.79 | +.017 [−.015, +.051], p=.31 |
+| Silent | −.000 [−.021, +.021], p=.98 | −.005 [−.036, +.026], p=.76 |
+
+All Holm p = 1.0, so there are no rejections.
+
+**Descriptive.**
+
+| | H8 lookahead use (base / described / renamed) | Mean H8 effective quality (base / described / renamed) |
+|---|---|---|
+| IC | .243 / .254 / .257 | .735 / .734 / .711 |
+| Silent | .286 / .290 / .282 | .787 / .789 / .772 |
+
+**Per-condition primary.**
+- Described: IC −.003, Silent +.003. Use equals the H-blind baseline (.254/.254, .290/.286).
+- Renamed: IC +.014, Silent −.002.
+
+**Reading.**
+- Llama-3.1-8B's H-blindness is **not** caused by missing game knowledge. An engine-exact rule
+  reference changes neither its response to H nor its absolute move quality. Confidence
+  intervals are about ±.02.
+- Removing name familiarity does not change H-use either. It costs about .02 of absolute
+  quality, a small descriptive drop, so names help this model a little with move choice but
+  not with horizon use.
+- The non-thinking null is therefore a planning or instruction-use null, not a knowledge
+  artifact. This answers the PTA reviewers' knowledge confound for this model. gpt-oss-120b
+  (the responsive model) is pending.
+
 ## 2026-10-03 - Amendment 3 link analysis (controlled-H lookahead use vs the full-run matrix): no detectable link
 
 `scripts/heldout_v3_link.py`, Spearman with exact permutation p. Directional only.
