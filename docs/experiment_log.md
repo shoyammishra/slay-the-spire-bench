@@ -1,5 +1,32 @@
 # Experiment Log
 
+## 2026-10-03 - Amendment 3 link analysis (controlled-H lookahead use vs the full-run matrix): no detectable link
+
+`scripts/heldout_v3_link.py`, Spearman with exact permutation p. Directional only.
+
+**Models (n = 4).** The gate-valid models that also have structured 5-seed matrix aggregates:
+Llama-3.1-8B, Mistral-7B, Qwen2.5-7B, Qwen3-32B. Qwen3-8B, Qwen3-14B and gpt-oss-120b have
+no matrix rows. With n = 4 there are 24 orderings, so the smallest attainable p is .083.
+
+| | H8 use ~ run progress | H8 use ~ turn damage | H8 use ~ combat hp ratio | (use − baseline) ~ any |
+|---|---|---|---|---|
+| IC | ρ = .8 (p = .33) | .8 (.33) | .4 (.75) | ρ ≤ .4, p ≥ .75 |
+| Silent | ρ = −.6 (p = .42) | .8 (.33) | .4 (.75) | ρ ≤ .4, p ≥ .75 |
+
+**Why the combat score drops out.** It equals 1.0 for all four models (win-rate ceiling), so
+its correlation is undefined.
+
+**Reading.**
+- No link between lookahead use and the full-run combat or run metrics is detectable. The run
+  correlation even flips sign between characters.
+- The full-run metrics barely separate these models: combat sits at the ceiling, and run
+  progress spans only .71–.84 around the greedy floor (η² for model at run level = .02, P4b).
+  So they cannot validate or contradict the controlled-H measure.
+- The only consistent ordering is turn damage (ρ = .8 on both characters). That is driven by
+  Qwen3-32B leading both measures, a single model.
+- **Paper wording:** "Lookahead use in the controlled protocol is not predicted by the
+  full-run metrics, which are near ceiling (combat) or floor (run) for these models."
+
 ## 2026-10-03 - v3 Qwen3-32B COMPLETE: gate valid; second model whose choices track H; same "abandon greedy, rarely plan" pattern
 
 Run: jobs 375643 (19h51m, died on the home quota at 5,887 rows) + 377474 (resume, 4h24m).
