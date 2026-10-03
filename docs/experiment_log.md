@@ -1,5 +1,54 @@
 # Experiment Log
 
+## 2026-10-03 - Amendment 6 COMPLETE: 0/8 pre-registered contrasts reject; neither missing knowledge nor name familiarity explains the v3 results
+
+**gpt-oss-120b described** (job 377785, 3h35m, H200).
+- 2,338/2,338 queries; truncation 0.38%; **valid**.
+- Its own H8 DiD: IC +.217 [+.151, +.283] (sensitive +.054, control −.163); Silent +.151
+  [+.080, +.221] (sensitive +.038, control −.113).
+- H8 use vs baseline: IC .389 vs .159, Silent .386 vs .166.
+- The Holm family is complete (8 tests).
+
+| Model | Char | Knowledge: DiD(g_described − g_base) | Familiarity: DiD(g_renamed − g_described) |
+|---|---|---|---|
+| Llama-3.1-8B | IC | −.003 [−.022, +.017], Holm 1.0 | +.017 [−.015, +.051], Holm 1.0 |
+| Llama-3.1-8B | Silent | −.000 [−.021, +.021], Holm 1.0 | −.005 [−.036, +.026], Holm 1.0 |
+| gpt-oss-120b | IC | +.073 [−.003, +.148], p=.060, Holm .36 | +.081 [−.000, +.161], p=.048, Holm .34, **invalid** (renamed gate) |
+| gpt-oss-120b | Silent | +.073 [−.007, +.154], p=.076, Holm .38 | +.084 [+.010, +.158], p=.026, Holm .21, **invalid** |
+
+**Descriptive.**
+
+| Model | Char | H8 use on sensitive (base / described / renamed) | Mean H8 quality (base / described / renamed) |
+|---|---|---|---|
+| Llama-3.1-8B | IC | .243 / .254 / .257 | .735 / .734 / .711 |
+| Llama-3.1-8B | Silent | .286 / .290 / .282 | .787 / .789 / .772 |
+| gpt-oss-120b | IC | .341 / .389 / .365 | .706 / .726 / .691 |
+| gpt-oss-120b | Silent | .336 / .386 / .394 | .723 / .784 / .760 |
+
+For gpt-oss, McNemar on H8 use between conditions gives p ≥ .20 everywhere.
+
+**Reading.**
+1. **No pre-registered knowledge or familiarity effect** (0/8 after Holm). The design answers
+   the PTA confound directly.
+2. **Llama-3.1-8B:** H-blind in every condition, with tight nulls (±.02). Its failure to use H
+   is not a knowledge gap.
+3. **gpt-oss-120b, knowledge supplied:**
+   - Its response to H persists with the same structure: control degradation dominates,
+     sensitive gain is about +.05.
+   - H8 use rises about +.05, not significantly.
+   - Absolute H8 quality rises (Silent +.06, IC +.02). The rules help it play better overall,
+     not use the horizon better.
+   - The knowledge DiD trends positive (p ≈ .06–.08) because controls degrade *more* under
+     described prompts. That is not better lookahead.
+4. **gpt-oss-120b, names removed** (renamed is gate-failed, so descriptive only):
+   - H-use survives (.37–.39), so its horizon response is **not driven by recognizing card or
+     enemy names**.
+   - Absolute quality drops .02–.035 relative to described.
+5. **Paper claim supported:** the horizon-responsiveness pattern (responsive large reasoning
+   models, H-blind small models; greedy moves abandoned and rarely replaced by the lookahead
+   move) is not an artifact of missing game knowledge or name familiarity. Scope: two models,
+   1,169-fixture subset, renamed gpt-oss descriptive.
+
 ## 2026-10-03 - Amendment 6: gpt-oss-120b RENAMED done: truncation gate FAILED (1.88% > 1%); descriptive only
 
 **Run.** Job 377478 (5h02m, H200), 2,338/2,338.
