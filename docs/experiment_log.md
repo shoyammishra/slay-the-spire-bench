@@ -1,5 +1,39 @@
 # Experiment Log
 
+## 2026-10-03 - Amendment 6: gpt-oss-120b RENAMED done: truncation gate FAILED (1.88% > 1%); descriptive only
+
+**Run.** Job 377478 (5h02m, H200), 2,338/2,338.
+- Rows: 2,287 clean, 44 truncated.
+- Excluded pairs: 0.
+
+**Gate.** Truncation fails, so `valid_for_primary_inference = False`. Any Amendment-6
+contrast involving `renamed` for gpt-oss cannot reject (pre-registered validity rule).
+The numbers below are **descriptive**.
+
+**H8 DiD.**
+
+| | Estimate [95% CI] | Sensitive gain | Control gain |
+|---|---|---|---|
+| IC | +.298 [+.226, +.372] | +.050 | −.248 |
+| Silent | +.235 [+.164, +.307] | +.049 | −.186 |
+
+**H8 use vs H-blind baseline.**
+
+| | Use | Baseline | McNemar p | Myopic |
+|---|---|---|---|---|
+| IC | .365 | .054 | 5e-16 | .234 |
+| Silent | .394 | .085 | 4e-16 | .224 |
+
+**Reading (provisional, before `described` lands).**
+- With rules supplied and names removed, gpt-oss's H1 answers almost never hit the H8-optimal
+  move. The baseline collapses from about .21–.25 in the base condition to .05–.09; its H1
+  play becomes sharply H1-specific.
+- Its H8 answers hit the H8-optimal move about as often as in base (.37–.39).
+- Value still flows from controls: the sensitive gain is about +.05, and the controls lose
+  .19–.25 at H8.
+- The larger truncation is consistent with longer reasoning over the longer prompt.
+- Interpretation waits for `described` (job 377785) and the paired contrasts.
+
 ## 2026-10-03 - Amendment 6 (knowledge conditions): Llama-3.1-8B COMPLETE: knowledge and familiarity both tight nulls
 
 **Runs.** Jobs 377488 (described, 54 min) and 377489 (renamed, 16 min), H200.
