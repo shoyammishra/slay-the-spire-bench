@@ -119,6 +119,13 @@ H8-optimal choices on controls: IC 289 → 218, Silent 284 → 229.
   "NVML: GPU requires reset" and showed no utilisation or memory-error data. The vLLM TP=2
   server deadlocked at NCCL init with 0 rows. Cancelled and resubmitted as **377473**,
   excluding that node. Ask the admins to reset the GPU.
+- **gpt-oss described (377477) was CANCELLED 2 min after starting** (2026-10-03 09:16 IST).
+  It had no log file and no rows, the same signature as Llama-70B 375642 on 2026-10-02. Both
+  happened shortly after start-up, while the GPU sat idle during model loading. Suspected cause:
+  automation run by another user of the shared account (we did not inspect their files). Resubmitted
+  as **377785**. The user should ask the account's other users whether a GPU watchdog cancels
+  jobs that look idle during start-up. gpt-oss renamed (377478) runs at about 2.5 queries/min
+  (about 15 h for 2,338), slower than estimated.
 
 ## 2026-10-02 - POST HOC robustness of v3 (PTA review response): encounters and the untargeted-Skill oracle bug
 
