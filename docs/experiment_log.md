@@ -1,5 +1,50 @@
 # Experiment Log
 
+## 2026-10-04 - v3 Llama-3.3-70B (Amendment 7 rerun) COMPLETE: valid NULL; size without reasoning does not produce H-use
+
+**Run.** Job 379568 on 2× H200: TP=2, FP8, `--disable-custom-all-reduce`.
+- Hardware moved from H100 (QOS held by another user); disclosed.
+- 2h33m; 7,040/7,040, **all clean**, 0 truncation, 0 failures. **Valid.**
+
+**Primary.**
+
+| | H8 DiD [95% CI] | p | Sensitive / control gain |
+|---|---|---|---|
+| IC | +.016 [−.033, +.064] | .45 | −.020 / −.037 |
+| Silent | +.001 [−.037, +.038] | .96 | −.010 / −.011 |
+
+**Lookahead curve (use vs H-blind baseline).**
+
+| | H2 | H4 | H8 |
+|---|---|---|---|
+| IC | .169 / .162 | .228 / .273 | .225 / .252 (p=.27) |
+| Silent | .097 / .067 | .266 / .245 | .259 / .273 (p=.56) |
+
+**Myopic rate H2 → H8.** IC .527 → .411; Silent .579 → .386.
+
+**Choice classes, sensitive fixtures, H1 → H8 (post hoc).**
+
+| | H1-optimal only | H8-optimal | Other |
+|---|---|---|---|
+| IC | 232 → 181 | 111 → 99 | 97 → 160 |
+| Silent | 193 → 170 | 120 → 114 | 127 → 156 |
+
+H8-optimal choices on controls: IC 284 → 256, Silent 297 → 273.
+
+**Robustness.**
+- Leave-one-encounter-out: IC +.007 to +.025, Silent −.011 to +.009.
+- Excluding the untargeted-Skill fixtures: IC +.032 (n.s.), Silent −.006.
+
+**Reading.**
+- A 70B non-thinking model is H-blind. Use never exceeds the baseline, and the primary is a
+  tight null.
+- It shows a mild version of the "abandon greedy → other" shift, but with *no* gain in
+  lookahead moves; H8-optimal choices even dip slightly.
+- **Across the 8 models: above-baseline H-use appears only in the larger reasoning models
+  (Qwen3-32B, gpt-oss-120b).** Small models, Qwen3-14B and the 70B non-thinking model do not
+  show it. Size alone (Llama 8B → 70B) does not produce it.
+- Caveats: 3.1 → 3.3 post-training and FP8 confound the Llama pair.
+
 ## 2026-10-03 - Amendment 6 COMPLETE: 0/8 pre-registered contrasts reject; neither missing knowledge nor name familiarity explains the v3 results
 
 **gpt-oss-120b described** (job 377785, 3h35m, H200).
