@@ -1,0 +1,32 @@
+{
+  "amendment_id": "controlled-h-v3-amendment-7-llama-70b-retry-2026-10-04",
+  "amends_protocol_digest": "697011782709a76095ea705dab1ee1e862891b9bd7f717a4f0221075c28b8ef2",
+  "status": "frozen 2026-10-04; the model's only prior v3 contact is the failed Amendment-4 attempt below (8 queries, no response text ever received)",
+  "decision": "user 2026-10-04: rerun Llama-3.3-70B with the TP=2 serving fix",
+  "add_models": {
+    "llama-3.3-70b-r2": {
+      "repository": "meta-llama/Llama-3.3-70B-Instruct",
+      "revision": "6f6073b423013f6a7d4d9f39144961bfbfbc386b",
+      "family": "Meta Llama 3.x",
+      "thinking": false,
+      "tensor_parallel_size": 2,
+      "quantization": "fp8",
+      "extra_server_args": [
+        "--disable-custom-all-reduce"
+      ],
+      "hardware_note": "2x H100 80GB, TP=2, vLLM dynamic FP8 weight quantization (as Amendment 4). Custom all-reduce disabled; tensor-parallel reductions go through NCCL instead."
+    }
+  },
+  "supersedes_attempt": {
+    "model": "llama-3.3-70b",
+    "job": 377473,
+    "outcome": "vLLM EngineCore died at the first batch (TimeoutError: RPC call to execute_model timed out -> EngineDeadError); all 8 smoke queries recorded as transport_failure with no response text; smoke gate failed. Hardware healthy (no NVML errors). Same TP=2 custom-all-reduce hang class as the 2026-08 Qwen3-235B serving record.",
+    "evidence_kept": "results/controlled_h_v3_inference/real/llama-3.3-70b/ is preserved untouched and never analyzed as a model result"
+  },
+  "unchanged": "fixtures, prompts, request settings, pinned stack (vLLM 0.8.5.post1 / Transformers 4.51.3), FP8, TP=2, 8-way concurrency, gates, analyses",
+  "disclosures": [
+    "A first attempt under Amendment 4 failed on a serving crash before any model output; it is disclosed and preserved, and the rerun is a new model key.",
+    "--disable-custom-all-reduce changes only how partial sums are reduced across the two GPUs (NCCL instead of vLLM's custom kernel); it is not a model, prompt or sampling change, but floating-point reduction order can differ.",
+    "As Amendment 4: FP8 precision deviation; 8B vs 70B confounds size with the 3.1->3.3 post-training update."
+  ]
+}

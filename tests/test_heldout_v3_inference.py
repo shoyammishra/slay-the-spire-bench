@@ -123,6 +123,21 @@ def test_amendment_only_adds_models_and_leaves_base_contracts_untouched():
     assert not inf.contract_matches(c2, a, strict=False)
 
 
+def test_amendment7_pins_tp2_serving_fix_for_the_70b_rerun_only():
+    """Regression (job 377473): TP=2 vLLM custom all-reduce hung at the first batch."""
+    cfg, _ = inf.load_config()
+    assert 'llama-3.3-70b-r2' in cfg['inference']['authorized_models']
+    cmd = inf.server_command(cfg, 'llama-3.3-70b-r2', 20001)
+    assert '--disable-custom-all-reduce' in cmd and cmd[cmd.index('--tensor-parallel-size') + 1] == '2'
+    assert cmd[cmd.index('--quantization') + 1] == 'fp8'
+    for other in ('llama-3.3-70b', 'llama-3.1-8b', 'qwen3-32b', 'gpt-oss-120b'):
+        assert '--disable-custom-all-reduce' not in inf.server_command(cfg, other, 20001)
+    old, new = (cfg['inference']['models'][m] for m in ('llama-3.3-70b', 'llama-3.3-70b-r2'))
+    assert {k: v for k, v in new.items() if k not in ('extra_server_args', 'hardware_note')} ==         {k: v for k, v in old.items() if k != 'hardware_note'}
+    for f in ('cluster/sharanga_v3_inference.sbatch', 'cluster/sharanga_v3_resume.sbatch'):
+        assert 'llama-3.3-70b-r2' in (ROOT / f).read_text(encoding='utf-8')
+
+
 def test_v3_inference_runner_is_outside_the_frozen_code_receipt():
     from scripts.controlled_horizon_confirmatory import code_receipt
     assert not any('heldout_v3' in p for p in code_receipt())

@@ -1,5 +1,36 @@
 # Decision Log
 
+## 2026-10-04 - v3 Amendment 7: rerun Llama-3.3-70B with `--disable-custom-all-reduce`
+
+**Problem.** Llama-3.3-70B (Amendment 4, job 377473, healthy node) loaded on 2× H100 at TP=2.
+At the first batch it died: `TimeoutError: RPC call to execute_model timed out`, then
+`EngineDeadError`. All 8 smoke queries were recorded as `transport_failure` with no response
+text, and the smoke gate failed. This is the same TP>1 custom-all-reduce hang class as the
+2026-08 Qwen3-235B serving record. The frozen runner refuses to continue after a failed smoke
+gate, and amendments may only add models.
+
+**Options.**
+- (a) Drop the 70B model: loses the Llama size point.
+- (b) Delete the failed rows and retry under the same key: violates "never retried" and destroys evidence.
+- (c) **Chosen:** add `llama-3.3-70b-r2` in Amendment 7 (`configs/controlled_h_v3_inference_amendment7.json`,
+  digest `eaa20e7d…`). It is identical to Amendment 4 apart from `extra_server_args:
+  ["--disable-custom-all-reduce"]`.
+
+**Implementation.**
+- The runner's `server_command` appends a model's `extra_server_args`. Only r2 has any, and a
+  regression test pins that.
+- Both launchers accept the new key.
+- The failed attempt's directory is preserved and never analyzed.
+
+**Comparability.**
+- No prompt, request or scoring change.
+- Partial sums go through NCCL instead of vLLM's custom kernel, so floating-point reduction
+  order can differ (disclosed).
+- Editing the runner changes its code hash. That is safe now: no evidence-writing run was
+  active (all base runs complete), and analysis ignores the code hash by design.
+
+**Disclosure.** In the paper, report the first attempt as a serving failure with no model output.
+
 ## 2026-10-02 - v3 Amendment 6 FROZEN: knowledge conditions on the 1,169-fixture subset
 
 **Decision (user, 2026-10-02):** run the knowledge conditions on the v3 fixtures that hold no
