@@ -13,7 +13,7 @@ We chose a card game because it is a rare domain where all of this is possible a
 We test eight open-weight models from four families. Three findings stand out.
 \begin{itemize}
 \item \textbf{Three tiers of response.} Small models ignore the horizon. Larger models abandon the obvious move when told to look ahead, including a 70-billion-parameter model that does not reason step by step. Only Qwen3-32B and gpt-oss-120b also choose the long-horizon move more often than they do at $H{=}1$.
-\item \textbf{Responding is not planning.} Even these two models do not get better on average. They find the long-horizon move on some states and give up correct answers on others. Where the obvious move was already right, they lose ground.
+\item \textbf{Responding is not planning.} Even these two models do not get better on average. They find the long-horizon move on some states and give up correct answers on others. Where the obvious move was already right, they lose ground. With its reasoning trace switched off, Qwen3-32B changes four times fewer answers and its long-horizon gain disappears.
 \item \textbf{Knowledge does not explain it.} A pre-registered test that supplies an exact rulebook does not remove the pattern. Neither does a test that replaces every card and enemy name with a code.
 \end{itemize}
 

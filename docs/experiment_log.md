@@ -1,5 +1,15 @@
 # Experiment Log
 
+## 2026-10-05 - Amendment 8 COMPLETE: Qwen3-32B thinking OFF removes most of the H response
+
+Job 381029 (gpu_h200_8), 45 min, 7,040/7,040, truncation 0, execution failures 0, valid. Same checkpoint as qwen3-32b, enable_thinking=false.
+- Answers changed H1->H8: 269/1,760 (15%) vs 1,157 (66%) with thinking.
+- H8 use vs H-blind baseline: IC .218 vs .195 (McNemar p=.052), Silent .250 vs .241 (p=.57); thinking on: .280/.218 (p=.026), .298/.191 (p=7e-5). Small gains remain at H2 (IC .19/.15 p=.0003; Silent .08/.04 p=.012) and H4 IC (.27/.24 p=.012).
+- Churn (both chars) sensitive found/lost 32/18 (on: 174/101); control 19/68 (on: 106/232).
+- Switches off the greedy move land on the H8-best move 25/77 = 32% vs chance 29% (at chance).
+- Primary: IC +.051 [+.019,+.083] (sens +.009, ctrl -.041, control-driven), Silent +.023 [-.007,+.053]. Post hoc (outcome-aware amendment), outside every Holm family.
+Reading: in Qwen3-32B the reasoning trace produces most of the horizon response, both the extra long-horizon picks and most of the lost correct answers; a smaller control loss persists without it. Folded into the paper (results subsection, Table 3 row, Figures 2-3 row, Appendix B row, abstract, intro).
+
 ## 2026-10-05 - Amendment 8 submitted (Qwen3-32B thinking off, job 381029) + review-response analyses
 
 Job 381029 on gpu_h200_8 (1 GPU, 4 CPU, 24 h), `V3_MODEL=qwen3-32b-nothink`, cluster checkout 93e1593. Post hoc analyses (`tmp/review_analysis.py` on the login node, no GPU): per-model sensitive/control gains with bootstrap CIs, switches away from the H1-optimal move vs a uniform random non-greedy baseline, switched-answer card-type taxonomy, oracle heuristic baselines. Ops note: `nohup ... &` processes started over a non-interactive ssh session were killed when the session closed (empty outputs, no error) -> run long login-node analyses inside a held-open session or sbatch. Results folded into the paper when complete.

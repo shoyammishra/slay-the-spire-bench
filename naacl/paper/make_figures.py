@@ -25,9 +25,9 @@ plt.rcParams.update({'font.family': 'sans-serif', 'font.sans-serif': ['Arial', '
 
 NAMES = {'llama-3.1-8b': 'Llama-3.1-8B', 'mistral-7b': 'Mistral-7B', 'qwen2.5-7b': 'Qwen2.5-7B',
          'llama-3.3-70b-r2': 'Llama-3.3-70B', 'qwen3-8b': 'Qwen3-8B$^\\dagger$', 'qwen3-14b': 'Qwen3-14B',
-         'qwen3-32b': 'Qwen3-32B', 'gpt-oss-120b': 'gpt-oss-120b'}
+         'qwen3-32b': 'Qwen3-32B', 'qwen3-32b-nothink': 'Qwen3-32B (no think)', 'gpt-oss-120b': 'gpt-oss-120b'}
 ORDER = ['mistral-7b', 'qwen2.5-7b', 'llama-3.1-8b', 'qwen3-8b',
-         'llama-3.3-70b-r2', 'qwen3-14b', 'qwen3-32b', 'gpt-oss-120b']
+         'llama-3.3-70b-r2', 'qwen3-14b', 'qwen3-32b-nothink', 'qwen3-32b', 'gpt-oss-120b']
 
 
 def load(name):
@@ -61,7 +61,7 @@ def fig_example():
 def fig_use(summary, baselines):
     """Figure 2: how often the H=8-best move is chosen when told H=8 (arrow head), against the
     model's own H=1 answer (open circle) and a uniformly random legal move (dashed line)."""
-    fig, axes = plt.subplots(1, 2, figsize=(3.15, 2.35), sharey=True)
+    fig, axes = plt.subplots(1, 2, figsize=(3.15, 2.55), sharey=True)
     for ax, char in zip(axes, ('ironclad', 'silent')):
         rnd = baselines[f'{char}_sens']['random_legal_h8opt']
         ax.axvline(rnd, color=MUTED, lw=0.7, ls=(0, (2, 2)), zorder=0)
@@ -78,7 +78,7 @@ def fig_use(summary, baselines):
             else:
                 ax.scatter(c['use'], i, s=14, color=col, zorder=4)
             ax.scatter(c['base'], i, s=17, facecolor='white', edgecolor=MUTED, lw=0.9, zorder=3)
-        ax.axhspan(5.5, 7.5, color=BLUE, alpha=0.07, lw=0, zorder=0)
+        ax.axhspan(len(ORDER) - 2.5, len(ORDER) - 0.5, color=BLUE, alpha=0.07, lw=0, zorder=0)
         ax.set_title(char.capitalize(), fontsize=7.8, color=INK, pad=3, fontweight='bold')
         ax.set_xlim(0.04, 0.42)
         ax.set_xticks([0.1, 0.2, 0.3, 0.4])
@@ -88,8 +88,12 @@ def fig_use(summary, baselines):
         ax.set_ylim(-0.6, len(ORDER) - 0.4)
     axes[0].set_yticks(range(len(ORDER)))
     axes[0].set_yticklabels([NAMES[m] for m in ORDER], fontsize=7)
-    for t in axes[0].get_yticklabels()[6:]:
+    for t in axes[0].get_yticklabels()[-2:]:
         t.set_fontweight('bold')
+    for t in axes[0].get_yticklabels():
+        if 'no think' in t.get_text():
+            t.set_color(MUTED)
+            t.set_fontstyle('italic')
     handles = [Line2D([], [], ls='', marker='o', mfc='white', mec=MUTED, ms=4.5),
                Line2D([], [], color=BLUE, lw=1.4, marker='>', ms=4),
                Line2D([], [], color=GREY, lw=0.9, marker='>', ms=3.5)]
@@ -105,7 +109,7 @@ def fig_use(summary, baselines):
 def fig_churn(churn):
     """Figure 3: answer changes from H=1 to H=8, both characters, as a share of states.
     Blue (right): answers that became an H=8-best move. Orange (left): H=8-best answers given up."""
-    fig, axes = plt.subplots(1, 2, figsize=(3.15, 2.25), sharey=True)
+    fig, axes = plt.subplots(1, 2, figsize=(3.15, 2.45), sharey=True)
     for ax, kind, title in zip(axes, ('sens', 'ctrl'), ('Sensitive states', 'Control states')):
         for i, m in enumerate(ORDER):
             d = [churn[m][f'{c}_{kind}'] for c in ('ironclad', 'silent')]
@@ -119,7 +123,7 @@ def fig_churn(churn):
                 ax.text(gain + 1.3, i, f'{net:+.0f}', va='center', fontsize=6.2,
                         color=BLUE if net > 0 else ORANGE, fontweight='bold')
         ax.axvline(0, color=MUTED, lw=0.6)
-        ax.axhspan(5.5, 7.5, color=BLUE, alpha=0.07, lw=0, zorder=0)
+        ax.axhspan(len(ORDER) - 2.5, len(ORDER) - 0.5, color=BLUE, alpha=0.07, lw=0, zorder=0)
         ax.set_title(title, fontsize=7.8, color=INK, pad=3, fontweight='bold')
         ax.set_xlim(-36, 30)
         ax.set_xticks([-30, -15, 0, 15])
@@ -129,8 +133,12 @@ def fig_churn(churn):
         ax.set_ylim(-0.6, len(ORDER) - 0.4)
     axes[0].set_yticks(range(len(ORDER)))
     axes[0].set_yticklabels([NAMES[m] for m in ORDER], fontsize=7)
-    for t in axes[0].get_yticklabels()[6:]:
+    for t in axes[0].get_yticklabels()[-2:]:
         t.set_fontweight('bold')
+    for t in axes[0].get_yticklabels():
+        if 'no think' in t.get_text():
+            t.set_color(MUTED)
+            t.set_fontstyle('italic')
     handles = [plt.Rectangle((0, 0), 1, 1, color=ORANGE), plt.Rectangle((0, 0), 1, 1, color=BLUE)]
     fig.legend(handles, ['best move given up', 'best move found'], ncol=2, fontsize=6.4, frameon=False,
                loc='upper center', bbox_to_anchor=(0.56, 1.07), handlelength=1.2, columnspacing=1.2)
