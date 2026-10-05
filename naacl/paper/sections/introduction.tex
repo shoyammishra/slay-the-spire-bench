@@ -14,10 +14,10 @@ We test eight open-weight models from four families. Three findings stand out.
 \begin{itemize}
 \item \textbf{Only large reasoning models respond to the horizon.} Qwen3-32B and gpt-oss-120b choose the long-horizon move more often when told to look eight decisions ahead. Smaller models and models without explicit reasoning do not, including a 70-billion-parameter model.
 \item \textbf{Responding is not planning.} The responsive models give up the greedy move, but only about one time in three do they replace it with the correct long-horizon move. On control states they also abandon moves that were already right, so their scores do not improve.
-\item \textbf{The pattern is not about knowing the game.} A pre-registered test that supplies an exact rulebook leaves the picture unchanged, and so does a second test that replaces every card and enemy name with a code.
+\item \textbf{The pattern is not about knowing the game.} A pre-registered test that supplies an exact rulebook leaves the picture unchanged. So does a second test that replaces every card and enemy name with a code.
 \end{itemize}
 
-We make three contributions. The first is a controlled-horizon benchmark of 1,760 game states with an exact answer key at four horizons. The second is a protocol for building such benchmarks in any domain with a simulator, including scoring that a model cannot game by ignoring the instruction. The third is evidence that current models treat ``look further ahead'' as a cue to avoid the obvious answer, without optimizing for the horizon they were given. All analyses were frozen before the models ran, and every amendment is versioned. We release the states, the exact action values, the prompts and every model response.
+We make three contributions. The first is a controlled-horizon benchmark of 1,760 game states with an exact answer key at four horizons. The second is a protocol for building such benchmarks in any domain with a simulator, including scoring that a model cannot game by ignoring the instruction. The third is evidence that current models treat ``look further ahead'' as a cue to avoid the obvious answer. They do not optimize for the horizon they were given. All analyses were frozen before the models ran, and every amendment is versioned. We release the states, the exact action values, the prompts and every model response.
 
 \begin{figure}[t]
 \centering

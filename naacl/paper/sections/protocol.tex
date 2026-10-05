@@ -5,7 +5,7 @@
 
 \paragraph{Prompt.} The model sees the full state as JSON: its health, energy, hand, the enemy's health and intent, every pile in its exact order and the remaining combat counters. It is told to choose ``the next action that maximizes the stated utility after exactly $H$ decision transitions.'' Utility is damage dealt minus health lost, plus 1,000 for a win and minus 1,000 for a loss. It answers with one action in JSON. The prompts for different $H$ differ in that one number and nothing else, which we verify byte for byte.
 
-\paragraph{Oracle.} For each state and horizon, depth-limited exhaustive search over the simulator returns the exact value $v_H(a)$ of every legal first action $a$, assuming best play for the remaining $H-1$ decisions. We score an answer by its normalized value
+\paragraph{Oracle.} For each state and horizon, depth-limited exhaustive search over the simulator returns the exact value $v_H(a)$ of every legal first action $a$. This value assumes best play for the remaining $H-1$ decisions. We score an answer by its normalized value
 \[
 \eqh{H}(a) = \frac{v_H(a) - \min_{a'} v_H(a')}{\max_{a'} v_H(a') - \min_{a'} v_H(a')},
 \]
@@ -19,6 +19,6 @@ both answers judged by the eight-decision standard. A model that ignores $H$ giv
 
 \paragraph{Lookahead use.} We also count how often the $H{=}8$ answer is a best eight-decision move on sensitive states. We compare that rate with an \emph{H-blind baseline}: the same rate for the model's own $H{=}1$ answer. A model that ignores $H$ matches its baseline exactly, and McNemar's exact test \citep{mcnemar1947} compares the two. We also report the \emph{greedy rate}, the share of answers that are best only at $H{=}1$.
 
-\paragraph{Validity gates.} A model's run counts as confirmatory only if two conditions hold. At most 1\% of its answers were cut off by the 16,000-token output limit, and at most 2\% of states lost an answer to an execution failure. Runs that fail a gate are reported but do not enter any confirmatory test.
+\paragraph{Validity gates.} A model's run counts as confirmatory only if two conditions hold. First, at most 1\% of its answers were cut off by the 16,000-token output limit. Second, at most 2\% of states lost an answer to an execution failure. Runs that fail a gate are reported but do not enter any confirmatory test.
 
 \paragraph{Pre-registration.} The states, prompts, scoring code, gates and analysis plan were frozen and fingerprinted before any model was run. Adding a model, a condition or a serving flag required a versioned amendment that may only add, never change. Appendix~\ref{app:amendments} lists every amendment. Analyses not in the frozen plan are labeled post hoc.
