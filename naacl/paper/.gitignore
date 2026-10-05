@@ -8,3 +8,5 @@
 page-*.png
 figures/*.png
 build.log
+*.fls
+*.fdb_latexmk
