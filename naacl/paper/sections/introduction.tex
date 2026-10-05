@@ -22,6 +22,6 @@ We make three contributions. The first is a controlled-horizon benchmark of 1,76
 \begin{figure}[t]
 \centering
 \includegraphics[width=\columnwidth]{figures/example.pdf}
-\caption{One state from the benchmark (Ironclad against the Slime Boss, 2 energy). Bars give the exact value of each legal move, found by exhaustive search. With a one-decision goal, Pommel Strike deals the most damage now. With an eight-decision goal, Bash is best. It applies \emph{Vulnerable}, so every later attack deals 50\% more damage. The state, the moves and the scoring rule are identical in both prompts. Only $H$ changes.}
+\caption{One state from the benchmark (Ironclad against the Slime Boss, 2 energy). The boss is \emph{Vulnerable}, taking 50\% more damage, for one more turn. Bars give the exact value of each legal move, found by exhaustive search. With a one-decision goal, Pommel Strike deals the most damage now. With an eight-decision goal, Bash is best. It deals slightly less now but extends Vulnerable, so the attacks of the next turns keep their bonus. The state, the moves and the scoring rule are identical in both prompts. Only $H$ changes.}
 \label{fig:example}
 \end{figure}
