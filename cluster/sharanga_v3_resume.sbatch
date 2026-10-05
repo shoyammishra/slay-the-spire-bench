@@ -20,7 +20,7 @@ set -u
 readonly MODEL="${V3_MODEL:?set V3_MODEL}"
 readonly COND="${V3_CONDITION:-base}"
 readonly ACCEPT="${V3_ACCEPT_LOST:?set V3_ACCEPT_LOST to the inspected row indices}"
-case "$MODEL" in qwen3-8b|qwen3-14b|llama-3.1-8b|deepseek-r1-distill-14b|qwen2.5-7b|mistral-7b|qwen3-32b|llama-3.3-70b|llama-3.3-70b-r2|gpt-oss-120b) ;; *) echo "unknown model"; exit 2 ;; esac
+case "$MODEL" in qwen3-8b|qwen3-14b|llama-3.1-8b|deepseek-r1-distill-14b|qwen2.5-7b|mistral-7b|qwen3-32b|llama-3.3-70b|llama-3.3-70b-r2|gpt-oss-120b|qwen3-32b-nothink) ;; *) echo "unknown model"; exit 2 ;; esac
 export HF_HOME="${HF_HOME:-/scratch/${USER}/hf}" HF_HUB_OFFLINE=1 TRANSFORMERS_OFFLINE=1
 export PYTHONUNBUFFERED=1 PYTHONIOENCODING=utf-8
 

@@ -138,6 +138,24 @@ def test_amendment7_pins_tp2_serving_fix_for_the_70b_rerun_only():
         assert 'llama-3.3-70b-r2' in (ROOT / f).read_text(encoding='utf-8')
 
 
+def test_amendment8_switches_thinking_off_for_one_model_only():
+    """Amendment 8: same Qwen3-32B checkpoint, enable_thinking=false; nothing else changes."""
+    cfg, _ = inf.load_config()
+    assert 'qwen3-32b-nothink' in cfg['inference']['authorized_models']
+    on, off = (cfg['inference']['models'][m] for m in ('qwen3-32b', 'qwen3-32b-nothink'))
+    assert (on['repository'], on['revision']) == (off['repository'], off['revision'])
+    msgs = [dict(role='user', content='x')]
+    assert inf.request_payload(cfg, 'qwen3-32b-nothink', msgs)['chat_template_kwargs'] == {'enable_thinking': False}
+    for other in ('qwen3-32b', 'qwen3-14b', 'gpt-oss-120b'):
+        assert inf.request_payload(cfg, other, msgs)['chat_template_kwargs'] == {'enable_thinking': True}
+    a, b = (inf.request_payload(cfg, m, msgs) for m in ('qwen3-32b', 'qwen3-32b-nothink'))
+    strip = lambda d: {k: v for k, v in d.items() if k not in ('model', 'chat_template_kwargs')}
+    assert strip(a) == strip(b)
+    assert inf.server_command(cfg, 'qwen3-32b', 1)[:6] == inf.server_command(cfg, 'qwen3-32b-nothink', 1)[:6]
+    for f in ('cluster/sharanga_v3_inference.sbatch', 'cluster/sharanga_v3_resume.sbatch'):
+        assert 'qwen3-32b-nothink' in (ROOT / f).read_text(encoding='utf-8')
+
+
 def test_v3_inference_runner_is_outside_the_frozen_code_receipt():
     from scripts.controlled_horizon_confirmatory import code_receipt
     assert not any('heldout_v3' in p for p in code_receipt())

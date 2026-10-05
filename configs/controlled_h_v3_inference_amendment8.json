@@ -1,0 +1,23 @@
+{
+  "amendment_id": "controlled-h-v3-amendment-8-qwen3-32b-thinking-off-2026-10-05",
+  "amends_protocol_digest": "697011782709a76095ea705dab1ee1e862891b9bd7f717a4f0221075c28b8ef2",
+  "status": "frozen 2026-10-05, before any thinking-off query was sent",
+  "decision": "user 2026-10-05: test whether the reasoning trace causes the H response (external review concern 3) by running the same Qwen3-32B checkpoint with thinking switched off",
+  "add_models": {
+    "qwen3-32b-nothink": {
+      "repository": "Qwen/Qwen3-32B",
+      "revision": "9216db5781bf21249d130ec9da846c4624c16137",
+      "family": "Qwen3",
+      "thinking": false,
+      "enable_thinking": false,
+      "hardware_note": "1x H200 141GB (gpu_h200_8, TP=1), BF16, as the Amendment-3 qwen3-32b run"
+    }
+  },
+  "unchanged": "checkpoint and revision (identical to Amendment 3 qwen3-32b), fixtures, prompts, horizons {1,2,4,8}, greedy decoding (temperature 0, seed 42), max_tokens 16000, pinned stack (vLLM 0.8.5.post1 / Transformers 4.51.3), gates, analyses",
+  "planned_comparison": "descriptive within-checkpoint contrast against qwen3-32b (thinking on): lookahead use vs H-blind baseline at H8 (McNemar, as pre-registered for every model), the primary DiD, and the sensitive-state choice breakdown. Not part of any pre-registered Holm family.",
+  "disclosures": [
+    "The only change from qwen3-32b is chat_template_kwargs.enable_thinking=false (Qwen3's documented non-thinking mode).",
+    "Qwen recommends temperature 0.7 for non-thinking mode; we keep the protocol's greedy decoding so the two runs differ in one variable.",
+    "Frozen after the thinking-on qwen3-32b results were known (outcome-aware); reported as a post hoc mechanism test."
+  ]
+}

@@ -42,7 +42,8 @@ AMENDMENTS = {'configs/controlled_h_v3_inference_amendment1.json': 'bac116c3e1d7
               'configs/controlled_h_v3_inference_amendment3.json': '6eb87256470c742db1174706480ddc6f65b17e21ac5f6f9960e5819b7a8c19d4',
               'configs/controlled_h_v3_inference_amendment4.json': '899adb8313cbba0228fe79f10d9b256f80d0a0b0a09456e65e4a0e9cd18abf86',
               'configs/controlled_h_v3_inference_amendment5.json': '6b212296a3dde6c498bae73510e354d7255c941a0728b1d0a7af19a41149f49e',
-              'configs/controlled_h_v3_inference_amendment7.json': 'eaa20e7d6a2bc304ae40109835f5b3e80d3b8e28cfc5a3405adca61aa201ed16'}
+              'configs/controlled_h_v3_inference_amendment7.json': 'eaa20e7d6a2bc304ae40109835f5b3e80d3b8e28cfc5a3405adca61aa201ed16',
+              'configs/controlled_h_v3_inference_amendment8.json': '33d68bddaccecce61ddc9e56e4206597f1e1c19085217ab630472aae660a068d'}
 # Prompt conditions beyond the base protocol (name -> (amendment path, frozen digest)).
 CONDITIONS = {'defined': ('configs/controlled_h_v3_inference_amendment2.json',
                           'eadf64f3cea0c40497855b24b9547deca57adeb89de4aa9a79fa55ad89378e67')}
@@ -223,11 +224,16 @@ def contract_matches(saved, current, strict):
     return strip(saved) == strip(current)
 
 
+def thinking(cfg, model):
+    """enable_thinking for this model; an amendment may switch it off for one model (Amendment 8)."""
+    return model_spec(cfg, model).get('enable_thinking', cfg['inference']['enable_thinking'])
+
+
 def request_payload(cfg, model, messages):
     inf = cfg['inference']
     return dict(model=model, messages=messages, max_tokens=inf['max_tokens'],
                 temperature=inf['temperature'], top_p=inf['top_p'], top_k=inf['top_k'],
-                seed=inf['seed'], chat_template_kwargs={'enable_thinking': inf['enable_thinking']})
+                seed=inf['seed'], chat_template_kwargs={'enable_thinking': thinking(cfg, model)})
 
 
 def messages(query, prompts):
@@ -376,7 +382,7 @@ def run(args, cfg, digest):
                     continue
                 v = http_json(base + '/tokenize', dict(model=args.model, messages=messages(q, ctx[3]),
                               add_generation_prompt=True,
-                              chat_template_kwargs={'enable_thinking': inf['enable_thinking']}))
+                              chat_template_kwargs={'enable_thinking': thinking(cfg, args.model)}))
                 if v['count'] + inf['max_tokens'] > inf['max_model_len']:
                     raise ValueError('prompt plus output allowance exceeds context')
                 tokens[q['index']] = v['count']
