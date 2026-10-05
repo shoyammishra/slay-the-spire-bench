@@ -1,0 +1,88 @@
+\section{Pre-registration, Amendments and Models}
+\label{app:amendments}
+
+The base protocol (states, prompts, scoring, gates, analysis) was frozen with a fingerprint before any model was run. Seven amendments followed, each frozen before the run it covers. Each may only add a model, a prompt condition or a serving flag.
+\begin{enumerate}
+\item Adds Llama-3.1-8B and DeepSeek-R1-Distill-Qwen-14B. The latter was excluded when only 2 of its first 8 answers fit in the 16,000-token budget.
+\item Adds a prompt condition that defines ``decision transition'' explicitly. It made no significant difference for Llama-3.1-8B or Qwen3-14B.
+\item Adds Mistral-7B, Qwen2.5-7B and Qwen3-32B, and the comparison with earlier full-game scores.
+\item Adds Llama-3.3-70B in FP8 across two GPUs.
+\item Adds gpt-oss-120b on its own serving stack (vLLM 0.10.2, Transformers 4.56.2), which its architecture requires.
+\item Adds the described and renamed conditions on the 1,169 states without targeted skill cards.
+\item Reruns Llama-3.3-70B with vLLM's custom all-reduce disabled. The first attempt crashed before producing any answer, and its records are kept but never analyzed.
+\end{enumerate}
+Every other model runs on vLLM 0.8.5.post1 with Transformers 4.51.3. Pinned revisions (first ten hex digits): Mistral-7B-Instruct-v0.3 \texttt{c170c708c4}, Qwen2.5-7B-Instruct \texttt{a09a35458c}, Llama-3.1-8B-Instruct \texttt{0e9e39f249}, Llama-3.3-70B-Instruct \texttt{6f6073b423}, Qwen3-8B \texttt{b968826d9c}, Qwen3-14B \texttt{40c069824f}, Qwen3-32B \texttt{9216db5781}, gpt-oss-120b \texttt{b5c939de8f}. Seven queries of Qwen3-32B were lost when a shared filesystem filled up mid-run. They are recorded as failures and never retried, which leaves the run well inside the 2\% gate.
+
+\section{Lookahead Use at Every Horizon}
+\label{app:curves}
+
+\begin{table*}[t]
+\centering
+\small
+\begin{tabular}{@{}lcccccc@{}}
+\toprule
+& \multicolumn{3}{c}{Ironclad} & \multicolumn{3}{c}{Silent} \\
+\cmidrule(lr){2-4}\cmidrule(l){5-7}
+Model & $H{=}2$ & $H{=}4$ & $H{=}8$ & $H{=}2$ & $H{=}4$ & $H{=}8$ \\
+\midrule
+Mistral-7B & .07/.07 & .11/.09 & .17/.14 & .06/.06 & .11/.09 & .11/.10 \\
+Qwen2.5-7B & .15/.15 & .18/.19 & .20/.21 & .13/.14 & .22/.23 & .26/.27 \\
+Llama-3.1-8B & .14/.15 & .22/.21 & .23/.23 & .13/.13 & .19/.20 & .27/.27 \\
+Llama-3.3-70B & .17/.16 & .23/.27 & .23/.25 & .10/.07 & .27/.24 & .26/.27 \\
+Qwen3-8B$^\dagger$ & .19/.18 & .23/.26 & .29/.29 & .13/.12 & .24/.27 & .28/.28 \\
+Qwen3-14B & .18/.20 & .28/.27 & .29/.25 & .15/.14 & .26/.22 & .30/.29 \\
+Qwen3-32B & .19/.13$^*$ & .25/.20 & .28/.22$^*$ & .12/.15 & .30/.23 & .30/.19$^*$ \\
+gpt-oss-120b & .25/.15$^*$ & .29/.23 & .36/.25$^*$ & .20/.14 & .28/.18$^*$ & .30/.21$^*$ \\
+\bottomrule
+\end{tabular}
+\caption{Use rate / H-blind baseline on states where the best move at $H$ differs from the best at $H{=}1$. $^*$Use above baseline, McNemar $p<.05$. $^\dagger$Failed the truncation gate.}
+\label{tab:curves}
+\end{table*}
+
+Table~\ref{tab:curves} gives the use rate and the H-blind baseline at $H \in \{2,4,8\}$. No model without explicit reasoning, and neither of the two smaller Qwen3 models, exceeds its baseline at any horizon.
+
+\section{Robustness}
+\label{app:robust}
+
+\begin{table*}[t]
+\centering
+\small
+\begin{tabular}{@{}lcccccc@{}}
+\toprule
+& \multicolumn{3}{c}{Ironclad} & \multicolumn{3}{c}{Silent} \\
+\cmidrule(lr){2-4}\cmidrule(l){5-7}
+Model & all & leave one encounter out & w/o targeted skills & all & leave one encounter out & w/o targeted skills \\
+\midrule
+Mistral-7B & +0.013 & [-0.004, +0.030] & +0.019 & +0.033 & [+0.023, +0.042] & +0.051 \\
+Qwen2.5-7B & -0.001 & [-0.008, +0.003] & +0.000 & -0.014 & [-0.018, -0.011] & -0.007 \\
+Llama-3.1-8B & +0.003 & [-0.000, +0.006] & -0.001 & -0.000 & [-0.003, +0.002] & +0.003 \\
+Llama-3.3-70B & +0.016 & [+0.007, +0.025] & +0.032 & +0.001 & [-0.011, +0.009] & -0.006 \\
+Qwen3-8B$^\dagger$ & -0.031 & [-0.055, -0.002] & -0.044 & +0.018 & [-0.006, +0.036] & +0.001 \\
+Qwen3-14B & +0.100 & [+0.084, +0.120] & +0.093 & +0.005 & [-0.007, +0.018] & +0.018 \\
+Qwen3-32B & +0.125 & [+0.105, +0.151] & +0.127 & +0.045 & [+0.021, +0.057] & +0.054 \\
+gpt-oss-120b & +0.155 & [+0.134, +0.172] & +0.144 & +0.074 & [+0.058, +0.089] & +0.078 \\
+\bottomrule
+\end{tabular}
+\caption{Primary statistic on all states, its range when each of the five encounters is left out in turn, and its value without the 591 states holding a targeted skill card. Post hoc.}
+\label{tab:robust}
+\end{table*}
+
+Table~\ref{tab:robust} reports two post hoc checks. Every state comes from one of five encounters, so we recompute the primary statistic leaving each encounter out in turn. We also drop the 591 states holding a targeted skill card, which the oracle treats as having no effect on enemies. No sign changes for any model with a confirmatory result, and every rejected effect stays well away from zero.
+
+\section{Engine Differences from the Commercial Game}
+\label{app:engine}
+
+The simulator implements the game's combat rules for two characters and the encounters used here. It is not a bit-exact clone. Differences that touch these states include the following.
+\begin{itemize}
+\item Some card values differ: Fiend Fire deals 6 per exhausted card, and Flame Barrier gives 8 block.
+\item Metallicize grants its block at the start of the next turn.
+\item Played power cards return to the discard pile and can be played again.
+\item Choices that the game leaves to the player inside a card (which card to discard or exhaust) are made automatically by a fixed rule.
+\item Lagavulin wakes when the player's health drops below its maximum. Slime Boss and Hexaghost follow fixed move cycles.
+\end{itemize}
+The described condition states our simulator's rules exactly, and the knowledge results hold under it. A complete list ships with the code.
+
+\section{Prompt}
+\label{app:prompt}
+
+The system prompt names the character and fixes the JSON answer format. The user prompt gives the state as JSON, followed by a full-observability block with every pile in order and the simulator counters. It ends with the only line that changes across horizons: ``Choose the next action that maximizes the stated utility after exactly $H$ decision transitions. Utility is enemy HP lost minus player HP lost, plus 1000 for a win and minus 1000 for a loss.'' The described condition inserts the effect reference immediately before that line. The renamed condition also replaces every proper name with a neutral code and rewrites the system prompt's first sentence as ``You are an expert player of a deterministic deck-building card game.'' Complete prompts for every condition are in the release.

@@ -1,0 +1,12 @@
+\section{Related Work}
+\label{sec:related}
+
+\paragraph{Planning benchmarks.} PlanBench checks plans exactly against symbolic domains \citep{valmeekam2023planbench}, and follow-up work finds that even reasoning models solve few of its harder instances \citep{valmeekam2024o1,kambhampati2024position}. NATURAL PLAN and TravelPlanner pose realistic planning tasks in natural language \citep{zheng2024naturalplan,xie2024travelplanner}. These benchmarks vary problem length together with problem content. We hold the problem fixed and vary only the horizon, which isolates whether a model uses it.
+
+\paragraph{Games as agent benchmarks.} GameBench, BALROG, AgentBench and Orak evaluate agents across many games or environments and score episode outcomes \citep{costarelli2024gamebench,paglieri2025balrog,liu2024agentbench,park2025orak}. Such scores combine rule knowledge, tactics and long-range planning. Our test trades breadth for an exact answer key per horizon.
+
+\paragraph{Language models and this game.} Bateni and Whitehead studied language-model play in a reimplementation of the same game and found that changing card names affects play \citep{bateni2024language}. Later work measured how well models judge card synergies \citep{kim2025synergy}, and Orak includes the commercial game in its suite \citep{park2025orak}. We use the game for a different purpose: as a source of states where a short and a long horizon disagree, with exact values for both. Our renaming condition extends their observation to horizon use.
+
+\paragraph{Reasoning and lookahead.} Explicit intermediate reasoning improves many tasks \citep{wei2022cot}, and search over reasoning paths can help with problems that need lookahead \citep{yao2023tot}. Reasoning models are trained to think longer before answering \citep{deepseek2025r1,yang2025qwen3,openai2025gptoss}. Our results suggest that longer thinking makes a model respond to a stated horizon without making it optimize for that horizon.
+
+\paragraph{Shortcuts.} Benchmarks can be solved by shortcuts that sidestep the intended skill \citep{geirhos2020shortcut}. Our scoring removes the shortcut of ignoring the instruction, and our control states separate real lookahead from a generic reaction to longer instructions.

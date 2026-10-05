@@ -1,0 +1,40 @@
+\section{The Game in One Page}
+\label{sec:game}
+
+The test is built on \emph{Slay the Spire}, a single-player card game. No knowledge of the game is needed to follow this paper. Table~\ref{tab:glossary} defines every game term we use.
+
+\paragraph{How a fight works.} The player fights one or more enemies. Each turn the player draws cards and has 3 energy to spend. Every card costs energy and does one thing: deal damage, gain \emph{block} that absorbs damage, or apply an effect that changes later turns. When the player ends the turn, each enemy acts. Enemies announce their next move in advance, so the player can see an attack coming. The fight ends when one side runs out of health.
+
+\paragraph{Why it is a planning problem.} Many cards pay off later. \emph{Vulnerable} makes an enemy take 50\% more damage for several turns, so applying it first and attacking afterwards beats attacking twice. Poison deals damage every turn rather than at once. Block spent now can save more health than damage dealt now. A player who only maximizes the next move plays a different game from a player who looks ahead, and the difference is measurable.
+
+\paragraph{Why a reimplementation.} We use a Python reimplementation of the game's combat with seeded random streams. Our oracle copies the state and searches every line of play, up to two million positions per state and horizon. The commercial game cannot do this, because it runs on the Java virtual machine behind a modding interface with no cheap state copying. The reimplementation gives exact replay, a license-clean release and fully reproducible states. Appendix~\ref{app:engine} lists where its rules differ from the commercial game.
+
+\begin{table}[t]
+\centering
+\small
+\setlength{\tabcolsep}{4pt}
+\begin{tabular}{@{}p{0.29\columnwidth}p{0.64\columnwidth}@{}}
+\toprule
+Term & Meaning \\
+\midrule
+Card & One action the player can take, at a cost in energy \\
+Energy & Budget per turn (3), lost if unspent \\
+Hand, draw pile & Cards playable now, and cards still to come in a known order \\
+Block & A shield that absorbs damage until the owner's next turn \\
+Intent & The enemy's announced next move, e.g.\ ``attack for 12'' \\
+Strength & Each point adds 1 damage to every hit \\
+Vulnerable & The target takes 50\% more attack damage \\
+Weak & The attacker deals 25\% less attack damage \\
+Poison & The target loses that much health each turn, then 1 less \\
+Ironclad, Silent & The two playable characters, with different cards \\
+\midrule
+Decision & One choice: play one card, or end the turn \\
+Horizon $H$ & How many decisions ahead the goal is measured \\
+Oracle & Exhaustive search giving the exact value of every move \\
+Sensitive state & The best move at $H{=}1$ differs from the best at $H{=}8$ \\
+Control state & The best move is the same at $H{=}1$ and $H{=}8$ \\
+\bottomrule
+\end{tabular}
+\caption{Game and protocol terms. The lower block is ours.}
+\label{tab:glossary}
+\end{table}

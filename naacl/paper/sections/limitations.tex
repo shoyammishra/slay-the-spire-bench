@@ -1,0 +1,10 @@
+\section*{Limitations}
+\label{sec:limits}
+
+\paragraph{One domain and open models.} All states come from one game, and we test open-weight models only. Closed models may behave differently. Section~\ref{sec:recipe} describes how to build the same test elsewhere.
+
+\paragraph{Simulator and oracle.} The reimplementation approximates the commercial game, and some rules differ (Appendix~\ref{app:engine}). The oracle values moves under our simulator's rules, which the prompt states in full in the described condition. The interface plays every non-attack card without a target, so seven targeted skill cards have no effect on enemies in the oracle. 591 states contain one. Removing them changes no conclusion (Appendix~\ref{app:robust}), and the knowledge conditions use only the remaining states.
+
+\paragraph{Scope of the knowledge test.} The described and renamed conditions cover two models and the 1,169 unaffected states. gpt-oss exceeded the truncation gate in the renamed condition, so that contrast is descriptive.
+
+\paragraph{Confounds between models.} Llama-3.1-8B and Llama-3.3-70B differ in post-training as well as size, and the 70B model runs in FP8. gpt-oss runs on a newer serving stack, which its architecture requires. Some runs used H200 rather than H100 GPUs. Greedy decoding gives one answer per query. The breakdown of answers by class (Figure~\ref{fig:decomp}) and the robustness analyses were not pre-registered.

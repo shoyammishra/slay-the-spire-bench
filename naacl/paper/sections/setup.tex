@@ -1,0 +1,28 @@
+\section{Models and Setup}
+\label{sec:setup}
+
+We test eight open-weight models from four families (Table~\ref{tab:models}). Four reason explicitly before answering: Qwen3 at 8B, 14B and 32B parameters with thinking enabled \citep{yang2025qwen3}, and gpt-oss-120b \citep{openai2025gptoss}. Four answer directly: Llama-3.1-8B and Llama-3.3-70B \citep{dubey2024llama}, Mistral-7B \citep{jiang2023mistral} and Qwen2.5-7B \citep{qwen2025qwen25}. Open weights let us pin every model to an exact revision and serving stack, so every number in this paper can be regenerated.
+
+All models are served with vLLM \citep{kwon2023vllm} and decoded greedily (temperature 0, fixed seed) with a 16,000-token output budget in a 32,768-token context. Each model answers all 1,760 states at all four horizons, 7,040 queries, in a counterbalanced order. No query is ever retried. A query lost to an infrastructure failure is recorded as a failure.
+
+\begin{table}[t]
+\centering
+\small
+\setlength{\tabcolsep}{3.5pt}
+\begin{tabular}{@{}llcc@{}}
+\toprule
+Model & Family & Reasons & Weights \\
+\midrule
+Mistral-7B-Instruct-v0.3 & Mistral & no & BF16 \\
+Qwen2.5-7B-Instruct & Qwen & no & BF16 \\
+Llama-3.1-8B-Instruct & Llama & no & BF16 \\
+Llama-3.3-70B-Instruct & Llama & no & FP8 \\
+Qwen3-8B & Qwen & yes & BF16 \\
+Qwen3-14B & Qwen & yes & BF16 \\
+Qwen3-32B & Qwen & yes & BF16 \\
+gpt-oss-120b & OpenAI & yes & MXFP4 \\
+\bottomrule
+\end{tabular}
+\caption{Models. MXFP4 is gpt-oss's released precision. FP8 lets the 70B model fit two GPUs. Revisions and serving stacks are pinned in Appendix~\ref{app:amendments}.}
+\label{tab:models}
+\end{table}

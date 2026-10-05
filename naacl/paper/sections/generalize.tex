@@ -1,0 +1,11 @@
+\section{A Recipe for Any Domain}
+\label{sec:recipe}
+
+Nothing in the protocol depends on cards. It needs four ingredients, and many domains supply all four.
+\begin{enumerate}
+\item \textbf{A deterministic simulator with copyable state}, so that every line of play can be replayed.
+\item \textbf{An objective indexed by a horizon}, so that the same state has a best move for each $H$, found exactly or with a certified bound.
+\item \textbf{Natural states where the horizon changes the answer}, selected without looking at any model, plus controls where it does not.
+\item \textbf{Scoring that is invariant to ignoring $H$}: judge the short- and long-horizon answers by the same long-horizon standard, so a model gets credit only for changing its choice.
+\end{enumerate}
+Chess endgames come with tablebases that give exact values at every depth. Sokoban and other sliding puzzles have exact solvers. Inventory, scheduling and routing simulators trade cost now against cost later. Tool-using agents in a sandboxed environment can be scored after a fixed number of steps. In each case the same construction yields a controlled test of lookahead, with the same guard against a model scoring by ignoring the instruction. We release our generator, oracle and analysis code as a template for these extensions.
