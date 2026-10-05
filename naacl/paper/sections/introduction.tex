@@ -12,16 +12,16 @@ We chose a card game because it is a rare domain where all of this is possible a
 
 We test eight open-weight models from four families. Three findings stand out.
 \begin{itemize}
-\item \textbf{Only large reasoning models respond to the horizon.} Qwen3-32B and gpt-oss-120b choose the long-horizon move more often when told to look eight decisions ahead. Smaller models and models without explicit reasoning do not, including a 70-billion-parameter model.
-\item \textbf{Responding is not planning.} The responsive models give up the greedy move, but only about one time in three do they replace it with the correct long-horizon move. On control states they also abandon moves that were already right, so their scores do not improve.
-\item \textbf{The pattern is not about knowing the game.} A pre-registered test that supplies an exact rulebook leaves the picture unchanged. So does a second test that replaces every card and enemy name with a code.
+\item \textbf{Three tiers of response.} Small models ignore the horizon. Larger models abandon the obvious move when told to look ahead, including a 70-billion-parameter model that does not reason step by step. Only Qwen3-32B and gpt-oss-120b also choose the long-horizon move more often than they do at $H{=}1$.
+\item \textbf{Responding is not planning.} Even these two models do not get better on average. They find the long-horizon move on some states and give up correct answers on others. Where the obvious move was already right, they lose ground.
+\item \textbf{Knowledge does not explain it.} A pre-registered test that supplies an exact rulebook does not remove the pattern. Neither does a test that replaces every card and enemy name with a code.
 \end{itemize}
 
-We make three contributions. The first is a controlled-horizon benchmark of 1,760 game states with an exact answer key at four horizons. The second is a protocol for building such benchmarks in any domain with a simulator, including scoring that a model cannot game by ignoring the instruction. The third is evidence that current models treat ``look further ahead'' as a cue to avoid the obvious answer. They do not optimize for the horizon they were given. All analyses were frozen before the models ran, and every amendment is versioned. We release the states, the exact action values, the prompts and every model response.
+We make three contributions. The first is a controlled-horizon benchmark of 1,760 game states with an exact answer key at four horizons. The second is a protocol for building such benchmarks in any domain with a simulator, including scoring that a model cannot game by ignoring the instruction. The third is evidence that current models treat ``look further ahead'' as a cue to change their answer. They do not optimize for the horizon they were given. All analyses were frozen before the models ran, and every amendment is versioned. We release the states, the exact action values, the prompts and every model response.
 
 \begin{figure}[t]
 \centering
 \includegraphics[width=\columnwidth]{figures/example.pdf}
-\caption{One state from the benchmark (Ironclad against the Slime Boss, 2 energy). The boss is \emph{Vulnerable}, taking 50\% more damage, for one more turn. Bars give the exact value of each legal move, found by exhaustive search. With a one-decision goal, Pommel Strike deals the most damage now. With an eight-decision goal, Bash is best. It deals slightly less now but extends Vulnerable, so the attacks of the next turns keep their bonus. The state, the moves and the scoring rule are identical in both prompts. Only $H$ changes.}
+\caption{One state from the benchmark (Ironclad against the Slime Boss, 2 energy). The boss is \emph{Vulnerable}, taking 50\% more damage, for one more turn. Bars give the exact value of each legal move, found by exhaustive search. With a one-decision goal, Pommel Strike deals the most damage now (orange, the greedy move). With an eight-decision goal, Bash is best (blue). The same two colours mark these two kinds of move in every figure. It deals slightly less now but extends Vulnerable, so the attacks of the next turns keep their bonus. The state, the moves and the scoring rule are identical in both prompts. Only $H$ changes.}
 \label{fig:example}
 \end{figure}

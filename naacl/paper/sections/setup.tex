@@ -1,7 +1,7 @@
 \section{Models and Setup}
 \label{sec:setup}
 
-We test eight open-weight models from four families (Table~\ref{tab:models}). Four reason explicitly before answering: Qwen3 at 8B, 14B and 32B parameters with thinking enabled \citep{yang2025qwen3}, and gpt-oss-120b \citep{openai2025gptoss}. Four answer directly: Llama-3.1-8B and Llama-3.3-70B \citep{dubey2024llama}, Mistral-7B \citep{jiang2023mistral} and Qwen2.5-7B \citep{qwen2025qwen25}. Open weights let us pin every model to an exact revision and serving stack, so every number in this paper can be regenerated.
+We test eight open-weight models from four families (Table~\ref{tab:models}). Four reason explicitly before answering: Qwen3 at 8B, 14B and 32B parameters with thinking enabled \citep{yang2025qwen3}, and gpt-oss-120b \citep{openai2025gptoss} at its default reasoning effort (medium). Four answer directly: Llama-3.1-8B and Llama-3.3-70B \citep{dubey2024llama}, Mistral-7B \citep{jiang2023mistral} and Qwen2.5-7B \citep{qwen2025qwen25}. Open weights let us pin every model to an exact revision and serving stack, so every number in this paper can be regenerated.
 
 All models are served with vLLM \citep{kwon2023vllm} and decoded greedily (temperature 0, fixed seed) with a 16,000-token output budget in a 32,768-token context. Each model answers all 1,760 states at all four horizons, 7,040 queries, in a counterbalanced order. No query is ever retried. A query lost to an infrastructure failure is recorded as a failure.
 

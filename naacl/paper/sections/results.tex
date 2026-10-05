@@ -1,86 +1,96 @@
 \section{Results}
 \label{sec:results}
 
-Seven of the eight runs pass both validity gates. Qwen3-8B cut off 4.0\% of its answers at the token limit, so its numbers are descriptive only.
+Seven of the eight runs pass both validity gates. Qwen3-8B cut off 4.0\% of its answers at the token limit, so its numbers are descriptive only. The models fall into three tiers.
 
-\subsection{Only large reasoning models respond to the horizon}
+\subsection{Three tiers of response}
 
-Figure~\ref{fig:use} shows, for each model, how often its answer is a best eight-decision move on sensitive states, next to its H-blind baseline. For six of the eight models the two numbers coincide. Telling them to look eight decisions ahead does not move their answers toward the long-horizon move. This holds at every horizon we tested (Appendix~\ref{app:curves}). Qwen3-32B and gpt-oss-120b are the exceptions. On both characters, their $H{=}8$ answers hit the long-horizon move far more often than their own $H{=}1$ answers do. For gpt-oss the rates are .36 against .25 (Ironclad) and .31 against .21 (Silent). For Qwen3-32B they are .28 against .22 and .30 against .19. McNemar's test gives $p \le .026$ in all four cases.
+\paragraph{Small models do not react.} Llama-3.1-8B and Qwen2.5-7B give nearly the same answer whatever horizon they are told, changing 48 and 59 of their 1,760 answers between $H{=}1$ and $H{=}8$. Mistral-7B changes 307, mostly from illegal answers to legal ones. Qwen3-8B changes more than half of its answers, but its changes run in no direction. It gains about as many best moves as it loses, on both kinds of state (Figure~\ref{fig:churn}).
 
-Size alone does not produce this. Llama-3.3-70B has more than twice the parameters of Qwen3-32B and no explicit reasoning, and its use rate sits at its baseline on both characters. Within one family the effect grows with scale: Qwen3-8B does not respond, Qwen3-14B moves slightly but stays within its baseline, and Qwen3-32B responds clearly.
+\paragraph{Larger models leave the greedy move.} Llama-3.3-70B and Qwen3-14B abandon the greedy move often when told $H{=}8$. On the 880 sensitive states, Llama-3.3-70B plays it 425 times at $H{=}1$ and 351 times at $H{=}8$, and Qwen3-14B goes from 378 to 252. Neither picks the long-horizon move more often than its own $H{=}1$ answer does (Figure~\ref{fig:use}). Reacting to the horizon does not require explicit reasoning, since Llama-3.3-70B does not reason step by step.
+
+\paragraph{Two models also find the long-horizon move.} Qwen3-32B and gpt-oss-120b choose a best eight-decision move more often at $H{=}8$ than at $H{=}1$, on both characters. For gpt-oss the rates are 36\% against 25\% (Ironclad) and 31\% against 21\% (Silent). For Qwen3-32B they are 28\% against 22\% and 30\% against 19\%. McNemar's test gives $p \le .026$ in all four cases, and the gap holds at every horizon we tested (Appendix~\ref{app:curves}). For comparison, a random legal move is a best eight-decision move 24\% of the time.
 
 \begin{figure}[t]
 \centering
 \includegraphics[width=\columnwidth]{figures/use_vs_baseline.pdf}
-\caption{How often each model picks the best eight-decision move on sensitive states when told $H{=}8$ (filled), against its H-blind baseline (open), which is its own $H{=}1$ answer judged by the same standard. A model that ignores $H$ sits on its baseline. $^*$McNemar $p<.05$. $^\dagger$Failed the truncation gate, so descriptive only.}
+\caption{How often each model picks the best eight-decision move on sensitive states. Each arrow runs from the model's own $H{=}1$ answer (open circle) to its answer when told $H{=}8$. Blue: significant gain (McNemar $p<.05$). The dashed line is a random legal move. Only the two shaded models move to the right on both characters. $^\dagger$Failed the truncation gate.}
 \label{fig:use}
 \end{figure}
 
 \subsection{Responding is not planning}
 
-The primary statistic tells a more sobering story (Table~\ref{tab:primary}). Five models show no effect, with confidence intervals tight around zero. The three models that move their answers, Qwen3-14B, Qwen3-32B and gpt-oss-120b, show a positive difference on Ironclad and, for gpt-oss, on Silent. In every case the difference comes from the control side. Their gain on sensitive states is close to zero, while their score on control states \emph{falls} when told to look further ahead. The instruction makes them abandon moves that were already right.
+Finding the long-horizon move more often does not make the answers better on average. Table~\ref{tab:primary} splits each model's gain into sensitive and control states. On sensitive states, where looking ahead should pay, no responsive model improves reliably. On control states, where the greedy move is already right, every responsive model gets worse. gpt-oss loses .14 on Ironclad controls and .11 on Silent controls. The pre-registered primary statistic, sensitive gain minus control gain, is significant for three models, and in each case the control loss produces it. We therefore read the two columns side by side and never the difference alone.
 
-Figure~\ref{fig:decomp} shows where the answers go (a post hoc breakdown). When gpt-oss is told $H{=}8$, it gives up the greedy move on 314 of the 880 sensitive states. Only 91 of those switches land on a best long-horizon move. The rest go to other moves, which on average score no better than the greedy move they replaced. Qwen3-32B behaves the same way: 73 of 209 switches find the long-horizon move. On control states, both models drop between a fifth and a third of their correct answers. The instruction works as a cue to avoid the obvious move. It does not lead the models to the move that looking ahead would reveal.
-
-The state in Figure~\ref{fig:example} shows the pattern in a single case. At $H{=}1$, gpt-oss plays Pommel Strike, the best move, and explains that it ``deals the most damage this turn.'' At $H{=}8$ it switches to Feel No Pain, a card that grants block whenever a card is later exhausted, reasoning that it ``sets up future block generation.'' The switch sounds like planning, but the move is worth .53 on the eight-decision scale. Bash, which keeps the boss Vulnerable, is worth 1. Qwen3-32B plays Bash at both horizons.
-
-\begin{table}[t]
+\begin{table*}[t]
 \centering
 \footnotesize
-\setlength{\tabcolsep}{2pt}
-\begin{tabular}{@{}lrr@{}}
+\setlength{\tabcolsep}{3.2pt}
+\renewcommand{\arraystretch}{1.15}
+\resizebox{\textwidth}{!}{%
+\begin{tabular}{@{}l ccc ccc@{}}
 \toprule
-Model & Ironclad & Silent \\
+& \multicolumn{3}{c}{\textbf{Ironclad}} & \multicolumn{3}{c}{\textbf{Silent}} \\
+\cmidrule(lr){2-4}\cmidrule(l){5-7}
+Model & Sensitive gain & Control gain & Primary & Sensitive gain & Control gain & Primary \\
 \midrule
-Mistral-7B & $+.013$ {\scriptsize$[-.03,+.06]$} & $+.033$ {\scriptsize$[-.01,+.08]$} \\
-Qwen2.5-7B & $-.001$ {\scriptsize$[-.01,+.01]$} & $-.014$ {\scriptsize$[-.03,+.00]$} \\
-Llama-3.1-8B & $+.003$ {\scriptsize$[-.01,+.01]$} & $-.000$ {\scriptsize$[-.01,+.01]$} \\
-Llama-3.3-70B & $+.016$ {\scriptsize$[-.03,+.06]$} & $+.001$ {\scriptsize$[-.04,+.04]$} \\
-Qwen3-8B$^\dagger$ & $-.031$ {\scriptsize$[-.10,+.03]$} & $+.018$ {\scriptsize$[-.04,+.07]$} \\
-Qwen3-14B & $\mathbf{+.100}$ {\scriptsize$[+.04,+.16]$} & $+.005$ {\scriptsize$[-.04,+.05]$} \\
-Qwen3-32B & $\mathbf{+.125}$ {\scriptsize$[+.07,+.18]$} & $+.045$ {\scriptsize$[-.01,+.10]$} \\
-gpt-oss-120b & $\mathbf{+.155}$ {\scriptsize$[+.09,+.22]$} & $\mathbf{+.074}$ {\scriptsize$[+.02,+.13]$} \\
+Mistral-7B & $+.064$ {\scriptsize$[+.03,+.09]$} & $+.050$ {\scriptsize$[+.02,+.08]$} & $+.013$ {\scriptsize$[-.03,+.06]$} & $+.022$ {\scriptsize$[-.01,+.05]$} & $-.011$ {\scriptsize$[-.04,+.02]$} & $+.033$ {\scriptsize$[-.01,+.08]$} \\
+Qwen2.5-7B & $-.004$ {\scriptsize$[-.01,-.00]$} & $-.004$ {\scriptsize$[-.02,+.01]$} & $-.001$ {\scriptsize$[-.01,+.01]$} & $-.008$ {\scriptsize$[-.02,+.00]$} & $+.006$ {\scriptsize$[-.01,+.02]$} & $-.014$ {\scriptsize$[-.03,+.00]$} \\
+Llama-3.1-8B & $+.001$ {\scriptsize$[-.01,+.01]$} & $-.002$ {\scriptsize$[-.01,+.00]$} & $+.003$ {\scriptsize$[-.01,+.01]$} & $+.001$ {\scriptsize$[-.01,+.01]$} & $+.001$ {\scriptsize$[-.01,+.01]$} & $-.000$ {\scriptsize$[-.01,+.01]$} \\
+\textcolor{muted}{Qwen3-8B$^\dagger$} & \textcolor{muted}{$-.005$ {\scriptsize$[-.05,+.04]$}} & \textcolor{muted}{$+.026$ {\scriptsize$[-.02,+.08]$}} & \textcolor{muted}{$-.031$ {\scriptsize$[-.10,+.03]$}} & \textcolor{muted}{$-.009$ {\scriptsize$[-.04,+.03]$}} & \textcolor{muted}{$-.027$ {\scriptsize$[-.07,+.01]$}} & \textcolor{muted}{$+.018$ {\scriptsize$[-.04,+.07]$}} \\
 \midrule
-\multicolumn{3}{@{}l}{\footnotesize Of which, gain on sensitive / control states:} \\
-gpt-oss-120b & $+.014 \,/\, {-.142}$ & $-.032 \,/\, {-.107}$ \\
+Llama-3.3-70B & $-.020$ {\scriptsize$[-.05,+.01]$} & $-.037$ {\scriptsize$[-.07,-.00]$} & $+.016$ {\scriptsize$[-.03,+.06]$} & $-.010$ {\scriptsize$[-.03,+.01]$} & $-.011$ {\scriptsize$[-.04,+.02]$} & $+.001$ {\scriptsize$[-.04,+.04]$} \\
+Qwen3-14B & $+.015$ {\scriptsize$[-.02,+.05]$} & $\mathbf{-.085}$ {\scriptsize$[-.13,-.04]$} & $\mathbf{+.100}$ {\scriptsize$[+.04,+.16]$} & $-.016$ {\scriptsize$[-.05,+.02]$} & $-.021$ {\scriptsize$[-.06,+.02]$} & $+.005$ {\scriptsize$[-.04,+.05]$} \\
+\midrule
+\rowcolor{tier} Qwen3-32B & $+.030$ {\scriptsize$[-.01,+.07]$} & $\mathbf{-.095}$ {\scriptsize$[-.14,-.05]$} & $\mathbf{+.125}$ {\scriptsize$[+.07,+.18]$} & $-.013$ {\scriptsize$[-.05,+.02]$} & $\mathbf{-.055}$ {\scriptsize$[-.09,-.02]$} & $+.045$ {\scriptsize$[-.01,+.10]$} \\
+\rowcolor{tier} gpt-oss-120b & $+.014$ {\scriptsize$[-.03,+.05]$} & $\mathbf{-.142}$ {\scriptsize$[-.19,-.10]$} & $\mathbf{+.155}$ {\scriptsize$[+.09,+.22]$} & $-.032$ {\scriptsize$[-.07,+.01]$} & $\mathbf{-.107}$ {\scriptsize$[-.15,-.06]$} & $\mathbf{+.074}$ {\scriptsize$[+.02,+.13]$} \\
 \bottomrule
-\end{tabular}
-\caption{Primary statistic: gain from the $H{=}8$ instruction on sensitive states minus gain on control states, with 95\% bootstrap intervals. Bold: rejects zero at $\alpha=.025$. The lower row shows that the positive values come from losses on control states.}
+\end{tabular}}
+\caption{What the $H{=}8$ instruction does to answer quality, on the eight-decision scale (0 = worst move, 1 = best). \emph{Sensitive gain} and \emph{control gain} are the mean change from the $H{=}1$ answer to the $H{=}8$ answer on each kind of state. \emph{Primary} is the pre-registered statistic, sensitive gain minus control gain. Brackets: 97.5\% bootstrap intervals, matching the pre-registered $\alpha=.025$ per character. Bold: the interval excludes zero for a responsive model. Rules separate the three tiers, and shading marks the two models that find the long-horizon move more often. Every positive primary value comes from control losses. $^\dagger$Failed the truncation gate.}
 \label{tab:primary}
-\end{table}
+\end{table*}
+
+Figure~\ref{fig:churn} shows why the averages do not move. The instruction makes the responsive models change most of their answers, and the changes cut both ways. On sensitive states, gpt-oss turns 189 answers into a best move but gives up 98 best moves it already had. Its other changes land on moves worse than the ones they replace, so its sensitive-state score stays flat. On control states the balance tips the wrong way: 77 best moves found and 284 given up. Qwen3-32B, Qwen3-14B and Llama-3.3-70B show the same pattern on a smaller scale.
 
 \begin{figure}[t]
 \centering
-\includegraphics[width=\columnwidth]{figures/decomposition.pdf}
-\caption{What models answer on sensitive states (both characters, 880 states) at $H{=}1$ and $H{=}8$. Responsive models move answers out of the greedy class, but mostly into other non-best moves. Post hoc.}
-\label{fig:decomp}
+\includegraphics[width=\columnwidth]{figures/churn.pdf}
+\caption{Answer changes from $H{=}1$ to $H{=}8$, both characters. Blue: a non-best answer became a best eight-decision move. Orange: a best move was given up. Responsive models gain on sensitive states but lose more on control states, where the greedy move was already best. Post hoc. $^\dagger$Failed the truncation gate.}
+\label{fig:churn}
 \end{figure}
+
+The changes are not random either. When gpt-oss abandons its greedy $H{=}1$ answer, the new move is a best eight-decision move 46\% of the time on Ironclad and 38\% on Silent. Picking uniformly among the other legal moves would give 32\% and 31\%. Qwen3-32B (43\% and 40\%) and Qwen3-14B (47\% and 33\%) also beat this chance level. Most switched answers are skills or powers, the cards that defend or set up later turns: 77\% for gpt-oss and 66\% for Qwen3-32B. The instruction pushes models toward setup moves in general, whether or not setup pays in the state at hand.
+
+A trivial rule puts these numbers in perspective. Playing the leftmost playable card scores .66 (Ironclad) and .69 (Silent) on sensitive states. At $H{=}8$, no model's answers on those states score more than .06 above this rule.
+
+The state in Figure~\ref{fig:example} shows the pattern in one case. At $H{=}1$, gpt-oss plays Pommel Strike, the best move, and explains that it ``deals the most damage this turn.'' At $H{=}8$ it switches to Feel No Pain, a power that grants block whenever a card is later exhausted, reasoning that it ``sets up future block generation.'' The switch sounds like planning, but the move is worth .53 on the eight-decision scale. Bash, which keeps the boss Vulnerable, is worth 1. Qwen3-32B plays Bash at both horizons.
 
 \subsection{It is not about knowing the game}
 
 Our prompts name each card without describing it, so a model must recall what ``Bash'' does. A reviewer could fairly ask whether the horizon results reflect gaps in game knowledge, or recognition of famous card names, rather than planning. We tested both explanations in a pre-registered amendment on the 1,169 states that hold no targeted skill card (see Limitations). In the \emph{described} condition, every prompt carries an exact rulebook generated from the simulator: what each visible card does, how each enemy behaves and how every effect works. In the \emph{renamed} condition, every card, enemy and relic name, and the name of the game, is replaced by a neutral code such as ``Card K7''. We ran both conditions on one model that ignores the horizon (Llama-3.1-8B) and one that responds to it (gpt-oss-120b).
 
-None of the eight pre-registered contrasts survives Holm correction \citep{holm1979} (Table~\ref{tab:knowledge}). With the rulebook, Llama-3.1-8B still ignores the horizon, with intervals of about $\pm.02$. Its blind spot is not a knowledge gap. gpt-oss plays somewhat better overall with the rulebook (mean $H{=}8$ quality rises from .71 to .76), but its use of the horizon does not change reliably. With all names hidden it still responds to the horizon at the same rate, so recognizing famous cards is not what drives it.\footnote{gpt-oss cut off 1.9\% of its renamed-condition answers, above the 1\% gate, so its familiarity contrasts are descriptive.}
+None of the eight pre-registered contrasts survives Holm correction \citep{holm1979} (Table~\ref{tab:knowledge}). For Llama-3.1-8B the null is confirmed. Equivalence tests \citep{schuirmann1987tost} place all four of its contrasts within the pre-registered smallest effect of interest, $\pm.10$. With the rulebook it still ignores the horizon, so its blind spot is not a knowledge gap. For gpt-oss the evidence is weaker. With the rulebook its primary statistic rises by .073 on both characters. This is not significant after correction, but effects up to about .14 cannot be excluded. The rise comes from larger losses on control states. Its use of the long-horizon move does not change reliably. With all names hidden it still responds to the horizon, so recognizing famous cards is not what drives it.\footnote{gpt-oss cut off 1.9\% of its renamed-condition answers, above the 1\% gate, so its familiarity contrasts are descriptive.}
 
 \begin{table}[t]
 \centering
 \footnotesize
-\setlength{\tabcolsep}{1.5pt}
+\setlength{\tabcolsep}{1.2pt}
+\resizebox{\columnwidth}{!}{%
 \begin{tabular}{@{}llrr@{}}
 \toprule
 & & Knowledge & Familiarity \\
 Model & Char. & {\scriptsize described $-$ base} & {\scriptsize renamed $-$ described} \\
 \midrule
-Llama-3.1-8B & IC & $-.003$ {\scriptsize$[-.02,+.02]$} & $+.017$ {\scriptsize$[-.02,+.05]$} \\
- & Silent & $-.000$ {\scriptsize$[-.02,+.02]$} & $-.005$ {\scriptsize$[-.04,+.03]$} \\
+Llama-3.1-8B & IC & $-.003$ {\scriptsize$[-.02,+.02]$}$^{\equiv}$ & $+.017$ {\scriptsize$[-.02,+.05]$}$^{\equiv}$ \\
+ & Silent & $-.000$ {\scriptsize$[-.02,+.02]$}$^{\equiv}$ & $-.005$ {\scriptsize$[-.04,+.03]$}$^{\equiv}$ \\
 gpt-oss-120b & IC & $+.073$ {\scriptsize$[-.00,+.15]$} & $+.081^\dagger$ {\scriptsize$[-.00,+.16]$} \\
  & Silent & $+.073$ {\scriptsize$[-.01,+.15]$} & $+.084^\dagger$ {\scriptsize$[+.01,+.16]$} \\
 \bottomrule
-\end{tabular}
-\caption{Knowledge and familiarity contrasts: change in the primary statistic between conditions, paired by state, 95\% intervals. None rejects after Holm correction over all eight. $^\dagger$Descriptive (gate failed).}
+\end{tabular}}
+\caption{Knowledge and familiarity contrasts: change in the primary statistic between conditions, paired by state, 95\% intervals. None rejects after Holm correction over all eight. $^{\equiv}$Equivalent to zero within $\pm.10$ (90\% interval). $^\dagger$Descriptive (gate failed).}
 \label{tab:knowledge}
 \end{table}
 
 \subsection{Robustness}
 
-Every conclusion above holds when any one of the five encounters is removed, and when the 591 states affected by the oracle limitation described under Limitations are removed (Appendix~\ref{app:robust}). A prompt variant that defines ``decision transition'' explicitly changes nothing for either model tested (Appendix~\ref{app:amendments}). The full-game scores of these models from an earlier version of the benchmark do not predict their horizon use. Those scores sit at a ceiling for combat and a floor for full runs, which is exactly why a controlled test is needed.
+Every conclusion above holds when any one of the five encounters is removed, under a bootstrap that resamples states within each encounter, and when the 591 states affected by the oracle limitation described under Limitations are removed (Appendix~\ref{app:robust}). A prompt variant that defines ``decision transition'' explicitly changes nothing for either model tested (Appendix~\ref{app:amendments}). These models' scores on full fights and full runs in the same simulator do not predict their horizon use. Those scores sit at a ceiling for fights and a floor for runs, which is why a controlled test is needed.

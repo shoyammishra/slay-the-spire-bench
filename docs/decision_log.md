@@ -1,5 +1,15 @@
 # Decision Log
 
+## 2026-10-05 - External pre-submission review of the ARR paper; v3 Amendment 8 (Qwen3-32B thinking off)
+
+**Problem.** An external critical review of the ARR draft raised: (1) the pre-registered DiD primary can be satisfied by control degradation; (2) the abstract contradicted the data on which models respond; (3) the title's "thinking" claim was never manipulated; (4) no chance baseline for the "hesitation" story; (5) null knowledge results overclaimed; plus minor points (H=8 spans ~2 turns, contrast-set citations, control/tie definition, unverifiable fingerprints, gpt-oss effort unreported).
+
+**Verified against our data before acting.** (2) is a real error: the sensitive-state choice breakdown shows Llama-3.3-70B also abandons the greedy move H1->H8 (425->351 of 880) while its best-long-horizon picks FALL (231->213); Qwen3-14B too (378->252). Three tiers, not two: 7-8B models do not react; every larger model leaves the greedy move; only Qwen3-32B and gpt-oss find the long-horizon move more often. (5) TOST at the pre-registered smallest effect of interest (.10, 90% CI = est +/- 1.645 bootstrap SD): Llama-3.1-8B equivalent to zero in all 4 contrasts; gpt-oss NOT equivalent (knowledge +.073, 90% CI [+.009,+.137] IC, [+.005,+.140] Silent).
+
+**Choices.** Primary statistic unchanged (frozen); sensitive and control gains now reported side by side for every model as co-equal quantities. Paper reframed to the three-tier result and "multi-turn lookahead" (not long-horizon). Knowledge wording softened with TOST. Chance (random non-greedy) and heuristic baselines plus a switched-answer taxonomy added post hoc. Not adopted for ARR: closed models (cost/time; Limitations), described condition for all models (breaks the frozen design; 2-model evidence already reported), sampled decoding (Limitations).
+
+**Amendment 8 (frozen 2026-10-05, digest 33d68bddacce...).** `qwen3-32b-nothink` = identical Qwen3-32B checkpoint/revision, only `enable_thinking=false` (runner: per-model `thinking()` override; regression test `test_amendment8_switches_thinking_off_for_one_model_only`). Greedy decoding kept (Qwen recommends T=0.7 for non-thinking; one-variable contrast preferred). Outcome-aware -> reported as a post hoc mechanism test, outside every Holm family. Job 381029 (gpu_h200_8).
+
 ## 2026-10-04 - v3 Amendment 7: rerun Llama-3.3-70B with `--disable-custom-all-reduce`
 
 **Problem.** Llama-3.3-70B (Amendment 4, job 377473, healthy node) loaded on 2× H100 at TP=2.

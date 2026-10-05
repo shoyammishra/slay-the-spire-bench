@@ -1,5 +1,9 @@
 # Experiment Log
 
+## 2026-10-05 - Amendment 8 submitted (Qwen3-32B thinking off, job 381029) + review-response analyses
+
+Job 381029 on gpu_h200_8 (1 GPU, 4 CPU, 24 h), `V3_MODEL=qwen3-32b-nothink`, cluster checkout 93e1593. Post hoc analyses (`tmp/review_analysis.py` on the login node, no GPU): per-model sensitive/control gains with bootstrap CIs, switches away from the H1-optimal move vs a uniform random non-greedy baseline, switched-answer card-type taxonomy, oracle heuristic baselines. Ops note: `nohup ... &` processes started over a non-interactive ssh session were killed when the session closed (empty outputs, no error) -> run long login-node analyses inside a held-open session or sbatch. Results folded into the paper when complete.
+
 ## 2026-10-04 - v3 Llama-3.3-70B (Amendment 7 rerun) COMPLETE: valid NULL; size without reasoning does not produce H-use
 
 **Run.** Job 379568 on 2× H200: TP=2, FP8, `--disable-custom-all-reduce`.

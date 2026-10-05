@@ -1,7 +1,7 @@
 \section{Pre-registration, Amendments and Models}
 \label{app:amendments}
 
-The base protocol (states, prompts, scoring, gates, analysis) was frozen with a fingerprint before any model was run. Seven amendments followed, each frozen before the run it covers. Each may only add a model, a prompt condition or a serving flag.
+The base protocol (states, prompts, scoring, gates, analysis) was frozen with a SHA-256 fingerprint before any model was run. Eight amendments followed, each frozen before the run it covers. Each may only add a model, a prompt condition or a serving flag.
 \begin{enumerate}
 \item Adds Llama-3.1-8B and DeepSeek-R1-Distill-Qwen-14B. The latter was excluded when only 2 of its first 8 answers fit in the 16,000-token budget.
 \item Adds a prompt condition that defines ``decision transition'' explicitly. It made no significant difference for Llama-3.1-8B or Qwen3-14B.
@@ -10,8 +10,9 @@ The base protocol (states, prompts, scoring, gates, analysis) was frozen with a 
 \item Adds gpt-oss-120b on its own serving stack (vLLM 0.10.2, Transformers 4.56.2), which its architecture requires.
 \item Adds the described and renamed conditions on the 1,169 states without targeted skill cards.
 \item Reruns Llama-3.3-70B with vLLM's custom all-reduce disabled. The first attempt crashed before producing any answer, and its records are kept but never analyzed.
+\item Adds Qwen3-32B with thinking switched off, the same checkpoint with one changed request flag. It was frozen after the thinking-on results were known, so we report it as a post hoc test of mechanism.
 \end{enumerate}
-Every other model runs on vLLM 0.8.5.post1 with Transformers 4.51.3. Pinned revisions (first ten hex digits): Mistral-7B-Instruct-v0.3 \texttt{c170c708c4}, Qwen2.5-7B-Instruct \texttt{a09a35458c}, Llama-3.1-8B-Instruct \texttt{0e9e39f249}, Llama-3.3-70B-Instruct \texttt{6f6073b423}, Qwen3-8B \texttt{b968826d9c}, Qwen3-14B \texttt{40c069824f}, Qwen3-32B \texttt{9216db5781}, gpt-oss-120b \texttt{b5c939de8f}. Seven queries of Qwen3-32B were lost when a shared filesystem filled up mid-run. They are recorded as failures and never retried, which leaves the run well inside the 2\% gate.
+Fingerprints (first twelve hex digits): base \texttt{697011782709}, amendments 1 to 8 \texttt{bac116c3e1d7}, \texttt{eadf64f3cea0}, \texttt{6eb87256470c}, \texttt{899adb8313cb}, \texttt{6b212296a3dd}, \texttt{b7f44796ac19}, \texttt{eaa20e7d6a2b}, \texttt{33d68bddacce}. The release lets anyone recompute them from the frozen files. Every other model runs on vLLM 0.8.5.post1 with Transformers 4.51.3. Pinned revisions (first ten hex digits): Mistral-7B-Instruct-v0.3 \texttt{c170c708c4}, Qwen2.5-7B-Instruct \texttt{a09a35458c}, Llama-3.1-8B-Instruct \texttt{0e9e39f249}, Llama-3.3-70B-Instruct \texttt{6f6073b423}, Qwen3-8B \texttt{b968826d9c}, Qwen3-14B \texttt{40c069824f}, Qwen3-32B \texttt{9216db5781}, gpt-oss-120b \texttt{b5c939de8f}. Seven queries of Qwen3-32B were lost when a shared filesystem filled up mid-run. They are recorded as failures and never retried, which leaves the run well inside the 2\% gate.
 
 \section{Lookahead Use at Every Horizon}
 \label{app:curves}
