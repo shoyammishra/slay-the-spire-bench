@@ -1,5 +1,13 @@
 # Decision Log
 
+## 2026-10-08 - Amendment 9: chess controlled-horizon pilot (second domain)
+
+**Problem.** Reviewers: the 'any domain' recipe is asserted, not demonstrated.
+**Choice (user 2026-10-08):** a small chess pilot with gpt-oss-120b (+ Llama-3.1-8B as the H-blind reference), frozen before any query (`configs/controlled_h_amendment9_chess_pilot.json`). Frontier closed model skipped (user).
+**Design.** Random positions (each king + two random pieces, White to move, at least one capture available), utility = material after exactly H plies (P1 N3 B3 R5 Q9, +-1000 mate, 0 draw), Black minimises; H in {1,5} plies; exact oracle = full-window alpha-beta from every first move (verified vs brute force, `tests/test_chess_pilot.py`); 240 states = 120 sensitive + 120 control (release sha 523db96b...); prompts differ only in H; same serving command as v3; same statistics. Yield check before freezing: 5-piece random positions gave 0/10 sensitive; capture-filtered 6-piece positions 22% sensitive, 2.7 s/state/core.
+**Trade-offs / disclosures.** Pilot scale; sensitive states have more legal moves (25.9 vs 19.1); H counts both sides' plies (adversarial opponent) unlike the card game's scripted enemy; exploratory, outside every confirmatory family.
+**Jobs.** gpt-oss 386148 (gpu_h200_8), Llama-3.1-8B 386149 (gpu_h100_4).
+
 ## 2026-10-05 - External pre-submission review of the ARR paper; v3 Amendment 8 (Qwen3-32B thinking off)
 
 **Problem.** An external critical review of the ARR draft raised: (1) the pre-registered DiD primary can be satisfied by control degradation; (2) the abstract contradicted the data on which models respond; (3) the title's "thinking" claim was never manipulated; (4) no chance baseline for the "hesitation" story; (5) null knowledge results overclaimed; plus minor points (H=8 spans ~2 turns, contrast-set citations, control/tie definition, unverifiable fingerprints, gpt-oss effort unreported).
