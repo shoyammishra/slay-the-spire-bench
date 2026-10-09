@@ -5,7 +5,7 @@ Seven of the eight runs pass both validity gates. Qwen3-8B cut off 4.0\% of its 
 
 \subsection{The models can play the short game}
 
-A model that cannot play at all would also fail to plan, so we first check play at $H{=}1$. Every model except Mistral-7B picks the best one-decision move about twice as often as a random legal move does (Table~\ref{tab:competence}). gpt-oss finds it in 68\% of Ironclad states, against 27\% for a random move. Told $H{=}8$, the same models pick the best eight-decision move at close to the random rate. The failure is specific to the longer horizon. Mistral-7B is the exception at both horizons, because half of its answers are illegal.
+A model that cannot play at all would also fail to plan, so we first check play at $H{=}1$. On the sensitive states, every model except Mistral-7B picks the best one-decision move well above the random rate. Most do so about twice as often (Table~\ref{tab:competence}). gpt-oss finds it in 60\% of Ironclad sensitive states, against 22\% for a random move. Told $H{=}8$, the same models on the same states pick the best eight-decision move at close to the random rate. The failure is specific to the longer horizon. Mistral-7B is the exception at both horizons, because half of its answers are illegal.
 
 \begin{table}[t]
 \centering
@@ -17,19 +17,19 @@ A model that cannot play at all would also fail to plan, so we first check play 
 \cmidrule(lr){2-3}\cmidrule(l){4-5}
 Model & IC & Silent & IC & Silent \\
 \midrule
-\textcolor{muted}{Random legal move} & \textcolor{muted}{.27} & \textcolor{muted}{.24} & \textcolor{muted}{.24} & \textcolor{muted}{.24} \\
+\textcolor{muted}{Random legal move} & \textcolor{muted}{.22} & \textcolor{muted}{.20} & \textcolor{muted}{.24} & \textcolor{muted}{.24} \\
 \midrule
-Mistral-7B & .07 & .05 & .17 & .11 \\
-Qwen2.5-7B & .48 & .45 & .20 & .26 \\
-Llama-3.1-8B & .48 & .46 & .23 & .27 \\
-Qwen3-8B$^\dagger$ & .35 & .35 & .29 & .28 \\
-Llama-3.3-70B & .59 & .48 & .23 & .26 \\
-Qwen3-14B & .52 & .42 & .29 & .30 \\
-\rowcolor{tier} Qwen3-32B & .60 & .56 & .28 & .30 \\
-\rowcolor{tier} gpt-oss-120b & .68 & .58 & .36 & .31 \\
+Mistral-7B & .02 & .00 & .17 & .11 \\
+Qwen2.5-7B & .43 & .39 & .20 & .26 \\
+Llama-3.1-8B & .42 & .40 & .23 & .27 \\
+Qwen3-8B$^\dagger$ & .29 & .31 & .29 & .28 \\
+Llama-3.3-70B & .53 & .44 & .23 & .26 \\
+Qwen3-14B & .45 & .41 & .29 & .30 \\
+\rowcolor{tier} Qwen3-32B & .54 & .53 & .28 & .30 \\
+\rowcolor{tier} gpt-oss-120b & .60 & .56 & .36 & .31 \\
 \bottomrule
 \end{tabular}
-\caption{Share of answers that are a best move for the stated goal. Left: the $H{=}1$ answer on all states. Right: the $H{=}8$ answer on sensitive states. Models play the one-decision game at about twice the random rate and the eight-decision game at about the random rate. $^\dagger$Failed the truncation gate.}
+\caption{Share of answers that are a best move for the stated goal, on the same 440 sensitive states per character. Left: the $H{=}1$ answer, judged by the one-decision key. Right: the $H{=}8$ answer, judged by the eight-decision key. On identical states, most models play the one-decision game at about twice the random rate and the eight-decision game at about the random rate. $^\dagger$Failed the truncation gate.}
 \label{tab:competence}
 \end{table}
 
@@ -41,12 +41,12 @@ The models fall into three tiers by how they respond to the horizon.
 
 \paragraph{Larger models leave the greedy move.} Llama-3.3-70B and Qwen3-14B abandon the greedy move often when told $H{=}8$. On the 880 sensitive states, Llama-3.3-70B plays it 425 times at $H{=}1$ and 351 times at $H{=}8$, and Qwen3-14B goes from 378 to 252. Neither picks the long-horizon move more often than its own $H{=}1$ answer does (Figure~\ref{fig:use}). Reacting to the horizon does not require explicit reasoning, since Llama-3.3-70B does not reason step by step.
 
-\paragraph{Two models also find the long-horizon move.} Qwen3-32B and gpt-oss-120b choose a best eight-decision move more often at $H{=}8$ than at $H{=}1$, on both characters. For gpt-oss the rates are 36\% against 25\% (Ironclad) and 31\% against 21\% (Silent). For Qwen3-32B they are 28\% against 22\% and 30\% against 19\%. McNemar's test gives $p \le .026$ in all four cases, and the gap holds at every horizon we tested (Appendix~\ref{app:curves}). For comparison, a random legal move is a best eight-decision move 24\% of the time. With Holm correction over all 16 model and character tests, three of the four gains survive. The fourth, Qwen3-32B on Ironclad, does not (corrected $p=.34$), and it is also not significant on the 1,169 clean states. We therefore treat it as weak evidence.
+\paragraph{Two models also find the long-horizon move.} Qwen3-32B and gpt-oss-120b choose a best eight-decision move more often at $H{=}8$ than at $H{=}1$. For gpt-oss the rates are 36\% against 25\% (Ironclad) and 31\% against 21\% (Silent). For Qwen3-32B they are 28\% against 22\% and 30\% against 19\%. McNemar's test gives $p \le .026$ in all four cases, and the gap holds at every horizon we tested (Appendix~\ref{app:curves}). For comparison, a random legal move is a best eight-decision move 24\% of the time. With Holm correction over all 16 model and character tests, three of the four gains survive. The fourth, Qwen3-32B on Ironclad, does not (corrected $p=.34$), and it is also not significant on the 1,169 clean states. We therefore treat it as weak evidence.
 
 \begin{figure}[t]
 \centering
 \includegraphics[width=\columnwidth]{figures/use_vs_baseline.pdf}
-\caption{How often each model picks the best eight-decision move on sensitive states. Each arrow runs from the model's own $H{=}1$ answer (open circle) to its answer when told $H{=}8$. Blue: significant gain (McNemar $p<.05$). The dashed line is a random legal move. Only the two shaded models move to the right on both characters. With thinking off (italic row), Qwen3-32B no longer does. $^\dagger$Failed the truncation gate.}
+\caption{How often each model picks the best eight-decision move on sensitive states. Each arrow runs from the model's own $H{=}1$ answer (open circle) to its answer when told $H{=}8$. Blue: significant gain (McNemar $p<.05$). The dashed line is a random legal move. gpt-oss moves to the right on both characters. Qwen3-32B does so clearly on Silent, while its Ironclad gain does not survive correction across models. With thinking off (italic row), Qwen3-32B moves on neither. $^\dagger$Failed the truncation gate.}
 \label{fig:use}
 \end{figure}
 
@@ -131,4 +131,4 @@ gpt-oss-120b & IC & $+.073$ {\scriptsize$[-.00,+.15]$} & $+.081^\dagger$ {\scrip
 
 \subsection{Robustness}
 
-Every conclusion above holds when any one of the five encounters is removed, under a bootstrap that resamples states within each encounter, and on the 1,169 states that the oracle limitation described under Limitations leaves untouched (Appendix~\ref{app:robust}). The only change on the clean states is the weak Qwen3-32B Ironclad gain discussed above. All four significant primary statistics survive Holm correction over the 14 valid model and character tests. Measured in raw value, without normalization, the control-state change of every responsive model stays negative. Intervals are wider because the win and loss bonuses make raw values heavy-tailed. Conditioning on a correct $H{=}1$ answer, and the clean-state results, are in Appendix~\ref{app:robust}. A prompt variant that defines ``decision transition'' explicitly changes nothing for either model tested (Appendix~\ref{app:amendments}). These models' scores on full fights and full runs in the same simulator do not predict their horizon use. Those scores sit at a ceiling for fights and a floor for runs, which is why a controlled test is needed.
+Every conclusion above holds when any one of the five encounters is removed, under a bootstrap that resamples states within each encounter, and on the 1,169 states that the oracle limitation described under Limitations leaves untouched (Appendix~\ref{app:robust}). The only change on the clean states is the weak Qwen3-32B Ironclad gain discussed above. All four significant primary statistics survive Holm correction over the 14 valid model and character tests. Measured in raw value, without normalization, the control-state change of every responsive model is negative in sign. It is significant only for Qwen3-14B on Ironclad, gpt-oss on Silent and the no-thinking run on Ironclad. The win and loss bonuses make raw values heavy-tailed, which widens the intervals. Conditioning on a correct $H{=}1$ answer, and the clean-state results, are in Appendix~\ref{app:robust}. A prompt variant that defines ``decision transition'' explicitly changes nothing for either model tested (Appendix~\ref{app:amendments}). These models' scores on full fights and full runs in the same simulator do not predict their horizon use. Those scores sit at a ceiling for fights and a floor for runs, which is why a controlled test is needed.
