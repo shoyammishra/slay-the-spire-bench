@@ -1,0 +1,28 @@
+{
+  "amendment_id": "controlled-h-amendment-9-chess-pilot-2026-10-08",
+  "status": "frozen 2026-10-08 before any model query on chess positions",
+  "decision": "user 2026-10-08: run a small second-domain pilot (chess endgames) with gpt-oss-120b on Sharanga; Llama-3.1-8B as the H-blind reference",
+  "purpose": "demonstrate the controlled-horizon recipe in a second simulator; exploratory pilot, not part of any confirmatory family",
+  "release": {
+    "path": "results/chess_pilot/release.json",
+    "sha256": "523db96b0446ada08806b613f3cebd82f1217969267c6a4625fbb9128532bdb9",
+    "generator": "scripts/chess_pilot.py build --seed 20261008 --candidates 1200 --per-set 120",
+    "states": "240 = 120 sensitive (H1/H5 optimal sets disjoint) + 120 control, first 120 of each in generation order; each king plus two random pieces, White to move, at least one capture available, both horizons discriminating",
+    "counts": {"candidates": 1200, "usable": 1192, "sensitive_available": 244, "control_available": 948}
+  },
+  "horizons": [1, 5],
+  "utility": "material balance from White's view after exactly H plies (P1 N3 B3 R5 Q9), +1000 if Black is checkmated, -1000 if White is, 0 for stalemate/insufficient material; Black minimises; scored when the game ends if earlier",
+  "oracle": "full-window alpha-beta minimax from every legal first move (exact; verified against brute-force minimax in tests/test_chess_pilot.py)",
+  "models": {
+    "gpt-oss-120b": "served exactly as in v3 Amendment 5 (same pinned server command via scripts/heldout_v3_inference.py server)",
+    "llama-3.1-8b": "served exactly as in v3 Amendment 1"
+  },
+  "request": "temperature 0, top_p 1, seed 42, max_tokens 16000, concurrency 8, no retries; answer = first JSON object with a legal UCI (or SAN) move",
+  "smoke_gate": "first 8 queries: at least 6 parsed legal moves, else stop",
+  "analysis": "same statistics as v3: primary = mean_sensitive(g) - mean_control(g), g = EQ5(a5) - EQ5(a1), 97.5% bootstrap (10k); sensitive and control gains reported side by side; H5 use vs H-blind baseline (McNemar exact); answer changes; H1-best rate on sensitive states vs random",
+  "disclosures": [
+    "Pilot scale (240 states, two models); exploratory.",
+    "Sensitive states have more legal moves than controls (25.9 vs 19.1).",
+    "H counts plies of both sides, unlike the card game where H counts the player's own decisions against a scripted enemy."
+  ]
+}
