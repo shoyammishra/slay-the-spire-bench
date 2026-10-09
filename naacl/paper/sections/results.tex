@@ -5,7 +5,7 @@ Seven of the eight runs pass both validity gates. Qwen3-8B cut off 4.0\% of its 
 
 \subsection{The models can play the short game}
 
-A model that cannot play at all would also fail to plan, so we first check play at $H{=}1$. On the sensitive states, every model except Mistral-7B picks the best one-decision move well above the random rate. Most do so about twice as often (Table~\ref{tab:competence}). gpt-oss finds it in 60\% of Ironclad sensitive states, against 22\% for a random move. Told $H{=}8$, the same models on the same states pick the best eight-decision move at close to the random rate. The failure is specific to the longer horizon. Mistral-7B is the exception at both horizons, because half of its answers are illegal.
+A model that cannot play at all would also fail to plan, so we first check play at $H{=}1$. On the sensitive states, every model except Mistral-7B picks the best one-decision move above the random rate. Most do so about twice as often (Table~\ref{tab:competence}). gpt-oss finds it in 60\% of Ironclad sensitive states, against 22\% for a random move. Told $H{=}8$, the same models on the same states pick the best eight-decision move at close to the random rate. The failure is specific to the longer horizon. Mistral-7B is the exception at both horizons, because half of its answers are illegal.
 
 \begin{table}[t]
 \centering
@@ -80,7 +80,7 @@ Qwen3-14B & $+.015$ {\scriptsize$[-.02,+.05]$} & $\mathbf{-.085}$ {\scriptsize$[
 \textit{Qwen3-32B, no thinking}$^\ddagger$ & $+.009$ {\scriptsize$[-.01,+.03]$} & $-.041$ {\scriptsize$[-.07,-.02]$} & $+.051$ {\scriptsize$[+.02,+.08]$} & $-.021$ {\scriptsize$[-.04,-.00]$} & $-.043$ {\scriptsize$[-.07,-.02]$} & $+.023$ {\scriptsize$[-.01,+.05]$} \\
 \bottomrule
 \end{tabular}}
-\caption{What the $H{=}8$ instruction does to answer quality, on the eight-decision scale (0 = worst move, 1 = best). \emph{Sensitive gain} and \emph{control gain} are the mean change from the $H{=}1$ answer to the $H{=}8$ answer on each kind of state. \emph{Primary} is the pre-registered statistic, sensitive gain minus control gain. Brackets: 97.5\% bootstrap intervals, matching the pre-registered $\alpha=.025$ per character. Bold: the interval excludes zero for a responsive model. Rules separate the three tiers, and shading marks the two models that find the long-horizon move more often. Every positive primary value comes from control losses. $^\dagger$Failed the truncation gate. $^\ddagger$Same weights as Qwen3-32B with the reasoning trace switched off (Amendment 8, post hoc), not bolded.}
+\caption{What the $H{=}8$ instruction does to answer quality, on the eight-decision scale (0 = worst move, 1 = best). \emph{Sensitive gain} and \emph{control gain} are the mean change from the $H{=}1$ answer to the $H{=}8$ answer on each kind of state. \emph{Primary} is the pre-registered statistic, sensitive gain minus control gain. Brackets: 97.5\% bootstrap intervals, matching the pre-registered $\alpha=.025$ per character. Bold: the interval excludes zero for a responsive model. Rules separate the three tiers, and shading marks the two models that find the long-horizon move more often (gpt-oss on both characters, Qwen3-32B reliably on Silent). Every positive primary value comes from control losses. $^\dagger$Failed the truncation gate. $^\ddagger$Same weights as Qwen3-32B with the reasoning trace switched off (Amendment 8, post hoc), not bolded.}
 \label{tab:primary}
 \end{table*}
 
