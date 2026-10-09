@@ -1,5 +1,24 @@
 # Experiment Log
 
+## 2026-10-10 - Amendment 9 chess pilot COMPLETE (gpt-oss-120b 386148, Llama-3.1-8B 386149)
+
+Both jobs COMPLETED on Sharanga (gpt-oss H200 01:28:35, started 2026-10-09 22:17 after ~1 day queued; Llama H100 00:18:06). 240 positions (120 sensitive / 120 control), H in {1,5} plies, 480 queries each, 0 execution failures. Rows + analysis scp'd to `results/chess_pilot/` (gitignored).
+
+| | Llama-3.1-8B | gpt-oss-120b |
+|---|---|---|
+| smoke gate | 8/8 | 7/8 |
+| truncated | 0% | 4.0% (19, all at H5 = 7.9% of H5) |
+| answers changed H1->H5 | 13% | 49% |
+| H1-best on sensitive (random .053) | .033 | .592 |
+| H5 use vs H-blind baseline | .200 vs .175 (McNemar p=.25) | .325 vs .192 (p=.017) |
+| churn sensitive found/lost | 3/0 | 28/12 |
+| churn control found/lost | 2/1 | 8/12 |
+| sensitive gain | +.024 [-.004,+.060] | +.025 [-.062,+.113] |
+| control gain | +.025 [-.013,+.065] | -.035 [-.101,+.028] |
+| primary DiD (97.5%) | -.001 [-.051,+.050] p=.97 | +.059 [-.048,+.170] p=.21 |
+
+Reading: replicates the card-game pattern in a second domain. gpt-oss changes moves and finds the H5-best move above its H-blind baseline, but average value gain is not significant; Llama ignores H (and its short game is at chance). Difference from the card game: gpt-oss sensitive churn is net positive (28/12), too small at n=120 to separate from zero. gpt-oss truncation 4% > the v3 1% gate -> reported as descriptive only (pilot was exploratory; Amendment 9 gate was only the smoke gate). Truncated answers score 0, so truncation biases H5 results down. Folded into paper: Appendix `app:chess` (Table 12), one sentence in Section 6 (recipe) and the abstract; Amendment 9 fingerprint f006e8ceee9d added to Appendix A.
+
 ## 2026-10-08 - Second external review: floor-effect, clean-subset, multiplicity, raw-value and confound analyses (no GPU)
 
 Script tmp/review2.py on the login node (results in results/v3_paper/review/r2_*.json, gitignored).

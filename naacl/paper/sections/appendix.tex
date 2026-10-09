@@ -1,7 +1,7 @@
 \section{Pre-registration, Amendments and Models}
 \label{app:amendments}
 
-The base protocol (states, prompts, scoring, gates, analysis) was frozen with a SHA-256 fingerprint before any model was run. Eight amendments followed, each frozen before the run it covers. Each may only add a model, a prompt condition or a serving flag.
+The base protocol (states, prompts, scoring, gates, analysis) was frozen with a SHA-256 fingerprint before any model was run. Nine amendments followed, each frozen before the run it covers. Each may only add a model, a prompt condition, a serving flag or a separate pilot.
 \begin{enumerate}
 \item Adds Llama-3.1-8B and DeepSeek-R1-Distill-Qwen-14B. The latter was excluded when only 2 of its first 8 answers fit in the 16,000-token budget.
 \item Adds a prompt condition that defines ``decision transition'' explicitly. It made no significant difference for Llama-3.1-8B or Qwen3-14B.
@@ -11,8 +11,9 @@ The base protocol (states, prompts, scoring, gates, analysis) was frozen with a 
 \item Adds the described and renamed conditions on the 1,169 states without targeted skill cards.
 \item Reruns Llama-3.3-70B with vLLM's custom all-reduce disabled. The first attempt crashed before producing any answer, and its records are kept but never analyzed.
 \item Adds Qwen3-32B with thinking switched off, the same checkpoint with one changed request flag. It was frozen after the thinking-on results were known, so we report it as a post hoc test of mechanism.
+\item Adds an exploratory chess pilot with gpt-oss-120b and Llama-3.1-8B (Appendix~\ref{app:chess}). It is outside every confirmatory family.
 \end{enumerate}
-Fingerprints (first twelve hex digits): base \texttt{697011782709}, amendments 1 to 8 \texttt{bac116c3e1d7}, \texttt{eadf64f3cea0}, \texttt{6eb87256470c}, \texttt{899adb8313cb}, \texttt{6b212296a3dd}, \texttt{b7f44796ac19}, \texttt{eaa20e7d6a2b}, \texttt{33d68bddacce}. The release lets anyone recompute them from the frozen files. Every other model runs on vLLM 0.8.5.post1 with Transformers 4.51.3. Pinned revisions (first ten hex digits): Mistral-7B-Instruct-v0.3 \texttt{c170c708c4}, Qwen2.5-7B-Instruct \texttt{a09a35458c}, Llama-3.1-8B-Instruct \texttt{0e9e39f249}, Llama-3.3-70B-Instruct \texttt{6f6073b423}, Qwen3-8B \texttt{b968826d9c}, Qwen3-14B \texttt{40c069824f}, Qwen3-32B \texttt{9216db5781}, gpt-oss-120b \texttt{b5c939de8f}. Seven queries of Qwen3-32B were lost when a shared filesystem filled up mid-run. They are recorded as failures and never retried, which leaves the run well inside the 2\% gate.
+Fingerprints (first twelve hex digits): base \texttt{697011782709}, amendments 1 to 9 \texttt{bac116c3e1d7}, \texttt{eadf64f3cea0}, \texttt{6eb87256470c}, \texttt{899adb8313cb}, \texttt{6b212296a3dd}, \texttt{b7f44796ac19}, \texttt{eaa20e7d6a2b}, \texttt{33d68bddacce}, \texttt{f006e8ceee9d}. The release lets anyone recompute them from the frozen files. Every other model runs on vLLM 0.8.5.post1 with Transformers 4.51.3. Pinned revisions (first ten hex digits): Mistral-7B-Instruct-v0.3 \texttt{c170c708c4}, Qwen2.5-7B-Instruct \texttt{a09a35458c}, Llama-3.1-8B-Instruct \texttt{0e9e39f249}, Llama-3.3-70B-Instruct \texttt{6f6073b423}, Qwen3-8B \texttt{b968826d9c}, Qwen3-14B \texttt{40c069824f}, Qwen3-32B \texttt{9216db5781}, gpt-oss-120b \texttt{b5c939de8f}. Seven queries of Qwen3-32B were lost when a shared filesystem filled up mid-run. They are recorded as failures and never retried, which leaves the run well inside the 2\% gate.
 
 \section{Lookahead Use at Every Horizon}
 \label{app:curves}
@@ -170,6 +171,37 @@ gpt-oss-120b & $+3.2$ {\scriptsize$[-12.6,+19.1]$} & $-18.1$ {\scriptsize$[-43.4
 \end{table}
 
 Tables~\ref{tab:clean}, \ref{tab:cond} and \ref{tab:raw} report three further post hoc checks. On the clean states, every conclusion holds except the Qwen3-32B Ironclad gain in long-horizon picks, which loses significance. Conditioning on a correct $H{=}1$ answer shows that small models keep it and that responsive models abandon it for the long-horizon move less often than for some other move. In raw utility, the control-state change of every responsive model is negative in sign but significant in only three cases (Qwen3-14B on Ironclad, gpt-oss on Silent, the no-thinking run on Ironclad), and sensitive-state gains stay within noise, with four exceptions. Two are positive: Mistral-7B on Silent (fewer illegal answers) and Qwen3-32B without thinking on Ironclad, at the edge of significance. Two are slightly negative: the no-thinking run on Silent and Qwen2.5-7B on Ironclad.
+
+\section{A Pilot in a Second Domain: Chess}
+\label{app:chess}
+
+To check that the recipe of Section~\ref{sec:recipe} transfers, we built a small chess version (Amendment 9, frozen before any query). Each position has both kings and two random pieces, White to move, with at least one capture available. Utility is the material balance after exactly $H$ plies (pawn 1, knight and bishop 3, rook 5, queen 9). Checkmating adds 1,000 and being checkmated subtracts 1,000. Black minimizes it. Here $H$ counts the moves of both sides, so $H{=}5$ is White's third move. Alpha-beta search returns the exact value of every legal first move at $H{=}1$ and $H{=}5$, and a test checks it against plain minimax. We kept the first 120 sensitive and 120 control positions in generation order. The prompt gives the position as FEN, as a board diagram and as the list of legal moves. The two horizons differ in one number. Scoring and statistics follow Section~\ref{sec:protocol} with $H{=}5$ in place of $H{=}8$. We ran gpt-oss-120b and Llama-3.1-8B on the same servers as the main study.
+
+\begin{table}[t]
+\centering
+\small
+\resizebox{\columnwidth}{!}{%
+\begin{tabular}{lcc}
+\toprule
+ & Llama-3.1-8B & gpt-oss-120b \\
+\midrule
+Answers changed, $H{=}1$ to $H{=}5$ & 13\% & 49\% \\
+Best $H{=}1$ move, sensitive (random .05) & .03 & .59 \\
+$H{=}5$ use (H-blind baseline) & .20 (.18) & .33 (.19) \\
+McNemar $p$ & .25 & .017 \\
+Best moves found / lost, sensitive & 3 / 0 & 28 / 12 \\
+Best moves found / lost, control & 2 / 1 & 8 / 12 \\
+Sensitive gain & $+.024$ & $+.025$ \\
+Control gain & $+.025$ & $-.035$ \\
+Primary (97.5\% CI) & $-.001$ [$-.05$, $+.05$] & $+.059$ [$-.05$, $+.17$] \\
+Truncated answers & 0\% & 4.0\% \\
+\bottomrule
+\end{tabular}}
+\caption{Chess pilot, 120 sensitive and 120 control positions. ``Use'' is the share of sensitive positions where the $H{=}5$ answer is a best five-ply move, and the H-blind baseline is the same share for the model's own $H{=}1$ answer.}
+\label{tab:chess}
+\end{table}
+
+The pattern matches the card game (Table~\ref{tab:chess}). Llama-3.1-8B rarely changes its answer, and its short-game play is no better than chance. gpt-oss-120b plays the short game well and changes half its answers when told to look five plies ahead. Its $H{=}5$ answer is a best five-ply move more often than its own $H{=}1$ answer ($p{=}.017$). Its average gain is not significant on either set, and the primary statistic does not reject. One difference from the card game is that its switches on sensitive positions find more best moves than they lose. With 120 positions per set, this gain is too small to separate from zero. All 19 truncated gpt-oss answers came at $H{=}5$, which exceeds the 1\% gate of the main study, so we report this pilot as descriptive. A truncated answer scores 0, so truncation can only lower the $H{=}5$ results. Sensitive positions also have more legal moves than controls (25.9 against 19.1).
 
 \section{Engine Differences from the Commercial Game}
 \label{app:engine}
