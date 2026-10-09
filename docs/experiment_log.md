@@ -1,5 +1,15 @@
 # Experiment Log
 
+## 2026-10-08 - Second external review: floor-effect, clean-subset, multiplicity, raw-value and confound analyses (no GPU)
+
+Script tmp/review2.py on the login node (results in results/v3_paper/review/r2_*.json, gitignored).
+- Short-horizon competence (H1 answer, all states, H1-best rate): gpt-oss .68/.58, Qwen3-32B .60/.56, Llama-70B .59/.48, Qwen3-14B .52/.42, Llama-8B .48/.46, Qwen2.5 .48/.45, Qwen3-8B .35/.35, Mistral .07/.05; random legal .27/.24. H8-best rate on sensitive states ~ random (.20-.36 vs .24). => not a general inability to play; failure is horizon-specific.
+- Conditioned on H1-best at H1 (sensitive): Llama-8B/Qwen2.5 keep 97-99%; gpt-oss kept 34%/22%, long-horizon 30%/29%, other 36%/49%.
+- Clean 1,169 states: all conclusions hold except Qwen3-32B IC H8-use gain (.267 vs .228, p=.23). Holm over 16 model x character McNemar tests: gpt-oss IC/Silent and Qwen3-32B Silent survive; Qwen3-32B IC does not (adj p=.34). All 4 significant primary DiDs survive Holm over 14 valid tests.
+- Raw utility: control change negative for every responsive model; sensitive gains within noise except Mistral Silent (+12, illegal->legal) and Qwen3-32B no-think IC (+9.5, edge).
+- Sensitive vs control matched on encounters (75-100 each), legal moves (<0.4 diff), hand, energy, HP; H8 value span differs in opposite directions per character.
+Paper: new Table 3 (competence), Sec 5.1 'The models can play the short game', Holm caveat on Qwen3-32B IC, appendix tables (props, clean, conditioned, raw), release = 1,169 clean states with the 591 flagged, related work + 5 verified citations (SokoBench, AgentCE-Bench, FLARE, LWM-Planner, CAST), H-truncation defence in protocol. Frontier model skipped (user, 2026-10-08).
+
 ## 2026-10-05 - Amendment 8 COMPLETE: Qwen3-32B thinking OFF removes most of the H response
 
 Job 381029 (gpu_h200_8), 45 min, 7,040/7,040, truncation 0, execution failures 0, valid. Same checkpoint as qwen3-32b, enable_thinking=false.

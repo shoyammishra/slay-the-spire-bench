@@ -1,15 +1,47 @@
 \section{Results}
 \label{sec:results}
 
-Seven of the eight runs pass both validity gates. Qwen3-8B cut off 4.0\% of its answers at the token limit, so its numbers are descriptive only. The models fall into three tiers.
+Seven of the eight runs pass both validity gates. Qwen3-8B cut off 4.0\% of its answers at the token limit, so its numbers are descriptive only.
+
+\subsection{The models can play the short game}
+
+A model that cannot play at all would also fail to plan, so we first check play at $H{=}1$. Every model except Mistral-7B picks the best one-decision move about twice as often as a random legal move does (Table~\ref{tab:competence}). gpt-oss finds it in 68\% of Ironclad states, against 27\% for a random move. Told $H{=}8$, the same models pick the best eight-decision move at close to the random rate. The failure is specific to the longer horizon. Mistral-7B is the exception at both horizons, because half of its answers are illegal.
+
+\begin{table}[t]
+\centering
+\footnotesize
+\setlength{\tabcolsep}{4pt}
+\begin{tabular}{@{}lcccc@{}}
+\toprule
+& \multicolumn{2}{c}{Goal at $H{=}1$} & \multicolumn{2}{c}{Goal at $H{=}8$} \\
+\cmidrule(lr){2-3}\cmidrule(l){4-5}
+Model & IC & Silent & IC & Silent \\
+\midrule
+\textcolor{muted}{Random legal move} & \textcolor{muted}{.27} & \textcolor{muted}{.24} & \textcolor{muted}{.24} & \textcolor{muted}{.24} \\
+\midrule
+Mistral-7B & .07 & .05 & .17 & .11 \\
+Qwen2.5-7B & .48 & .45 & .20 & .26 \\
+Llama-3.1-8B & .48 & .46 & .23 & .27 \\
+Qwen3-8B$^\dagger$ & .35 & .35 & .29 & .28 \\
+Llama-3.3-70B & .59 & .48 & .23 & .26 \\
+Qwen3-14B & .52 & .42 & .29 & .30 \\
+\rowcolor{tier} Qwen3-32B & .60 & .56 & .28 & .30 \\
+\rowcolor{tier} gpt-oss-120b & .68 & .58 & .36 & .31 \\
+\bottomrule
+\end{tabular}
+\caption{Share of answers that are a best move for the stated goal. Left: the $H{=}1$ answer on all states. Right: the $H{=}8$ answer on sensitive states. Models play the one-decision game at about twice the random rate and the eight-decision game at about the random rate. $^\dagger$Failed the truncation gate.}
+\label{tab:competence}
+\end{table}
 
 \subsection{Three tiers of response}
+
+The models fall into three tiers by how they respond to the horizon.
 
 \paragraph{Small models do not react.} Llama-3.1-8B and Qwen2.5-7B give nearly the same answer whatever horizon they are told, changing 48 and 59 of their 1,760 answers between $H{=}1$ and $H{=}8$. Mistral-7B changes 307, mostly from illegal answers to legal ones. Qwen3-8B changes more than half of its answers, but its changes run in no direction. It gains about as many best moves as it loses, on both kinds of state (Figure~\ref{fig:churn}).
 
 \paragraph{Larger models leave the greedy move.} Llama-3.3-70B and Qwen3-14B abandon the greedy move often when told $H{=}8$. On the 880 sensitive states, Llama-3.3-70B plays it 425 times at $H{=}1$ and 351 times at $H{=}8$, and Qwen3-14B goes from 378 to 252. Neither picks the long-horizon move more often than its own $H{=}1$ answer does (Figure~\ref{fig:use}). Reacting to the horizon does not require explicit reasoning, since Llama-3.3-70B does not reason step by step.
 
-\paragraph{Two models also find the long-horizon move.} Qwen3-32B and gpt-oss-120b choose a best eight-decision move more often at $H{=}8$ than at $H{=}1$, on both characters. For gpt-oss the rates are 36\% against 25\% (Ironclad) and 31\% against 21\% (Silent). For Qwen3-32B they are 28\% against 22\% and 30\% against 19\%. McNemar's test gives $p \le .026$ in all four cases, and the gap holds at every horizon we tested (Appendix~\ref{app:curves}). For comparison, a random legal move is a best eight-decision move 24\% of the time.
+\paragraph{Two models also find the long-horizon move.} Qwen3-32B and gpt-oss-120b choose a best eight-decision move more often at $H{=}8$ than at $H{=}1$, on both characters. For gpt-oss the rates are 36\% against 25\% (Ironclad) and 31\% against 21\% (Silent). For Qwen3-32B they are 28\% against 22\% and 30\% against 19\%. McNemar's test gives $p \le .026$ in all four cases, and the gap holds at every horizon we tested (Appendix~\ref{app:curves}). For comparison, a random legal move is a best eight-decision move 24\% of the time. With Holm correction over all 16 model and character tests, three of the four gains survive. The fourth, Qwen3-32B on Ironclad, does not (corrected $p=.34$), and it is also not significant on the 1,169 clean states. We therefore treat it as weak evidence.
 
 \begin{figure}[t]
 \centering
@@ -61,7 +93,7 @@ Figure~\ref{fig:churn} shows why the averages do not move. The instruction makes
 \label{fig:churn}
 \end{figure}
 
-The changes are not random either. When gpt-oss abandons its greedy $H{=}1$ answer, the new move is a best eight-decision move 46\% of the time on Ironclad and 38\% on Silent. Picking uniformly among the other legal moves would give 32\% and 31\%. Qwen3-32B (43\% and 40\%) and Qwen3-14B (47\% and 33\%) also beat this chance level. Most switched answers are skills or powers, the cards that defend or set up later turns: 77\% for gpt-oss and 66\% for Qwen3-32B. The instruction pushes models toward setup moves in general, whether or not setup pays in the state at hand.
+The changes are not random either. When gpt-oss abandons its greedy $H{=}1$ answer, the new move is a best eight-decision move 46\% of the time on Ironclad and 38\% on Silent. Picking uniformly among the other legal moves would give 32\% and 31\%. Qwen3-32B (43\% and 40\%) and Qwen3-14B (47\% and 33\%) also beat this chance level. Most switched answers are skills or powers, the cards that defend or set up later turns: 77\% for gpt-oss and 66\% for Qwen3-32B. The instruction pushes models toward setup moves in general, whether or not setup pays in the state at hand. The same holds on the sensitive states where a model's $H{=}1$ answer was the best one-decision move. On these states the model had read the position correctly. There, Llama-3.1-8B and Qwen2.5-7B keep their answer 97\% to 99\% of the time. gpt-oss moves to the long-horizon move on 30\% of these states and to some other non-best move on 35\% (Ironclad) and 48\% (Silent) (Appendix~\ref{app:robust}).
 
 A trivial rule puts these numbers in perspective. Playing the leftmost playable card scores .66 (Ironclad) and .69 (Silent) on sensitive states. At $H{=}8$, no model's answers on those states score more than .06 above this rule.
 
@@ -99,4 +131,4 @@ gpt-oss-120b & IC & $+.073$ {\scriptsize$[-.00,+.15]$} & $+.081^\dagger$ {\scrip
 
 \subsection{Robustness}
 
-Every conclusion above holds when any one of the five encounters is removed, under a bootstrap that resamples states within each encounter, and when the 591 states affected by the oracle limitation described under Limitations are removed (Appendix~\ref{app:robust}). A prompt variant that defines ``decision transition'' explicitly changes nothing for either model tested (Appendix~\ref{app:amendments}). These models' scores on full fights and full runs in the same simulator do not predict their horizon use. Those scores sit at a ceiling for fights and a floor for runs, which is why a controlled test is needed.
+Every conclusion above holds when any one of the five encounters is removed, under a bootstrap that resamples states within each encounter, and on the 1,169 states that the oracle limitation described under Limitations leaves untouched (Appendix~\ref{app:robust}). The only change on the clean states is the weak Qwen3-32B Ironclad gain discussed above. All four significant primary statistics survive Holm correction over the 14 valid model and character tests. Measured in raw value, without normalization, the control-state change of every responsive model stays negative. Intervals are wider because the win and loss bonuses make raw values heavy-tailed. Conditioning on a correct $H{=}1$ answer, and the clean-state results, are in Appendix~\ref{app:robust}. A prompt variant that defines ``decision transition'' explicitly changes nothing for either model tested (Appendix~\ref{app:amendments}). These models' scores on full fights and full runs in the same simulator do not predict their horizon use. Those scores sit at a ceiling for fights and a floor for runs, which is why a controlled test is needed.

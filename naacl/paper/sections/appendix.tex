@@ -42,7 +42,32 @@ gpt-oss-120b & .25/.15$^*$ & .29/.23 & .36/.25$^*$ & .20/.14 & .28/.18$^*$ & .30
 \label{tab:curves}
 \end{table*}
 
-Table~\ref{tab:curves} gives the use rate and the H-blind baseline at $H \in \{2,4,8\}$. No model without explicit reasoning, and neither of the two smaller Qwen3 models, exceeds its baseline at any horizon.
+Table~\ref{tab:curves} gives the use rate and the H-blind baseline at $H \in \{2,4,8\}$. No model without explicit reasoning, and neither of the two smaller Qwen3 models, exceeds its baseline at any horizon. Qwen3-32B with thinking switched off exceeds it slightly at $H{=}2$ and $H{=}4$, but not at $H{=}8$.
+
+\section{Sensitive and Control States Compared}
+\label{app:props}
+
+\begin{table}[h]
+\centering
+\footnotesize
+\setlength{\tabcolsep}{3pt}
+\resizebox{\columnwidth}{!}{%
+\begin{tabular}{@{}llcccccc@{}}
+\toprule
+& & Legal & Hand & Energy & Health & Value span & Targeted \\
+& & moves & size & & & at $H{=}8$ & skill \\
+\midrule
+Ironclad & sensitive & 5.70 & 4.68 & 2.60 & 54.8 & 134 & .24 \\
+ & control & 5.35 & 4.54 & 2.43 & 53.9 & 162 & .27 \\
+Silent & sensitive & 6.64 & 5.54 & 2.56 & 46.5 & 152 & .41 \\
+ & control & 6.36 & 5.18 & 2.56 & 46.1 & 107 & .42 \\
+\bottomrule
+\end{tabular}}
+\caption{Mean properties of the 440 states in each set. Each set draws 75 to 100 states from each of the five encounters.}
+\label{tab:props}
+\end{table}
+
+Table~\ref{tab:props} compares the two sets. They differ by less than half a card in legal moves and hand size, and by about one point of health. The value span differs in opposite directions on the two characters, so the normalized scale does not favour one set consistently. Appendix~\ref{app:robust} repeats the main comparison on raw values.
 
 \section{Robustness}
 \label{app:robust}
@@ -71,6 +96,80 @@ gpt-oss-120b & +0.155 & [+0.134, +0.172] & +0.144 & +0.074 & [+0.058, +0.089] & 
 \end{table*}
 
 Table~\ref{tab:robust} reports two post hoc checks. Every state comes from one of five encounters, so we recompute the primary statistic leaving each encounter out in turn. We also drop the 591 states holding a targeted skill card, which the oracle treats as having no effect on enemies. No sign changes for any model with a confirmatory result, and every rejected effect stays well away from zero.
+
+\begin{table*}[t]
+\centering
+\resizebox{\textwidth}{!}{%
+\begin{tabular}{@{}l ccc ccc@{}}
+\toprule
+& \multicolumn{3}{c}{\textbf{Ironclad} (334 sensitive, 321 control)} & \multicolumn{3}{c}{\textbf{Silent} (259 sensitive, 255 control)} \\
+\cmidrule(lr){2-4}\cmidrule(l){5-7}
+Model & Sensitive gain & Control gain & Use / baseline ($p$) & Sensitive gain & Control gain & Use / baseline ($p$) \\
+\midrule
+Mistral-7B & $+.067$ {\scriptsize$[+.03,+.10]$} & $+.048$ {\scriptsize$[+.01,+.09]$} & .15/.13 {\scriptsize(.238)} & $+.019$ {\scriptsize$[-.02,+.06]$} & $-.031$ {\scriptsize$[-.07,+.01]$} & .11/.09 {\scriptsize(.454)} \\
+Qwen2.5-7B & $-.004$ {\scriptsize$[-.01,-.00]$} & $-.005$ {\scriptsize$[-.02,+.01]$} & .22/.23 {\scriptsize(.250)} & $-.002$ {\scriptsize$[-.01,+.01]$} & $+.005$ {\scriptsize$[-.01,+.02]$} & .28/.28 {\scriptsize(1.000)} \\
+Llama-3.1-8B & $-.001$ {\scriptsize$[-.01,+.01]$} & $-.000$ {\scriptsize$[-.01,+.01]$} & .24/.24 {\scriptsize(1.000)} & $+.002$ {\scriptsize$[-.01,+.01]$} & $-.002$ {\scriptsize$[-.02,+.01]$} & .29/.29 {\scriptsize(1.000)} \\
+Qwen3-8B$^\dagger$ & $+.005$ {\scriptsize$[-.04,+.05]$} & $+.050$ {\scriptsize$[-.01,+.11]$} & .29/.29 {\scriptsize(.915)} & $-.010$ {\scriptsize$[-.06,+.03]$} & $-.011$ {\scriptsize$[-.06,+.04]$} & .28/.27 {\scriptsize(.699)} \\
+Llama-3.3-70B & $-.016$ {\scriptsize$[-.05,+.02]$} & $-.048$ {\scriptsize$[-.09,-.00]$} & .23/.25 {\scriptsize(.572)} & $-.007$ {\scriptsize$[-.04,+.02]$} & $-.001$ {\scriptsize$[-.04,+.04]$} & .27/.26 {\scriptsize(1.000)} \\
+Qwen3-14B & $-.006$ {\scriptsize$[-.05,+.04]$} & $-.099$ {\scriptsize$[-.15,-.05]$} & .28/.28 {\scriptsize(.920)} & $-.021$ {\scriptsize$[-.06,+.02]$} & $-.039$ {\scriptsize$[-.08,+.00]$} & .30/.28 {\scriptsize(.450)} \\
+Qwen3-32B & $+.020$ {\scriptsize$[-.02,+.06]$} & $-.107$ {\scriptsize$[-.16,-.05]$} & .27/.23 {\scriptsize(.232)} & $-.009$ {\scriptsize$[-.05,+.04]$} & $-.057$ {\scriptsize$[-.11,-.01]$} & .32/.19 {\scriptsize(<.001)} \\
+\textit{Qwen3-32B, no thinking} & $-.002$ {\scriptsize$[-.02,+.02]$} & $-.047$ {\scriptsize$[-.08,-.02]$} & .20/.19 {\scriptsize(.302)} & $-.023$ {\scriptsize$[-.05,-.00]$} & $-.036$ {\scriptsize$[-.07,-.00]$} & .27/.24 {\scriptsize(.096)} \\
+gpt-oss-120b & $+.006$ {\scriptsize$[-.04,+.05]$} & $-.137$ {\scriptsize$[-.19,-.08]$} & .34/.26 {\scriptsize(.014)} & $-.035$ {\scriptsize$[-.08,+.01]$} & $-.114$ {\scriptsize$[-.16,-.06]$} & .34/.22 {\scriptsize(.003)} \\
+\bottomrule
+\end{tabular}}
+\caption{The main results on the 1,169 released states without a targeted skill card. Gains as in Table~\ref{tab:primary} (97.5\% intervals). Use / baseline: share of sensitive states where the $H{=}8$ answer, and the $H{=}1$ answer, is a best eight-decision move, with McNemar's $p$. Post hoc.}
+\label{tab:clean}
+\end{table*}
+
+\begin{table*}[t]
+\centering
+\footnotesize
+\begin{tabular}{@{}l cccr cccr@{}}
+\toprule
+& \multicolumn{4}{c}{\textbf{Ironclad}} & \multicolumn{4}{c}{\textbf{Silent}} \\
+\cmidrule(lr){2-5}\cmidrule(l){6-9}
+Model & kept & long-horizon & other & $n$ & kept & long-horizon & other & $n$ \\
+\midrule
+Mistral-7B & $\cdot$ & $\cdot$ & $\cdot$ & 10 & $\cdot$ & $\cdot$ & $\cdot$ & 1 \\
+Qwen2.5-7B & 99\% & 0\% & 1\% & 190 & 98\% & 1\% & 2\% & 171 \\
+Llama-3.1-8B & 98\% & 1\% & 1\% & 183 & 97\% & 1\% & 2\% & 176 \\
+Qwen3-8B$^\dagger$ & 51\% & 17\% & 32\% & 126 & 53\% & 12\% & 35\% & 135 \\
+Llama-3.3-70B & 58\% & 15\% & 27\% & 232 & 64\% & 14\% & 22\% & 193 \\
+Qwen3-14B & 45\% & 26\% & 30\% & 199 & 42\% & 19\% & 39\% & 179 \\
+Qwen3-32B & 45\% & 23\% & 31\% & 236 & 28\% & 29\% & 43\% & 232 \\
+\textit{Qwen3-32B, no thinking} & 83\% & 4\% & 13\% & 220 & 82\% & 7\% & 11\% & 223 \\
+gpt-oss-120b & 34\% & 30\% & 36\% & 265 & 22\% & 29\% & 49\% & 245 \\
+\bottomrule
+\end{tabular}
+\caption{The $H{=}8$ answer on sensitive states where the model's $H{=}1$ answer was the best one-decision move. \emph{Kept}: the same greedy answer. \emph{Long-horizon}: a best eight-decision move. \emph{Other}: any other move, including illegal answers. Mistral-7B rarely answers correctly at $H{=}1$, so its rows are left empty. Post hoc.}
+\label{tab:cond}
+\end{table*}
+
+\begin{table}[t]
+\centering
+\resizebox{\columnwidth}{!}{%
+\begin{tabular}{@{}l cc cc@{}}
+\toprule
+& \multicolumn{2}{c}{\textbf{Ironclad}} & \multicolumn{2}{c}{\textbf{Silent}} \\
+\cmidrule(lr){2-3}\cmidrule(l){4-5}
+Model & Sensitive & Control & Sensitive & Control \\
+\midrule
+Mistral-7B & $+8.3$ {\scriptsize$[-5.3,+22.5]$} & $+10.7$ {\scriptsize$[-3.5,+25.3]$} & $+12.1$ {\scriptsize$[+2.4,+26.2]$} & $+4.4$ {\scriptsize$[-5.4,+15.8]$} \\
+Qwen2.5-7B & $-0.1$ {\scriptsize$[-0.2,-0.0]$} & $+2.2$ {\scriptsize$[-0.3,+9.2]$} & $-0.2$ {\scriptsize$[-0.4,+0.0]$} & $+2.3$ {\scriptsize$[-0.2,+9.0]$} \\
+Llama-3.1-8B & $-2.2$ {\scriptsize$[-9.1,+0.2]$} & $-0.0$ {\scriptsize$[-0.1,+0.0]$} & $+0.0$ {\scriptsize$[-0.0,+0.1]$} & $+2.2$ {\scriptsize$[-0.1,+8.9]$} \\
+Qwen3-8B$^\dagger$ & $+2.4$ {\scriptsize$[-16.1,+21.1]$} & $+25.4$ {\scriptsize$[-1.3,+52.9]$} & $+2.2$ {\scriptsize$[-11.7,+16.1]$} & $-0.3$ {\scriptsize$[-11.9,+11.4]$} \\
+Llama-3.3-70B & $-0.5$ {\scriptsize$[-10.1,+10.8]$} & $-11.8$ {\scriptsize$[-32.9,+8.9]$} & $-6.8$ {\scriptsize$[-18.5,+4.4]$} & $-0.3$ {\scriptsize$[-13.9,+13.1]$} \\
+Qwen3-14B & $-5.6$ {\scriptsize$[-19.5,+8.1]$} & $-33.0$ {\scriptsize$[-58.4,-8.1]$} & $+6.3$ {\scriptsize$[-7.7,+20.8]$} & $-9.4$ {\scriptsize$[-25.1,+4.4]$} \\
+Qwen3-32B & $+5.8$ {\scriptsize$[-10.4,+23.7]$} & $-13.3$ {\scriptsize$[-36.7,+8.0]$} & $-12.0$ {\scriptsize$[-28.1,+0.2]$} & $-7.4$ {\scriptsize$[-21.4,+4.6]$} \\
+\textit{Qwen3-32B, no thinking} & $+9.5$ {\scriptsize$[+0.1,+21.2]$} & $-7.4$ {\scriptsize$[-21.1,-0.3]$} & $-2.6$ {\scriptsize$[-9.3,-0.1]$} & $-0.7$ {\scriptsize$[-7.8,+6.4]$} \\
+gpt-oss-120b & $+3.2$ {\scriptsize$[-12.6,+19.1]$} & $-18.1$ {\scriptsize$[-43.4,+7.2]$} & $-0.2$ {\scriptsize$[-18.7,+18.4]$} & $-15.3$ {\scriptsize$[-31.2,-1.4]$} \\
+\bottomrule
+\end{tabular}}
+\caption{Gain from the $H{=}8$ instruction in raw utility on the eight-decision key, without normalization (97.5\% intervals). Win and loss bonuses of $\pm1000$ make raw values heavy-tailed. Post hoc.}
+\label{tab:raw}
+\end{table}
+
+Tables~\ref{tab:clean}, \ref{tab:cond} and \ref{tab:raw} report three further post hoc checks. On the clean states, every conclusion holds except the Qwen3-32B Ironclad gain in long-horizon picks, which loses significance. Conditioning on a correct $H{=}1$ answer shows that small models keep it and that responsive models abandon it for the long-horizon move less often than for some other move. In raw utility, the control-state change of every responsive model stays negative, and sensitive-state gains stay within noise apart from Mistral-7B (fewer illegal answers) and Qwen3-32B without thinking on Ironclad, at the edge of significance.
 
 \section{Engine Differences from the Commercial Game}
 \label{app:engine}

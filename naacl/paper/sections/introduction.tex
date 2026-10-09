@@ -17,7 +17,7 @@ We test eight open-weight models from four families. Three findings stand out.
 \item \textbf{Knowledge does not explain it.} A pre-registered test that supplies an exact rulebook does not remove the pattern. Neither does a test that replaces every card and enemy name with a code.
 \end{itemize}
 
-We make three contributions. The first is a controlled-horizon benchmark of 1,760 game states with an exact answer key at four horizons. The second is a protocol for building such benchmarks in any domain with a simulator, including scoring that a model cannot game by ignoring the instruction. The third is evidence that current models treat ``look further ahead'' as a cue to change their answer. They do not optimize for the horizon they were given. All analyses were frozen before the models ran, and every amendment is versioned. We release the states, the exact action values, the prompts and every model response.
+We make three contributions. The first is a controlled-horizon benchmark of game states with an exact answer key at four horizons. We tested 1,760 states and release the 1,169 whose answer key is unaffected by a known simulator limitation. The second is a protocol for building such benchmarks in any domain with a simulator, including scoring that a model cannot game by ignoring the instruction. The third is evidence that current models treat ``look further ahead'' as a cue to change their answer. They do not optimize for the horizon they were given. All analyses were frozen before the models ran, and every amendment is versioned. We release the states, the exact action values, the prompts and every model response.
 
 \begin{figure}[t]
 \centering
